@@ -1,0 +1,185 @@
+@use "../../global.scss" as *;
+
+.profile-menu {
+    font-family: $font-family;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+
+    .username-text {
+        font-size: 14px;
+        font-weight: 700;
+        color: $titleColor;
+        margin-left: 6px;
+        user-select: none;
+        cursor: pointer;
+        max-width: 150px; // adjust as per layout
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: color 0.2s ease;
+
+        &:hover {
+            color: $primary-main;
+        }
+
+        &:active {
+            transform: translateY(0px) scale(0.97);
+        }
+    }
+
+    .profile-avatar {
+        color: $titleColor;
+        padding: 2px;
+        border-radius: 10px;
+        transition: all 0.2s ease;
+
+        &:hover {
+            background-color: rgba(0, 0, 0, 0.04);
+            color: $titleColor;
+        }
+    }
+
+    .profile-dropdown {
+        border-radius: 12px !important;
+        padding: 8px 0;
+        min-width: 280px;
+        border: 1px solid #e5e7eb;
+        background-color: #ffffff;
+        box-shadow:
+            0 10px 15px -3px rgba(0, 0, 0, 0.1),
+            0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        font-family: $font-family;
+        overflow: hidden;
+
+        /* Hide scrollbars for the dropdown menu */
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
+
+        .menu-header {
+            padding: 8px 12px 4px;
+        }
+
+        .menu-section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #6b7280;
+            padding-left: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-family: $font-family !important;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            margin: 3px 8px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #374151;
+            transition: all 0.15s ease;
+            font-family: $font-family;
+
+            &:focus-visible {
+                outline: none;
+                box-shadow: 0 0 0 3px rgba(0, 70, 255, 0.18);
+            }
+
+            &:hover {
+                background-color: #f9fafb;
+                color: #111827;
+
+                .menu-icon {
+                    color: #111827;
+                }
+            }
+
+            &:active {
+                background-color: #f3f4f6;
+            }
+
+            &.disabled {
+                color: #9ca3af;
+                cursor: not-allowed;
+
+                &:hover {
+                    background-color: transparent;
+                }
+
+                &:active {
+                    background-color: transparent;
+                }
+
+                .menu-icon {
+                    color: #9ca3af;
+                }
+
+                .menu-text {
+                    color: #9ca3af;
+                }
+            }
+
+            .menu-icon {
+                min-width: 36px;
+                color: #6b7280;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .menu-text {
+                font-family: $font-family;
+                font-weight: 500;
+                font-size: 14px;
+                color: inherit;
+            }
+
+            &.logout {
+                color: #b42318;
+
+                .menu-icon {
+                    color: #b42318;
+                }
+
+                &:hover {
+                    background-color: rgba(180, 35, 24, 0.08);
+                    color: #7a271a;
+
+                    .menu-icon {
+                        color: #7a271a;
+                    }
+                }
+
+                &:active {
+                    background-color: rgba(180, 35, 24, 0.14);
+                }
+            }
+        }
+
+        .shortcut {
+            color: #9ca3af;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: $font-family;
+            background-color: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            letter-spacing: 0.025em;
+        }
+
+        .menu-divider {
+            margin: 6px 12px;
+            border-color: #f3f4f6;
+            height: 1px;
+        }
+    }
+}

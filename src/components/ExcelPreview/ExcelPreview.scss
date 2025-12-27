@@ -1,0 +1,104 @@
+.data-table-container-excel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: #6d6d77;
+
+
+  .data-table-header {
+    margin-bottom: 16px;
+    color: #6d6d77;
+  }
+
+  .data-table-chips {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    span {
+      color: #6d6d77;
+
+    }
+  }
+
+  .data-table-tabs {
+    border-bottom: 1px solid var(--mui-palette-divider, #e0e0e0);
+    margin-bottom: 16px;
+
+    button {
+      color: #6d6d77;
+
+    }
+  }
+
+  .data-table-wrapper {
+    flex-grow: 1;
+    overflow: auto;
+    color: #6d6d77;
+  }
+
+  .data-table-paper {
+    height: 100%;
+    color: #6d6d77;
+  }
+
+  .data-table-header-cell {
+    font-weight: bold;
+    background-color: #f5f5f5;
+    white-space: nowrap;
+    // max-width: 200px;
+    // min-width: 80px;
+    color: #6d6d77;
+  }
+
+  .data-table-cell {
+    white-space: nowrap;
+    max-width: 200px;
+    min-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 40px;
+    color: #6d6d77;
+  }
+}
+
+.docs-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  .docs-icon {
+    padding: 2px;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background-color: #f0f0f0;
+    }
+  }
+
+  .docs-close-icon {
+    margin-top: -30px;
+    margin-right: -10px;
+  }
+
+  .zoom-group {
+    .MuiButton-root {
+      color: #444050;
+      border-color: #444050;
+      min-width: 40px;
+      padding: 6px 12px;
+
+      &:hover {
+        background-color: #f0f0f0;
+        border-color: #444050;
+      }
+    }
+  }
+
+  .download-btn {
+    .MuiButton-startIcon {
+      margin-right: 6px;
+    }
+  }
+}

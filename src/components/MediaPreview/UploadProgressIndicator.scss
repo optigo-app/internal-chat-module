@@ -1,0 +1,49 @@
+.upload-progress-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80%;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 8px;
+  padding: 16px;
+  z-index: 100;
+  backdrop-filter: blur(4px);
+  
+  .progress-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    
+    .file-name {
+      color: white;
+      font-size: 14px;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 70%;
+    }
+    
+    .progress-percent {
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+    }
+  }
+  
+  .progress-bar-container {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    overflow: hidden;
+    
+    .progress-bar-fill {
+      height: 100%;
+      background: #4CAF50;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+  }
+}

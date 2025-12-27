@@ -1,0 +1,105 @@
+$button-Bgcolor: linear-gradient(270deg, rgba(115, 103, 240, 0.7) 0%, #7367f0 100%);
+$button-color: #fff;
+$button-color-hover: #685dd8;
+$button-Bordercolor: #685dd8;
+$button-DangerBgcolor: linear-gradient(270deg, rgba(255, 72, 66, 0.8) 0%, #d90429 100%);
+$button-DangerBgcolor-hover: #c20225;
+$button-Dangercolor: #ffffff;
+
+$sidebar-Activebg: linear-gradient(270deg, rgba(115, 103, 240, 0.7) 0%, #7367f0 100%) !important;
+$sidebar-Bgcolor: #ffffff;
+$sidebar-borderColor:#5a5a5a0e;
+$side-bar-boxShadow:rgba(0, 0, 0, 0.1) 0px 4px 10px;
+$sidebar-padding: 16px;
+$sidebar-section-gap: 12px;
+$sidebar-item-gap: 10px;
+$sidebar-item-padding-y: 10px;
+$sidebar-item-padding-x: 12px;
+$sidebar-item-radius: 16px;
+$sidebar-icon-size: 20px;
+$sidebar-icon-stroke: 2;
+$sidebar-header-icon-size: 40px;
+$sidebar-tag-gap: 10px;
+$sidebar-tag-dot-size: 10px;
+
+$header-height: 3.2rem;
+$header-padding-x: 12px;
+$header-padding-y: 8px;
+$header-radius: 14px;
+
+$font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+$titleColor: #444050;
+$secondaryColor: #7D7f85;
+$text2ndColor: #6D6B77;
+$placeholderColor: #808080;
+$text-white:#fff;
+$text-light:#f1f1f1;
+$bg-light:#ebebeb;
+
+$box-shadow-value: 0 4px 16px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.08);
+$paper-shadow-value: 0px 5px 5px -3px rgba(0, 0, 0, 0.2), 0px 8px 10px 1px rgba(0, 0, 0, 0.14), 0px 3px 14px 2px rgba(0, 0, 0, 0.12);
+$transition-duration: 200ms;
+
+// Primary Colors
+$primary-main: #7367f0;
+$primary-light: rgba(115, 103, 240, 0.16);
+$primary-light-bg: rgba($primary-main, 0.16);
+
+$success-main: #28C76F;
+$success-light: #c8e6c9;
+$success-light-bg: rgba($success-main, 0.16);
+
+// Error Colors
+$error-main: #d32f2f;
+$error-light: #ffcdd2;
+$error-light-bg: rgba($error-main, 0.16);
+
+// Warning Colors
+$warning-main: #f57c00;
+$warning-light: #ffe0b2;
+$warning-light-bg: rgba($warning-main, 0.16);
+
+// Info Colors
+$info-main: #00CFE8;
+$info-light: #b3e5fc;
+$info-light-bg: rgba($info-main, 0.16);
+
+$new-main: #a6a2d18a;
+$new-light: #33299f;
+$support-bg: #e3e3e3;
+$support-main: $titleColor;
+$support-light: #e3e3e3;
+
+$dark-bg: #6788f394;
+$dark-main: #fff;
+$dark-light: #fff;
+
+
+
+.secondaryBtnClassname {
+    font-family: $font-family !important;
+    background: #ebebed !important;
+    color: $secondaryColor !important;
+    border-color: #ebebed !important;
+    text-transform: capitalize !important;
+    border-radius: 16px !important;
+
+    &:hover {
+        background-color: $button-color-hover;
+        border-color: $button-Bordercolor;
+    }
+}
+
+.primaryBtnClassname {
+    font-family: $font-family !important;
+    background: $button-Bgcolor !important;
+    color: $button-color !important;
+    border-color: $button-Bordercolor !important;
+    text-transform: capitalize !important;
+    border-radius: 16px !important;
+
+    &:hover {
+        background-color: $button-color-hover;
+        border-color: $button-Bordercolor;
+    }
+}

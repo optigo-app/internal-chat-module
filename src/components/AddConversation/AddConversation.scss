@@ -1,0 +1,229 @@
+@use "../../global.scss" as *;
+
+.customer_lists_mainDiv_2 {
+    max-width: 440px;
+    width: 100%;
+    height: calc(100vh - #{$header-height});
+    background-color: #ffffff;
+    border-right: 1px solid $sidebar-borderColor;
+
+    display: flex;
+    flex-direction: column;
+    margin-top: $header-height;
+    font-family: $font-family;
+
+    .customer_lists_header {
+        padding: 14px 16px;
+        border-bottom: 1px solid $sidebar-borderColor;
+
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: $sidebar-Bgcolor;
+
+        .header_title {
+            font-family: $font-family;
+            font-weight: 700;
+            color: $titleColor;
+            margin: 0;
+        }
+    }
+
+    .customer_lists_search {
+        padding: 10px 16px;
+        border-bottom: 1px solid $sidebar-borderColor;
+
+        .MuiOutlinedInput-root {
+            background-color: $sidebar-Bgcolor;
+            border-radius: 12px;
+
+            input {
+                font-family: $font-family;
+                font-size: 14px;
+            }
+
+            fieldset {
+                border-color: $sidebar-borderColor;
+            }
+
+            &:hover fieldset {
+                border-color: $sidebar-borderColor;
+            }
+
+            &.Mui-focused fieldset {
+                border-color: $primary-main;
+            }
+        }
+    }
+
+    .customer_lists_filters {
+        border-bottom: 1px solid $sidebar-borderColor;
+        padding: 8px 10px;
+
+    }
+
+    .customer_lists_main {
+        flex: 1;
+        overflow: hidden;
+
+        ul {
+            padding: 6px; // match CustomerLists ul padding
+            margin: 0;
+            list-style: none;
+            height: 100%;
+            overflow-y: auto;
+
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+
+            &::-webkit-scrollbar {
+                display: none;
+            }
+
+            li {
+                margin: 0;
+                width: 100%;
+                display: block;
+                border-radius: 12px;
+                overflow: hidden;
+                transition: background-color $transition-duration ease;
+
+                &:last-child {
+                    border-bottom: none;
+                }
+
+                .member-item {
+                    display: flex;
+                    align-items: center;
+                    width: 100%;
+                    padding: 12px 12px;
+                    gap: 12px;
+                    cursor: pointer;
+                    position: relative;
+
+                    // Smooth GPU-accelerated transition
+                    transition: background-color 0.2s ease, transform 0.15s ease;
+
+                    &:hover {
+                        background-color: rgba(0, 0, 0, 0.03);
+                    }
+
+                    &.active {
+                        background: $primary-light;
+                        box-shadow: inset 3px 0 0 0 $primary-main;
+
+                        .member-name {
+                            color: $primary-main;
+                            font-weight: 600;
+                        }
+                    }
+
+                    .member-avatar {
+                        position: relative;
+                        flex: 0 0 auto;
+
+                        .MuiBadge-badge {
+                            // border: 2px solid #fff;
+                            transition: transform 0.2s ease;
+                        }
+
+                        .MuiAvatar-root {
+                            width: 38px;
+                            height: 38px;
+                            font-size: 14px;
+                            border-radius: 50%;
+                            box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.06);
+                        }
+                    }
+
+                    .member-info {
+                        flex: 1;
+                        min-width: 0;
+
+                        .member-header,
+                        .member-message {
+                            transition: color 0.2s ease, opacity 0.2s ease;
+                        }
+
+                        .member-name,
+                        .member-time,
+                        .last-message {
+                            will-change: color, opacity;
+                        }
+
+                        .member-header {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 2px;
+
+                            .member-name {
+                                font-family: $font-family;
+                                font-weight: 600;
+                                font-size: 14px;
+                                color: $titleColor;
+                                margin: 0;
+                                line-height: 1.2;
+                            }
+
+                            .member-time {
+                                font-family: $font-family;
+                                font-size: 11px;
+                                color: $text2ndColor;
+                                margin: 0;
+                                white-space: nowrap;
+                                margin-left: 8px;
+                                transition: color 0.2s ease-in-out;
+                            }
+                        }
+
+                        .member-message {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            gap: 10px;
+
+                            .last-message {
+                                font-family: $font-family;
+                                font-size: 13px;
+                                color: $text2ndColor;
+                                margin: 0;
+                                line-height: 1.3;
+                                overflow: hidden;
+                                text-overflow: ellipsis;
+                                white-space: nowrap;
+                                flex: 1;
+                                min-width: 0;
+                                margin-right: 0;
+                                transition: color 0.2s ease-in-out;
+                            }
+
+                            .unread-badge {
+                                flex-shrink: 0;
+                                transition: all 0.2s ease-in-out;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+.no-access-message1 {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    padding: 25px;
+    background-color: #fff8f8;
+    border-radius: 8px;
+    border: 1px solid #ffd6d6;
+
+    p,
+    .MuiTypography-root {
+        color: #c62828;
+        font-weight: 500;
+        text-align: center;
+    }
+}

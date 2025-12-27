@@ -1,0 +1,588 @@
+@use "../../global.scss" as *;
+
+// Variables
+$whatsapp-green: $primary-main;
+$whatsapp-dark-green: $primary-main;
+$whatsapp-light-green: $primary-light-bg;
+$header-bg: $button-Bgcolor;
+$text-primary: $titleColor;
+$text-secondary: $secondaryColor;
+$text-muted: $text2ndColor;
+$border-color: rgba(0, 0, 0, 0.08);
+$hover-bg: $bg-light;
+$danger-color: $error-main;
+$white: #ffffff;
+
+// Mixins
+@mixin flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@mixin flex-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+@mixin transition {
+    transition: all $transition-duration ease;
+}
+
+// Main Container
+.customer-details-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 1199;
+
+    &.open {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+.customer-details-container {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 100%;
+    max-width: 420px;
+    height: 100vh;
+    background: $white;
+    box-shadow: $box-shadow-value;
+    border-left: 1px solid $border-color;
+    border-top-left-radius: 24px;
+    border-bottom-left-radius: 24px;
+    z-index: 1200;
+    @include transition;
+    transform: translateX(100%);
+    will-change: transform;
+
+    &.slide-in {
+        transform: translateX(0);
+    }
+
+    &.visible {
+        opacity: 1;
+    }
+
+    @media (max-width: 768px) {
+        max-width: 100%;
+    }
+
+    &.panel {
+        position: relative;
+        inset: auto;
+        top: auto;
+        right: auto;
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        transform: none;
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+        z-index: auto;
+    }
+}
+
+.details-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+// Header
+.header-section {
+    @include flex-between;
+    padding: 16px 20px;
+    background: $header-bg;
+    color: $white;
+    box-shadow: $box-shadow-value;
+    border-top-left-radius: 24px;
+
+    .customer-details-container.panel & {
+        border-top-left-radius: 0;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.92);
+        color: $text-primary;
+        box-shadow: none;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+
+        .back-button {
+            color: $white !important;
+            padding: 8px !important;
+
+            &:hover {
+                background: rgba(255, 255, 255, 0.12) !important;
+            }
+        }
+
+        .header-title {
+            font-size: 20px !important;
+            font-weight: 500 !important;
+            color: $white;
+        }
+
+        .customer-details-container.panel & {
+            .header-title {
+                font-size: 14px !important;
+                font-weight: 600 !important;
+                color: $text-primary;
+            }
+
+            .back-button {
+                color: $text-primary !important;
+
+                &:hover {
+                    background: rgba(0, 0, 0, 0.06) !important;
+                }
+            }
+        }
+    }
+
+    .header-right {
+        display: flex;
+        gap: 8px;
+
+        .MuiIconButton-root {
+            color: $white !important;
+            padding: 8px !important;
+
+            &:hover {
+                background: rgba(255, 255, 255, 0.12) !important;
+            }
+        }
+
+        .customer-details-container.panel & {
+            .MuiIconButton-root {
+                color: $text-primary !important;
+
+                &:hover {
+                    background: rgba(0, 0, 0, 0.06) !important;
+                }
+            }
+        }
+    }
+}
+
+// Content Scroll
+.content-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+// Profile Section
+.profile-section {
+    text-align: center;
+    padding: 25px 24px;
+    border-bottom: 1px solid $border-color;
+
+    .avatar-container {
+        position: relative;
+        display: inline-block;
+        margin-bottom: 20px;
+
+        .profile-avatar {
+            width: 80px !important;
+            height: 80px !important;
+            cursor: pointer;
+            @include transition;
+
+            &:hover {
+                opacity: 0.9;
+            }
+        }
+
+        .status-indicator {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 3px solid $white;
+            position: absolute;
+            bottom: -9px;
+            right: 4px;
+        }
+    }
+
+    .customer-name {
+        font-size: 24px !important;
+        font-weight: 500 !important;
+        color: $text-primary;
+        margin-bottom: 4px !important;
+    }
+
+    .customer-phone {
+        font-size: 16px !important;
+        color: $text-secondary;
+        margin-bottom: 8px !important;
+    }
+
+    .last-seen {
+        font-size: 14px !important;
+        color: $text-muted;
+    }
+}
+
+// About Section
+.about-section {
+    padding: 20px 24px;
+    border-bottom: 1px solid $border-color;
+
+    .about-header {
+        @include flex-between;
+        margin-bottom: 8px;
+
+        .section-title {
+            font-size: 14px !important;
+            color: $text-muted;
+            font-weight: 500 !important;
+        }
+
+        .edit-btn {
+            background: none;
+            border: none;
+            color: $whatsapp-green;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            @include transition;
+
+            &:hover {
+                background: rgba($whatsapp-green, 0.1);
+            }
+        }
+    }
+
+    .about-text {
+        font-size: 16px !important;
+        color: $text-primary;
+        margin-bottom: 4px !important;
+    }
+
+    .joined-date {
+        font-size: 12px !important;
+        color: $text-muted;
+    }
+}
+
+// Action Buttons
+.action-buttons {
+    display: flex;
+    justify-content: space-around;
+    padding: 20px 24px;
+    background: $hover-bg;
+    border-bottom: 1px solid $border-color;
+
+    .action-button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        background: none;
+        border: none;
+        padding: 12px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        @include transition;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .action-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            @include flex-center;
+            color: $white;
+
+            &.audio {
+                background: $whatsapp-green;
+            }
+
+            &.video {
+                background: $whatsapp-green;
+            }
+
+            &.search {
+                background: $whatsapp-green;
+            }
+
+            .MuiSvgIcon-root {
+                font-size: 20px;
+            }
+        }
+
+        span {
+            font-size: 12px;
+            color: $text-secondary;
+            font-weight: 500;
+        }
+    }
+}
+
+// Settings Section
+.settings-section {
+    border-bottom: 1px solid $border-color;
+
+    .setting-item {
+        @include flex-between;
+        padding: 16px 24px;
+        cursor: pointer;
+        @include transition;
+
+        &:hover {
+            background: $hover-bg;
+        }
+
+        &.toggle-item {
+            .setting-left {
+                flex: 1;
+            }
+        }
+
+        &.danger {
+            .setting-left {
+                span {
+                    color: $danger-color;
+                }
+            }
+
+            .MuiSvgIcon-root {
+                color: $danger-color;
+            }
+        }
+
+        .setting-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+
+            .MuiSvgIcon-root {
+                color: $text-secondary;
+                font-size: 20px;
+            }
+
+            span {
+                font-size: 16px;
+                color: $text-primary;
+            }
+        }
+
+        .setting-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            .encryption-text {
+                font-size: 14px;
+                color: $text-muted;
+            }
+
+            .count {
+                font-size: 14px;
+                color: $text-muted;
+            }
+        }
+
+        .chevron {
+            color: $text-muted !important;
+            font-size: 16px !important;
+        }
+    }
+}
+
+// Toggle Switch
+.toggle-switch {
+    width: 48px;
+    height: 24px;
+    background: #ccc;
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    @include transition;
+
+    &.active {
+        // background: $whatsapp-green;
+        background: #8e4ff3;
+
+        .toggle-slider {
+            transform: translateX(24px);
+        }
+    }
+
+    .toggle-slider {
+        width: 20px;
+        height: 20px;
+        background: $white;
+        border-radius: 50%;
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        @include transition;
+    }
+}
+
+// Media Section
+.media-section {
+
+    .media-tabs {
+        display: flex;
+        border-bottom: 1px solid $border-color;
+        gap: 6px;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.9);
+
+        .tab-button {
+            flex: 1;
+            padding: 10px 12px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: $text2ndColor;
+            @include transition;
+            border: none;
+            border-radius: 16px;
+
+            &.active {
+                background: rgba($primary-main, 0.10);
+                color: $text-primary;
+                box-shadow: none;
+            }
+
+            &:hover {
+                background: rgba(0, 0, 0, 0.04);
+            }
+
+            .MuiSvgIcon-root {
+                font-size: 20px;
+            }
+
+            span {
+                font-size: 12px;
+                font-weight: 500;
+            }
+        }
+    }
+
+    .tab-content {
+        padding: 16px 24px;
+    }
+}
+
+.customer-details-container.panel {
+    .media-section {
+
+        .media-tabs {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            padding: 8px 10px;
+
+            .tab-button {
+                padding: 8px 10px;
+                border-radius: 14px;
+
+                &.active {
+                    background: rgba($primary-main, 0.08);
+                }
+
+                span {
+                    font-size: 11px;
+                }
+            }
+        }
+
+        .tab-content {
+            padding: 12px 14px;
+        }
+    }
+}
+
+.starred-section,
+.groups-section,
+.danger-section {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e0e0e0;
+
+    .setting-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.9rem 0;
+        cursor: pointer;
+
+        .setting-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+
+            svg {
+                font-size: 1.6rem;
+                color: #54656f;
+            }
+
+            span {
+                font-size: 1rem;
+                color: #111b21;
+            }
+
+            .group-icon {
+                width: 36px;
+                height: 36px;
+                background-color: #d9fdd3;
+                border-radius: 50%;
+            }
+        }
+
+        .setting-right {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+
+            .count {
+                font-size: 0.95rem;
+                color: #54656f;
+            }
+
+            .chevron {
+                font-size: 1.2rem;
+                color: #54656f;
+            }
+        }
+    }
+}
+
+.danger-section {
+
+    .setting-item {
+        border-top: 1px solid #f5f5f5;
+
+        .setting-left {
+            svg {
+                color: #ea0037; // red for danger icons
+            }
+
+            span {
+                color: #ea0037;
+                font-weight: 500;
+            }
+        }
+    }
+}

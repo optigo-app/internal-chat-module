@@ -1,0 +1,74 @@
+@use "../../global.scss" as *;
+
+.header_mainDiv {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $header-padding-y $header-padding-x;
+    background:$sidebar-Bgcolor;
+    border-bottom: 1px solid $sidebar-borderColor;
+    height: $header-height;
+    backdrop-filter: blur(10px);
+    box-sizing: border-box;
+
+    .header_main {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+
+        .header_left {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            align-items: center;
+
+            .header_brand {
+                position: relative;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-width: 0;
+                padding: 6px 10px;
+                border-radius: $header-radius;
+                cursor: pointer;
+                overflow: hidden;
+                transition: background-color $transition-duration ease, transform $transition-duration ease;
+
+                &:hover {
+                    background-color: rgba(0, 0, 0, 0.04);
+                }
+
+                &:active {
+                    transform: translateY(0px) scale(0.99);
+                }
+            }
+
+            .header_left_logo {
+                position: relative;
+                height: 25px;
+                width: auto;
+                flex: 0 0 auto;
+            }
+        }
+        
+        .header_center {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+        }
+        
+        .header_right {
+            flex: 0 0 250px;
+            min-width: 250px;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+        }
+    }
+}

@@ -1,0 +1,222 @@
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+    Typography,
+    Avatar,
+    Badge,
+    Chip,
+    IconButton
+} from '@mui/material';
+import {
+    Circle,
+    Phone,
+    Email,
+    LocationOn,
+    Message,
+    Close
+} from '@mui/icons-material';
+import './CustomerDetails.scss';
+
+const CustomerDetails = ({ customer, onClose, open }) => {
+
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const [isVisible, setIsVisible] = useState(false);
+
+    // Mock customer data - in real app, this would come from API
+    // const customerData = {
+    //     id: parseInt(id),
+    //     name: 'John Doe',
+    //     avatar: 'https://mui.com/static/images/avatar/1.jpg',
+    //     status: 'online',
+    //     email: 'john.doe@example.com',
+    //     phone: '+1 (555) 123-4567',
+    //     location: 'New York, NY',
+    //     lastSeen: '2 minutes ago',
+    //     isOnline: true,
+    //     unreadMessages: 2,
+    //     totalMessages: 156,
+    //     memberSince: 'March 2023'
+    // };
+    const customerData = customer;
+
+    // useEffect(() => {
+    //     // Trigger slide-in animation after component mounts
+    //     const timer = setTimeout(() => {
+    //         setIsVisible(true);
+    //     }, 100);
+
+    //     return () => clearTimeout(timer);
+    // }, []);
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'online':
+                return '#4caf50';
+            case 'away':
+                return '#ff9800';
+            case 'offline':
+                return '#9e9e9e';
+            default:
+                return '#9e9e9e';
+        }
+    };
+
+    const handleClose = () => {
+        onClose(false);
+        // Wait for animation to complete before navigating
+        setTimeout(() => {
+            navigate('/');
+        }, 300);
+    };
+
+    const handleStartChat = () => {
+        // Navigate to chat interface
+        console.log('Starting chat with customer:', customerData.name);
+    };
+
+    return (
+        <div className={`customer-details-container ${open ? 'slide-in' : ''}`}>
+            <div className="details-content">
+                {/* Header Section */}
+                <div className="header-section">
+                    <Typography className="header-title">
+                        Customer Details
+                    </Typography>
+                    <IconButton
+                        className="close-button"
+                        onClick={handleClose}
+                    >
+                        <Close />
+                    </IconButton>
+                </div>
+
+                {/* Customer Info Section */}
+                <div className="customer-info-section">
+                    <div className="avatar-container">
+                        <Badge
+                            overlap="circular"
+                            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                            badgeContent={
+                                <Circle
+                                    sx={{
+                                        color: getStatusColor(customerData.status),
+                                        fontSize: 16,
+                                        backgroundColor: '#fff',
+                                        borderRadius: '50%'
+                                    }}
+                                />
+                            }
+                        >
+                            <Avatar
+                                src={customerData.avatar}
+                                alt={customerData.name}
+                            />
+                        </Badge>
+                    </div>
+
+                    <Typography className="customer-name">
+                        {customerData.name}
+                    </Typography>
+
+                    <Chip
+                        label={customerData.status}
+                        color={customerData.status === 'online' ? 'success' : 'default'}
+                        size="small"
+                        className="status-chip"
+                    />
+
+                    <Typography className="last-seen">
+                        Last seen: {customerData.lastSeen}
+                    </Typography>
+
+                    <button
+                        className="start-chat-button"
+                        onClick={handleStartChat}
+                    >
+                        <Message sx={{ mr: 1, fontSize: 18 }} />
+                        Start Chat
+                    </button>
+                </div>
+
+                {/* Contact Information Section */}
+                <div className="contact-info-section">
+                    <Typography className="section-title">
+                        Contact Information
+                    </Typography>
+
+                    <div className="contact-item">
+                        <Email className="contact-icon" />
+                        <div className="contact-details">
+                            <Typography className="contact-label">Email</Typography>
+                            <Typography className="contact-value">{customerData.email}</Typography>
+                        </div>
+                    </div>
+
+                    <div className="contact-item">
+                        <Phone className="contact-icon" />
+                        <div className="contact-details">
+                            <Typography className="contact-label">Phone</Typography>
+                            <Typography className="contact-value">{customerData.phone}</Typography>
+                        </div>
+                    </div>
+
+                    <div className="contact-item">
+                        <LocationOn className="contact-icon" />
+                        <div className="contact-details">
+                            <Typography className="contact-label">Location</Typography>
+                            <Typography className="contact-value">{customerData.location}</Typography>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Statistics Section */}
+                <div className="stats-section">
+                    <Typography className="section-title">
+                        Chat Statistics
+                    </Typography>
+
+                    <div className="stats-grid">
+                        <div className="stat-card">
+                            <Typography className="stat-value">
+                                {customerData.unreadMessages}
+                            </Typography>
+                            <Typography className="stat-label">
+                                Unread Messages
+                            </Typography>
+                        </div>
+
+                        <div className="stat-card">
+                            <Typography className="stat-value">
+                                {customerData.totalMessages}
+                            </Typography>
+                            <Typography className="stat-label">
+                                Total Messages
+                            </Typography>
+                        </div>
+
+                        <div className="stat-card">
+                            <Typography className="stat-value">
+                                {customerData.memberSince}
+                            </Typography>
+                            <Typography className="stat-label">
+                                Member Since
+                            </Typography>
+                        </div>
+
+                        <div className="stat-card">
+                            <Typography className="stat-value">
+                                {customerData.isOnline ? 'Online' : 'Offline'}
+                            </Typography>
+                            <Typography className="stat-label">
+                                Status
+                            </Typography>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default CustomerDetails;

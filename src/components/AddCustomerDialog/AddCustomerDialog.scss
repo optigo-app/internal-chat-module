@@ -1,0 +1,46 @@
+// AddCustomerDialog styles
+.add-customer-dialog {
+    .MuiDialog-paper {
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .MuiDialogTitle-root {
+        padding: 24px 24px 16px;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .MuiDialogContent-root {
+        padding: 0 24px;
+    }
+
+    .MuiDialogActions-root {
+        gap: 12px;
+        
+        .MuiButton-root {
+            min-width: 80px;
+            height: 40px;
+            border-radius: 8px;
+        }
+    }
+
+    .MuiTextField-root {
+        .MuiInputLabel-root {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 500;
+        }
+
+        .MuiOutlinedInput-input {
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+        }
+
+        .MuiOutlinedInput-root {
+            border-radius: 8px;
+            
+            fieldset {
+                border-color: #e0e0e0;
+            }
+        }
+    }
+}
