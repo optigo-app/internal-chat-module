@@ -1,17 +1,13 @@
 import { useContext, useEffect, useState } from 'react'
 import './Sidebar.scss'
-import { HomeIcon, Users, Megaphone, MessageCircle, Workflow } from 'lucide-react'
+import { HomeIcon, Users, MessageCircle } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useTagsContext } from '../../contexts/TagsContexts'
-import { fetchAllTagsApi } from '../../API/FetchTags/FetchAllTagsApi'
 import { LoginContext } from '../../context/LoginData'
 import CryptoJS from "crypto-js";
 
 const Sidebar = ({ onStatusSelect, selectedStatus, onTagSelect, selectedTag }) => {
 
     const location = useLocation();
-    const [allTagLists, setAllTagsLists] = useState([]);
-    const { refetchTrigger } = useTagsContext();
     const [activePath, setActivePath] = useState(location.pathname);
     const { auth } = useContext(LoginContext);
     const navigate = useNavigate();
@@ -45,7 +41,7 @@ const Sidebar = ({ onStatusSelect, selectedStatus, onTagSelect, selectedTag }) =
         if (!token) return "";
         try {
             const ciphertext = CryptoJS.AES.encrypt(JSON.stringify(token), page === "broadcast" ? broadcast_SECRET_KEY : automation_SECRET_KEY).toString();
-            return encodeURIComponent(ciphertext); // safe for URL
+            return encodeURIComponent(ciphertext);
         } catch (error) {
             console.error('Error encrypting token:', error);
             return "";
@@ -63,31 +59,6 @@ const Sidebar = ({ onStatusSelect, selectedStatus, onTagSelect, selectedTag }) =
         { type: "internal", path: "/", icon: <HomeIcon {...ICON_PROPS} />, label: "Inbox" },
         { type: "internal", path: "/add-conversation", icon: <Users {...ICON_PROPS} />, label: "Add Conversation" },
     ];
-
-    const handleTagsClick = (tag) => {
-        if (selectedTag === tag) {
-            onTagSelect('All');
-        } else {
-            onTagSelect(tag);
-        }
-    };
-
-    const handleFetchAllTags = async () => {
-        try {
-            const response = await fetchAllTagsApi(auth?.userId);
-            if (response?.rd) {
-                setAllTagsLists(response.rd);
-            }
-        } catch (error) {
-            console.error('Error fetching all tags:', error);
-        }
-    };
-
-    useEffect(() => {
-        if (auth?.token) {
-            handleFetchAllTags();
-        }
-    }, [refetchTrigger]);
 
     useEffect(() => {
         setActivePath(location.pathname);
@@ -143,31 +114,6 @@ const Sidebar = ({ onStatusSelect, selectedStatus, onTagSelect, selectedTag }) =
                             })}
                         </ul>
                     </div>
-
-                    {allTagLists?.length > 0 &&
-                        <div className="sidebar_main_tags">
-                            <div className="sidebar_tags_label">Tags</div>
-                            <ul>
-                                {allTagLists.map((tag) => {
-                                    return (
-                                        <li
-                                            key={tag.TagId}
-                                            className={selectedTag?.Id === tag.Id ? 'active' : ''}
-                                            onClick={() => handleTagsClick(tag)}
-                                        >
-                                            <div className="tag-chip">
-                                                <span
-                                                    className="tag-dot"
-                                                    style={{ backgroundColor: tag.color || '#e0f2f1' }}
-                                                />
-                                                <span className="tag-name">{tag.TagName}</span>
-                                            </div>
-                                        </li>
-                                    )
-                                })}
-                            </ul>
-                        </div>
-                    }
                 </div>
 
                 {/* Powered by section at the bottom */}

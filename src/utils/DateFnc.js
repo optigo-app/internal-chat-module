@@ -1,71 +1,74 @@
 export function formatChatTimestamp(input) {
     const date = new Date(input);
+    if (isNaN(date.getTime())) return '';
+
     const now = new Date();
+    const timeZone = 'UTC';
 
-    // Convert both to Indian timezone for accurate comparison
-    const indianDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
-    const indianNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const getTzDateKey = (d) => new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(d);
 
-    const isSameDay = (d1, d2) =>
-        d1.getDate() === d2.getDate() &&
-        d1.getMonth() === d2.getMonth() &&
-        d1.getFullYear() === d2.getFullYear();
+    const dateKey = getTzDateKey(date);
+    const nowKey = getTzDateKey(now);
 
-    const indianYesterday = new Date(indianNow.getTime());
-    indianYesterday.setDate(indianNow.getDate() - 1);
+    const nowStartUtc = new Date(`${nowKey}T00:00:00Z`);
+    const dateStartUtc = new Date(`${dateKey}T00:00:00Z`);
+    const diffDays = Math.floor((nowStartUtc.getTime() - dateStartUtc.getTime()) / (24 * 60 * 60 * 1000));
 
-    if (isSameDay(indianDate, indianNow)) {
-        // Show time: e.g., 5:30 PM in Indian timezone
-        return indianDate.toLocaleTimeString('en-GB', {
+    const yesterdayKey = new Date(nowStartUtc.getTime() - (24 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+
+    if (dateKey === nowKey) {
+        // Show time: e.g., 5:30 PM in UTC timezone
+        return new Intl.DateTimeFormat('en-US', {
+            timeZone,
             hour: 'numeric',
             minute: '2-digit',
             hour12: true,
-            timeZone: 'GMT'
-        });
-    } else if (isSameDay(indianDate, indianYesterday)) {
-        return 'Yesterday';
-    } else if (indianNow - indianDate < 7 * 24 * 60 * 60 * 1000) {
-        // Within last 7 days: show weekday (e.g., Monday)
-        return indianDate.toLocaleDateString('en-IN', {
-            weekday: 'long',
-            timeZone: 'GMT'
-        });
-    } else if (indianDate.getFullYear() === indianNow.getFullYear()) {
-        // Same year: show "5 Aug" in Indian format
-        return indianDate.toLocaleDateString('en-GB', {
-            day: 'numeric',
-            month: 'short',
-            timeZone: 'GMT'
-        });
-    } else {
-        // Different year: show full date in Indian format
-        return indianDate.toLocaleDateString('en-GB', {
-            timeZone: 'GMT'
-        });
+        }).format(date);
     }
+
+    if (dateKey === yesterdayKey) {
+        return 'Yesterday';
+    }
+
+    if (diffDays >= 0 && diffDays < 7) {
+        // Within last 7 days: show weekday (e.g., Mon)
+        return new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            weekday: 'short',
+        }).format(date);
+    }
+
+    return new Intl.DateTimeFormat('en-GB', {
+        timeZone,
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+    }).format(date);
 }
 
 
-
-// Extract current time from ISO date string in Indian timezone
+// Extract current time from ISO date string in UTC timezone
 export const extractTimeFromISO = (isoString) => {
     if (!isoString) return '';
 
     try {
         const date = new Date(isoString);
 
-
         if (isNaN(date.getTime())) {
             return '';
         }
 
-        // Use GMT timezone
-        return date.toLocaleTimeString('en-GB', {
+        return new Intl.DateTimeFormat('en-US', {
+            timeZone: 'UTC',
             hour: 'numeric',
             minute: '2-digit',
             hour12: true,
-            timeZone: 'GMT'
-        });
+        }).format(date);
     } catch (error) {
         console.warn('Error extracting time from ISO string:', isoString, error);
         return '';

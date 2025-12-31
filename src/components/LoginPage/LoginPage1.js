@@ -113,58 +113,25 @@ const LoginPage1 = () => {
                 return setIsLoading(false);
             }
 
-            const socket = initializeSocket(userInfo.token)
-
             const userData = {
                 userId: userInfo.userid,
                 username: userInfo.customercode,
                 ukey: userInfo.ukey,
                 token: userInfo.token,
                 id: userInfo.id,
-                whatsappKey: userInfo.whatsappKey,
-                whatsappNumber: userInfo.whatsappNumber,
-                SocketId: userInfo.SocketId || ""
             };
 
-            if (userInfo?.SocketId) {
-                const sessionData = {
-                    data: true,
-                    socketId: socket?.id || userInfo.SocketId,
-                    ...userData,
-                };
+            const sessionData = {
+                data: true,
+                ...userData,
+            };
 
-                sessionStorage.setItem("hasSocketId", JSON.stringify(sessionData));
-                console.log("⚠️ Redirecting to session check page...");
-                setPermissions(loginData?.rd1);
-                navigate("/session-check");
-                setIsLoading(false);
-                return;
-            }
-
-            // ✅ Wait for socket to actually connect
-            socket.on("connect", async () => {
-                console.log("✅ Socket connected with ID:", socket.id);
-
-                await savePlayerId(socket.id, userData.userId, userData?.id);
-
-                const updatedUserData = { ...userData, SocketId: socket.id };
-                sessionStorage.setItem("userData", JSON.stringify(updatedUserData));
-                sessionStorage.setItem("isLoggedIn", true);
-                setAuth(updatedUserData);
-                setPermissions(loginData?.rd1);
-
-                console.log("goes here");
-                toast.success("Login successful! Welcome back!", { icon: "🎉" });
-                navigate("/");
-                setIsLoading(false);
-            });
-
-            // ❌ Handle connection failure
-            socket.on("connect_error", (err) => {
-                console.error("❌ Socket connect error:", err.message);
-                toast.error("Socket connection failed");
-                setIsLoading(false);
-            });
+            sessionStorage.setItem("hasSocketId", JSON.stringify(sessionData));
+            console.log("⚠️ Redirecting to session check page...");
+            setPermissions(loginData?.rd1);
+            navigate("/session-check");
+            setIsLoading(false);
+            return;
 
         } catch (err) {
             console.error("Login error:", err);

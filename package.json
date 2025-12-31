@@ -29,6 +29,7 @@
     "react-onesignal": "^3.2.3",
     "react-router-dom": "^7.7.1",
     "react-scripts": "5.0.1",
+    "react-window": "^2.2.3",
     "sass": "^1.90.0",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",

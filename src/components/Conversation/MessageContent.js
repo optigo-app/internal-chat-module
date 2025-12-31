@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Box, CircularProgress, IconButton, Skeleton, Typography } from '@mui/material';
+import { Box, CircularProgress, IconButton, Skeleton, Typography, Menu, MenuItem } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { ChevronDown, Download, FileText, CheckCheck } from 'lucide-react';
 import { Emoji } from 'emoji-picker-react';
 import { FormatDateIST } from '../../utils/DateFnc';
 import DynamicTemplate from '../DynamicTemplate/DynamicTemplate';
 import QuickReactionMenu from './QuickReactionMenu';
+import ReactionMenu from './ReactionMenu';
+import ReactionDetailsMenu from './ReactionMenu';
 
 const imageDimsCache = new Map();
 
@@ -45,10 +47,15 @@ const MessageContent = ({
     handleMediaClick,
     getMessageStatusIcon,
 }) => {
-    console.log('msg---', msg)
     const theme = useTheme();
 
     const [imageDims, setImageDims] = useState(null);
+    const [anchorEl, setAnchorEl] = React.useState(null);
+    const reactions = [
+        { emoji: "👍", users: ["You", "Alice"] },
+        { emoji: "❤️", users: ["Bob"] }
+    ];
+
 
     useEffect(() => {
         setImageDims(null);
@@ -58,6 +65,8 @@ const MessageContent = ({
         const safePercent = Math.max(0, Math.min(100, Number(percent) || 0));
         const thickness = size <= 40 ? 4.5 : 4;
         const labelFontSize = size <= 40 ? 10 : 12;
+
+
 
         return (
             <Box
@@ -319,10 +328,10 @@ const MessageContent = ({
                                             {(() => {
                                                 const statusKey = getMessageStatusIcon(msg);
                                                 if (statusKey === 'sent') {
-                                                    return <CheckCheck size={14} style={{ marginLeft: 4, color: alpha(theme.palette.text.primary, 0.6) }} />;
+                                                    return <CheckCheck size={18} style={{ marginLeft: 4, color: alpha(theme.palette.text.primary, 0.6) }} />;
                                                 }
                                                 if (statusKey === 'read') {
-                                                    return <CheckCheck size={14} style={{ marginLeft: 4, color: '#f4c542' }} />;
+                                                    return <CheckCheck size={18} style={{ marginLeft: 4, color: theme.palette.primary.blue }} />;
                                                 }
                                                 return null;
                                             })()}
@@ -369,6 +378,11 @@ const MessageContent = ({
                     const mediaKey = getMediaKey(msg, index);
                     const src = getMediaSrcForMessage(msg);
 
+                    const mediaItems = Array.isArray(msg?.mediaItems) ? msg.mediaItems : [];
+                    const hasGrid = mediaItems.length > 1;
+                    const gridRows = mediaItems.length <= 2 ? '1fr' : '1fr 1fr';
+                    const gridHeight = mediaItems.length <= 2 ? 160 : 220;
+
                     const cachedDims = src ? imageDimsCache.get(src) : null;
                     const dimsForCalc = imageDims || cachedDims;
 
@@ -383,64 +397,157 @@ const MessageContent = ({
                             style={{
                                 position: 'relative',
                                 width: mediaWidth,
-                                height: computedHeight,
+                                height: hasGrid ? gridHeight : computedHeight,
                                 borderRadius: 12,
                                 overflow: 'hidden',
                             }}
                         >
-                            {/* Skeleton until loaded */}
-                            {!loadedMedia[mediaKey] && (
-                                <Skeleton
-                                    variant="rounded"
-                                    className="media-skeleton"
-                                    sx={{
-                                        borderRadius: 0,
-                                        position: 'absolute',
-                                        inset: 0,
+                            {hasGrid ? (
+                                <div
+                                    style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 1fr',
+                                        gridTemplateRows: gridRows,
+                                        gap: 2,
                                         width: '100%',
                                         height: '100%',
+                                        cursor: 'pointer',
+                                        backgroundColor: 'rgba(0,0,0,0.04)',
                                     }}
-                                />
-                            )}
+                                >
+                                    {mediaItems.slice(0, 4).map((item, tileIndex) => {
+                                        const tileKey = `${mediaKey}-${tileIndex}`;
+                                        const tileSrc = item?.url;
+                                        const overflowCount = mediaItems.length - 4;
+                                        const showOverflow = tileIndex === 3 && overflowCount > 0;
 
-                            <div onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                handleMediaClick({
-                                    mediaItems: [{
-                                        url: src,
-                                        mimeType: 'image/*',
-                                        filename: 'image'
-                                    }]
-                                }, 0);
-                            }} style={{ cursor: 'pointer' }}>
-                                {src &&
-                                    <img
-                                        src={src}
-                                        alt="sent-img"
-                                        onLoad={(e) => {
-                                            const w = e?.currentTarget?.naturalWidth || 0;
-                                            const h = e?.currentTarget?.naturalHeight || 0;
-                                            if (w > 0 && h > 0) {
-                                                const nextDims = { w, h };
-                                                setImageDims(nextDims);
-                                                if (src) {
-                                                    imageDimsCache.set(src, nextDims);
-                                                }
-                                            }
-                                            markLoaded(mediaKey);
-                                        }}
-                                        onError={() => markLoaded(mediaKey)}
-                                        style={{
-                                            display: 'block',
-                                            width: '100%',
-                                            height: '100%',
-                                            objectFit: 'cover',
-                                            opacity: loadedMedia[mediaKey] ? 1 : 0,
-                                        }}
-                                    />
-                                }
-                            </div>
+                                        return (
+                                            <div
+                                                key={tileKey}
+                                                style={{
+                                                    position: 'relative',
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    overflow: 'hidden',
+                                                    borderRadius: 8,
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    e.preventDefault();
+                                                    handleMediaClick(msg, tileIndex);
+                                                }}
+                                            >
+                                                {!loadedMedia[tileKey] && (
+                                                    <Skeleton
+                                                        variant="rounded"
+                                                        className="media-skeleton"
+                                                        sx={{
+                                                            borderRadius: 0,
+                                                            position: 'absolute',
+                                                            inset: 0,
+                                                            width: '100%',
+                                                            height: '100%',
+                                                        }}
+                                                    />
+                                                )}
+
+                                                {tileSrc && (
+                                                    <img
+                                                        src={tileSrc}
+                                                        alt="sent-img"
+                                                        onLoad={() => markLoaded(tileKey)}
+                                                        onError={() => markLoaded(tileKey)}
+                                                        style={{
+                                                            display: 'block',
+                                                            width: '100%',
+                                                            height: '100%',
+                                                            objectFit: 'cover',
+                                                            opacity: loadedMedia[tileKey] ? 1 : 0,
+                                                        }}
+                                                    />
+                                                )}
+
+                                                {showOverflow && (
+                                                    <div
+                                                        style={{
+                                                            position: 'absolute',
+                                                            inset: 0,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            backgroundColor: 'rgba(0,0,0,0.45)',
+                                                            color: '#fff',
+                                                            fontWeight: 600,
+                                                            fontSize: 22,
+                                                        }}
+                                                    >
+                                                        +{overflowCount}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <>
+                                    {!loadedMedia[mediaKey] && (
+                                        <Skeleton
+                                            variant="rounded"
+                                            className="media-skeleton"
+                                            sx={{
+                                                borderRadius: 0,
+                                                position: 'absolute',
+                                                inset: 0,
+                                                width: '100%',
+                                                height: '100%',
+                                            }}
+                                        />
+                                    )}
+
+                                    <div onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        if (msg?.mediaItems?.length) {
+                                            handleMediaClick(msg, 0);
+                                        } else {
+                                            handleMediaClick({
+                                                mediaItems: [{
+                                                    url: src,
+                                                    mimeType: 'image/*',
+                                                    filename: 'image'
+                                                }]
+                                            }, 0);
+                                        }
+                                    }} style={{ cursor: 'pointer' }}>
+                                        {src &&
+                                            <img
+                                                src={src}
+                                                alt="sent-img"
+                                                onLoad={(e) => {
+                                                    const w = e?.currentTarget?.naturalWidth || 0;
+                                                    const h = e?.currentTarget?.naturalHeight || 0;
+                                                    if (w > 0 && h > 0) {
+                                                        const nextDims = { w, h };
+                                                        setImageDims(nextDims);
+                                                        if (src) {
+                                                            imageDimsCache.set(src, nextDims);
+                                                        }
+                                                    }
+                                                    markLoaded(mediaKey);
+                                                }}
+                                                onError={() => markLoaded(mediaKey)}
+                                                style={{
+                                                    display: 'block',
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'cover',
+                                                    opacity: loadedMedia[mediaKey] ? 1 : 0,
+                                                }}
+                                            />
+                                        }
+                                    </div>
+                                </>
+                            )}
 
                             {msg.isUploading && (
                                 <UploadProgressOverlay percent={msg.percent} />
@@ -481,13 +588,17 @@ const MessageContent = ({
                             <div onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
-                                handleMediaClick({
-                                    mediaItems: [{
-                                        url: src,
-                                        mimeType: 'video/*',
-                                        filename: 'video'
-                                    }]
-                                }, 0);
+                                if (msg?.mediaItems?.length) {
+                                    handleMediaClick(msg, 0);
+                                } else {
+                                    handleMediaClick({
+                                        mediaItems: [{
+                                            url: src,
+                                            mimeType: 'video/*',
+                                            filename: 'video'
+                                        }]
+                                    }, 0);
+                                }
                             }} style={{ cursor: 'pointer' }}>
                                 {src &&
                                     <video
@@ -657,7 +768,7 @@ const MessageContent = ({
                                         return <CheckCheck size={18} style={{ marginLeft: 4, color: alpha(theme.palette.text.primary, 0.6) }} />;
                                     }
                                     if (statusKey === 'read') {
-                                        return <CheckCheck size={18} style={{ marginLeft: 4, color: '#f4c542' }} />;
+                                        return <CheckCheck size={18} style={{ marginLeft: 4, color: theme.palette.primary.blue }} />;
                                     }
                                     return null;
                                 })()}
@@ -667,7 +778,14 @@ const MessageContent = ({
                 )}
 
                 {msg?.ReactionEmojis && msg.ReactionEmojis !== "" && msg.ReactionEmojis !== "[]" && (
-                    <div className="message-reaction">
+                    <div
+                        className="message-reaction"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setAnchorEl(e.currentTarget);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                    >
                         <span>
                             {(() => {
                                 try {
@@ -700,6 +818,16 @@ const MessageContent = ({
                 )}
 
             </Box>
+            {msg?.ReactionEmojis && (
+                <ReactionDetailsMenu
+                    anchorEl={anchorEl}
+                    onClose={() => setAnchorEl(null)}
+                    reactions={reactions}
+                    currentUser="You"
+                    onAddReaction={() => console.log("add reaction")}
+                    onRemoveReaction={() => console.log("remove reaction")}
+                />
+            )}
             {/* {msg?.Direction == 1 && (
                 <Box className="message-username-sendinfo" sx={{
                     marginTop: msg?.Direction === 1 && msg?.ReactionEmojis && msg?.ReactionEmojis !== "" && msg.ReactionEmojis !== "[]" ? "20px" : "0px"

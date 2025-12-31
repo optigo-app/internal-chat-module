@@ -1,7 +1,7 @@
 import { formatChatTimestamp } from '../../utils/DateFnc';
 import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig } from '../../utils/globalFunc';
 import React from 'react';
-import { Archive, ArchiveRestore, File, FileText, Image, MessageCircle, Pin, PinOff, Star, StarOff, UserPlus, Video } from 'lucide-react';
+import { Archive, ArchiveRestore, File, FileText, Image, Pin, PinOff, Star, StarOff, Video } from 'lucide-react';
 
 export const getMessagePreview = (msg) => {
   const type = msg?.MessageType;
@@ -82,16 +82,21 @@ export const processApiResponse = (apiData) => {
 
     const preview = lastMessage ? getMessagePreview(lastMessage) : { text: '', node: '' };
 
+    const lastMessageTimeValue =
+      lastMessage?.DateTime ||
+      conversation.LastMessageDate ||
+      conversation.LastUpdatedDate ||
+      conversation.DateTime ||
+      null;
+
     return {
       ...conversation,
       ConversationId: conversation.ConversationId ?? conversation.Id,
       lastMessage: preview.node,
       lastMessageText: preview.text,
+      lastMessageTimeValue,
       lastMessageTime: formatChatTimestamp(
-        lastMessage?.DateTime ||
-        conversation.LastMessageDate ||
-        conversation.LastUpdatedDate ||
-        conversation.DateTime
+        lastMessageTimeValue
       ),
       lastMessageStatus: lastMessage?.Status,
       lastMessageDirection: lastMessage?.Direction,
@@ -121,10 +126,5 @@ export const getCustomerListMenuItems = (member) => [
       ? React.createElement(ArchiveRestore, { size: 18 })
       : React.createElement(Archive, { size: 18 }),
     label: member?.IsArchived === 1 ? 'Unarchive' : 'Archive',
-  },
-  {
-    action: 'AddCustomer',
-    icon: React.createElement(UserPlus, { size: 18 }),
-    label: 'Add to Customer',
   },
 ];

@@ -79,7 +79,7 @@ export const sendImageMessage = async (auth, {
         receiverId,
         conversationId,
         message: caption,
-        messageType: 1,
+        messageType: 2,
         attachments,
         fLabel: "Message ( Send Image )",
     });
@@ -99,7 +99,7 @@ export const sendVideoMessage = async (auth, {
         receiverId,
         conversationId,
         message: caption,
-        messageType: 2,
+        messageType: 3,
         attachments,
         fLabel: "Message ( Send Video )",
     });
@@ -119,7 +119,7 @@ export const sendDocumentMessage = async (auth, {
         receiverId,
         conversationId,
         message: caption,
-        messageType: 3,
+        messageType: 4,
         attachments,
         fLabel: "Message ( Send Message )",
     });

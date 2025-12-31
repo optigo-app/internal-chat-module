@@ -2,16 +2,34 @@ import { GetCredentialsFromCookie } from "../../utils/FetchToken";
 
 const isLocal = ["localhost", "nzen", '9511a53f910a.ngrok-free.app'].includes(window.location.hostname);
 
-export const MEDIAAPIURL = "https://crmapp.mpillarapi.com/api/meta/v19.0/622385334300738/Media/";
-export const MESSAGEAPIURL = isLocal ? "http://192.168.1.71:3001/api/whatsapp/chat/send" : "https://nxtapi.optigoapps.com/api/whatsapp/chat/send";
-export const MESSAGEAPIURLBULK = isLocal ? "http://192.168.1.71:3001/api/whatsapp/chat/send-bulk" : "https://nxtapi.optigoapps.com/api/whatsapp/chat/send-bulk";
-export const GETCONVERSATIONURL = isLocal ? "http://newnextjs.web/api/report" : "https://nxtapi.optigoapps.com/api/report";
-export const LOGOUTAPI = isLocal ? "http://192.168.1.71:3001/api/whatsapp/chat/logout" : "https://nxtapi.optigoapps.com/api/whatsapp/chat/logout";
-export const UPLOADMEDIA = "https://crmapp.mpillarapi.com/api/meta/v19.0/622385334300738/Media/";
-export const SAVEPLAYERID = isLocal ? "http://newnextjs.web/api/report" : "https://nxtapi.optigoapps.com/api/report";
+// Base URLs
+const API_BASE_URL = isLocal
+    ? "http://newnextjs.web/api"
+    : "https://nxtapi.optigoapps.com/api";
 
-//main api 
-export const APIURL = isLocal ? "http://newnextjs.web/api/report" : "https://nxtapi.optigoapps.com/api/report";
+const WHATSAPP_BASE_URL = isLocal
+    ? "http://192.168.1.71:3001/api"
+    : "https://nxtapi.optigoapps.com/api";
+
+const MEDIA_BASE_URL =
+    "https://crmapp.mpillarapi.com/api/meta/v19.0/622385334300738/Media/";
+
+// Media
+export const MEDIAAPIURL = MEDIA_BASE_URL;
+export const UPLOADMEDIA = MEDIA_BASE_URL;
+export const UPLOAD_URL = `${API_BASE_URL}/upload`;
+export const REMOVE_FILE_URL = `${API_BASE_URL}/removefile`;
+
+// WhatsApp APIs
+export const MESSAGEAPIURL = `${WHATSAPP_BASE_URL}/whatsapp/chat/send`;
+export const MESSAGEAPIURLBULK = `${WHATSAPP_BASE_URL}/whatsapp/chat/send-bulk`;
+export const LOGOUTAPI = `${WHATSAPP_BASE_URL}/whatsapp/chat/logout`;
+
+// Report / Common APIs
+export const APIURL = `${API_BASE_URL}/report`;
+export const GETCONVERSATIONURL = `${API_BASE_URL}/report`;
+export const SAVEPLAYERID = `${API_BASE_URL}/report`;
+
 
 export const getHeaders = () => {
     let credentials = GetCredentialsFromCookie();

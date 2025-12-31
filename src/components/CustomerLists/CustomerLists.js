@@ -1,14 +1,8 @@
-import { addMessageHandler, addMessageHandlerFromAssigningUser, addStatusHandler, getSocket, isSocketConnected } from '../../socket';
-import { FileText, Image, Video, Clock3, ArrowLeft, Pin, UserPlus, ChevronDown, Star } from 'lucide-react';
-import { pinConversationApi } from '../../API/PinConversation/PinConversation';
+import { addMessageHandler, addMessageHandlerFromAssigningUser, addStatusHandler } from '../../socket';
+import { FileText, Image, Video, ArrowLeft, Pin, ChevronDown, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Check, CheckCheck, AlertCircle } from "lucide-react";
-import { unPinConversationApi } from '../../API/unPinConversation/UnPinConversation';
-import { favoriteApi } from '../../API/FavoriteApi/FavoriteApi';
-import { unFavoriteApi } from '../../API/UnFavoriteApi/UnFavoriteApi';
+import { CheckCheck } from "lucide-react";
 import { useLocation, useNavigate } from 'react-router-dom';
-import { archieveApi } from '../../API/ArchieveAPi/ArchieveApi';
-import { unArchieveApi } from '../../API/UnArchieveApi/UnArchieveApi';
 import { LoginContext } from '../../context/LoginData';
 import { useArchieveContext } from '../../contexts/ArchieveContext';
 import React, { useEffect, useState, useCallback, useRef, useContext } from 'react';
@@ -26,15 +20,15 @@ import {
     CircularProgress
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { Clear, KeyboardArrowDown, Search } from '@mui/icons-material';
+import { Clear, Search } from '@mui/icons-material';
 import PersonIcon from '@mui/icons-material/Person';
 import './CustomerLists.scss';
 import { fetchConversationLists } from '../../API/ConverLists/ConversationLists';
 import { formatChatTimestamp } from '../../utils/DateFnc';
 import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig, hasCustomerName } from '../../utils/globalFunc';
-import AddCustomerDialog from '../AddCustomerDialog/AddCustomerDialog';
 import WhatsAppMenu from '../ReusableComponent/WhatsAppMenu';
 import { getMessagePreview, processApiResponse, getCustomerListMenuItems } from './CustomerListFunc';
+import { updateConversationApi } from '../../API/SendMessage/updateConversationApi';
 
 const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, selectedStatus = 'All', selectedTag = 'All', isConversationRead = false, viewConversationRead = false, onConversationList = () => { } }) => {
     const location = useLocation();
@@ -49,13 +43,11 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const [currentPage, setCurrentPage] = useState(1);
     const [anchorEl, setAnchorEl] = useState(null);
     const [selectMember, setSelectMember] = useState({});
-    const [addCustomerDialogOpen, setAddCustomerDialogOpen] = useState(false);
-    const [selectedMemberForDialog, setSelectedMemberForDialog] = useState(null);
     const [hoveredId, setHoveredId] = useState(null);
     const containerRef = useRef(null);
     const pageSize = 100;
     const searchTimeoutRef = useRef(null);
-    const { auth, PERMISSION_SET, isSyncing } = useContext(LoginContext);
+    const { auth, isSyncing } = useContext(LoginContext);
 
     const handleCloseMenu = () => {
         setAnchorEl(null);
@@ -64,7 +56,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
 
     const loadMembers = useCallback(async (page = 1, reset = false, search = null) => {
         if (loading || (!reset && !hasMore)) return;
-
         if (!auth?.token || !auth?.userId) {
             console.log('⚠️ No auth token available, skipping conversation load');
             return;
@@ -84,9 +75,10 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 name: customer.CustomerName || customer.CustomerPhone,
                 lastMessage: '',
                 lastMessageText: '',
-                lastMessageTime: new Date().toISOString(),
+                lastMessageTimeValue: customer?.LastMessageDate || customer?.LastUpdatedDate || new Date().toISOString(),
+                lastMessageTime: formatChatTimestamp(customer?.LastMessageDate || customer?.LastUpdatedDate || new Date().toISOString()),
                 unreadCount: 0,
-                isSearchResult: true // Flag to identify search results
+                isSearchResult: true
             })) || [];
 
             // Combine both, but keep them separate for rendering
@@ -99,7 +91,9 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
 
             // Sort by last message time (newest first)
             const sortedConversations = mergedConversations.sort((a, b) => {
-                return new Date(b.lastMessageTime) - new Date(a.lastMessageTime);
+                const aTime = new Date(a?.lastMessageTimeValue || a?.LastMessageDate || a?.LastUpdatedDate || a?.lastMessageTime || 0).getTime();
+                const bTime = new Date(b?.lastMessageTimeValue || b?.LastMessageDate || b?.LastUpdatedDate || b?.lastMessageTime || 0).getTime();
+                return (bTime || 0) - (aTime || 0);
             });
 
             setChatMembers(prev => ({
@@ -221,150 +215,74 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const archivedCount = chatMembers?.data?.filter(m => m.IsArchived === 1)?.length || 0;
 
     const getMessageStatusIcon = (member) => {
-        if (member?.lastMessageDirection !== 1) return null;
-
-        const status = typeof member?.lastMessageStatus === 'number' ? member.lastMessageStatus : -1;
-
-        switch (status) {
-            case 0: // Queued/Sending
-                return <Clock3 size={14} style={{ marginRight: 5, color: "#9e9e9e" }} />;
-
-            case 1: // Sent (single grey tick)
-                return <Check size={15} style={{ marginRight: 5, color: "#9e9e9e" }} />;
-
-            case 2: // Delivered (double grey tick)
-                return <CheckCheck size={15} style={{ marginRight: 5, color: "#9e9e9e" }} />;
-
-            case 3: // Read (double blue tick)
-                return <CheckCheck size={15} style={{ marginRight: 5, color: "#1F51FF" }} />;
-
-            case 4: // Failed
-                return <AlertCircle size={14} style={{ marginRight: 5, color: "#ff4444" }} />;
-
-            default:
-                return null;
+        if (member?.UnreadCount > 0) {
+            return (
+                <CheckCheck
+                    size={16}
+                    style={{ marginRight: 5, color: "#9e9e9e" }}
+                />
+            );
         }
+        return (
+            <CheckCheck
+                size={16}
+                style={{ marginRight: 5, color: "#1F51FF" }}
+            />
+        );
     };
 
     useEffect(() => {
         addArchieve(archivedCount);
     }, [chatMembers]);
 
-    const handlePinChat = async (member, shouldPin) => {
-        if (!member?.ConversationId || !member?.UserId) {
-            toast.error("Missing Conversation ID or User ID. Cannot pin/unpin this chat.");
-            return;
-        }
-        try {
-            if (shouldPin === "Pin") {
-                const pinnedCount = chatMembers.data?.filter(m => m.IsPin === 1).length || 0;
-                if (pinnedCount >= 3) {
-                    toast.error("You can only pin up to 3 chats. Please unpin a chat first.");
-                    return;
-                }
-            }
-
-            const response = shouldPin === "Pin"
-                ? await pinConversationApi(member.ConversationId, member.UserId, auth?.userId)
-                : await unPinConversationApi(member.ConversationId, member.UserId, auth?.userId);
-
-            if (response?.Status === "200") {
-                toast.success(`Chat ${shouldPin === "Pin" ? 'pinned' : 'unpinned'} successfully`);
-                loadMembers(currentPage, true);
-            } else {
-                toast.error(`Failed to ${shouldPin === "Pin" ? 'pin' : 'unpin'} chat`);
-            }
-        } catch (error) {
-            console.error("Error handling pin chat", error);
-            toast.error("Something went wrong while pinning/unpinning the chat.");
-        }
-    };
-
-    const handleFavoriteChat = async (member, shouldFavorite) => {
-        if (!member?.ConversationId || !member?.UserId) {
-            toast.error("Missing Conversation ID or User ID. Cannot pin/unpin this chat.");
-            return;
-        }
-
-        try {
-            const response = shouldFavorite === "Favorite"
-                ? await favoriteApi(member.ConversationId, member.UserId, auth?.userId)
-                : await unFavoriteApi(member.ConversationId, member.UserId, auth?.userId);
-
-            if (response?.Status === "200") {
-                toast.success(`Chat ${shouldFavorite === "Favorite" ? 'favorited' : 'unfavorited'} successfully`);
-                loadMembers(currentPage, true);
-            } else {
-                toast.error(`Failed to ${shouldFavorite === "Favorite" ? 'favorite' : 'unfavorite'} chat`);
-            }
-        } catch (error) {
-            console.error("Error handling favorite chat", error);
-            toast.error("Something went wrong while favoriting/unfavoriting the chat.");
-        }
-    };
-
-    const handleArchieveChat = async (member, shouldArchieve) => {
-        if (!member?.ConversationId || !member?.UserId) {
-            toast.error("Missing Conversation ID or User ID. Cannot archive/unarchive this chat.");
-            return;
-        }
-
-        try {
-            const response = shouldArchieve === "Archive"
-                ? await archieveApi(member.ConversationId, member.UserId, auth?.userId)
-                : await unArchieveApi(member.ConversationId, member.UserId, auth?.userId);
-
-            if (response?.Status === "200") {
-                toast.success(`Chat ${shouldArchieve === "Archive" ? 'archived' : 'unarchived'} successfully`);
-                loadMembers(currentPage, true);
-            } else {
-                toast.error(`Failed to ${shouldArchieve === "Archive" ? 'archive' : 'unarchive'} chat`);
-            }
-        } catch (error) {
-            console.error("Error handling favorite chat", error);
-            toast.error("Something went wrong while archiving/unarchiving the chat.");
-        }
-    };
-
-    const handleAddCustomer = (member) => {
-        if (!member?.CustomerPhone) {
-            toast.error("Missing customer phone number. Cannot add customer.");
-            return;
-        }
-
-        setSelectedMemberForDialog(member);
-        setAddCustomerDialogOpen(true);
-    };
-
-    const handleCloseAddCustomerDialog = () => {
-        setAddCustomerDialogOpen(false);
-        setSelectedMemberForDialog(null);
-    };
-
-    const handleAddCustomerSuccess = () => {
-        loadMembers(currentPage, true);
-    };
-
-    const handleMenuAction = (action, member) => {
+    const handleMenuAction = async (action, member) => {
         setSelectMember(member);
         onConversationList(member);
-
-        if (action === "Pin" || action === "UnPin") {
-            handlePinChat(member, action === "Pin" ? "Pin" : "UnPin");
+        if (!member?.ConversationId) {
+            toast.error("Missing Conversation ID. Cannot update conversation.");
+            handleCloseMenu();
+            return;
         }
 
-        if (action === "Star" || action === "UnStar") {
-            handleFavoriteChat(member, action === "Star" ? "Favorite" : "UnFavorite");
-        }
+        // Base flags from current member
+        let isPin = member.IsPin || 0;
+        let isStar = member.IsStar || 0;
+        let isArchived = member.IsArchived || 0;
 
-        if (action === "Archive" || action === "UnArchive") {
-            handleArchieveChat(member, action === "Archive" ? "Archive" : "UnArchive", loadMembers, currentPage);
+        if (action === "Pin") {
+            isPin = 1;
+        } else if (action === "UnPin") {
+            isPin = 0;
         }
-
-        if (action === "AddCustomer") {
-            handleAddCustomer(member);
+        if (action === "Star") {
+            isStar = 1;
+        } else if (action === "UnStar") {
+            isStar = 0;
         }
-
+        if (action === "Archive") {
+            isArchived = 1;
+        } else if (action === "UnArchive") {
+            isArchived = 0;
+        }
+        try {
+            const response = await updateConversationApi(auth, {
+                page: 1,
+                pageSize: 50,
+                conversationId: member.ConversationId,
+                isPin,
+                isStar,
+                isArchived,
+            });
+            if (response?.Status === "200" || response?.success === true) {
+                toast.success("Conversation updated");
+                loadMembers(currentPage, true);
+            } else {
+                toast.error("Failed to update conversation");
+            }
+        } catch (error) {
+            console.error("Error updating conversation:", error);
+            toast.error("Something went wrong while updating conversation.");
+        }
         handleCloseMenu();
     };
 
@@ -615,9 +533,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                                 const parsed = JSON.parse(member.LastMessage);
                                                 lastMessageData = Array.isArray(parsed) ? parsed : [parsed];
                                             } catch (e) {
-                                                // When LastMessage is now just plain text (new API),
-                                                // fall back to an empty array so type-based preview
-                                                // below will show "Text".
                                                 lastMessageData = [];
                                             }
                                         }
@@ -664,37 +579,42 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                                                 className={shouldShowUnreadBadge ? 'last-message-unread' : 'last-message'}
                                                                 style={{ display: 'flex', alignItems: 'center' }}
                                                             >
-                                                                <span style={{ display: 'flex', alignItems: 'center' }}>
+                                                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                                     {getMessageStatusIcon(member)}
-                                                                    {member.lastMessageText !== 'No message' ? (
-                                                                        member.lastMessage
-                                                                    ) : (
-                                                                        <span
-                                                                            style={{
-                                                                                display: 'inline-flex',
-                                                                                alignItems: 'center',
-                                                                                gap: '4px'
-                                                                            }}
-                                                                        >
-                                                                            {lastMessageData?.[0]?.MessageType === 'image' && (
-                                                                                <>
-                                                                                    <Image size={12} /> Image
-                                                                                </>
-                                                                            )}
-                                                                            {lastMessageData?.[0]?.MessageType === 'video' && (
-                                                                                <>
-                                                                                    <Video size={14} /> Video
-                                                                                </>
-                                                                            )}
-                                                                            {lastMessageData?.[0]?.MessageType === 'document' && (
-                                                                                <>
-                                                                                    <FileText size={12} /> Document
-                                                                                </>
-                                                                            )}
-                                                                            {!lastMessageData?.[0]?.MessageType && 'Text'}
-                                                                        </span>
+
+                                                                    {/* TEXT MESSAGE */}
+                                                                    {member.LastMessageType === 1 && (
+                                                                        member.LastMessage || 'Text'
                                                                     )}
+
+                                                                    {/* IMAGE */}
+                                                                    {member.LastMessageType === 2 && (
+                                                                        <>
+                                                                            <Image size={12} />
+                                                                            <span>Image</span>
+                                                                        </>
+                                                                    )}
+
+                                                                    {/* VIDEO */}
+                                                                    {member.LastMessageType === 3 && (
+                                                                        <>
+                                                                            <Video size={14} />
+                                                                            <span>Video</span>
+                                                                        </>
+                                                                    )}
+
+                                                                    {/* DOCUMENT */}
+                                                                    {member.LastMessageType === 4 && (
+                                                                        <>
+                                                                            <FileText size={12} />
+                                                                            <span>Document</span>
+                                                                        </>
+                                                                    )}
+
+                                                                    {/* FALLBACK */}
+                                                                    {!member.LastMessageType && <span>Text</span>}
                                                                 </span>
+
                                                             </Typography>
 
                                                             <div className="member-trailing">
@@ -712,10 +632,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                                                             <IconButton
                                                                                 size="small"
                                                                                 className={`action-btn ${member?.IsPin === 1 ? 'is-on' : ''}`}
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    handlePinChat(member, member?.IsPin === 1 ? "UnPin" : "Pin");
-                                                                                }}
                                                                             >
                                                                                 <Pin size={17} />
                                                                             </IconButton>
@@ -726,10 +642,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                                                             <IconButton
                                                                                 size="small"
                                                                                 className={`action-btn ${member?.IsStar === 1 ? 'is-on' : ''}`}
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    handlePinChat(member, member?.IsStar === 1 ? "UnStar" : "Star");
-                                                                                }}
                                                                             >
                                                                                 <Star size={17} />
                                                                             </IconButton>
@@ -861,15 +773,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     items={getCustomerListMenuItems(selectMember)}
                     onAction={handleMenuAction}
                     context={selectMember}
-                />
-
-                {/* Add Customer Dialog */}
-                <AddCustomerDialog
-                    open={addCustomerDialogOpen}
-                    onClose={handleCloseAddCustomerDialog}
-                    selectedMember={selectedMemberForDialog}
-                    auth={auth}
-                    onSuccess={handleAddCustomerSuccess}
                 />
             </div>
         </div >

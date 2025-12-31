@@ -39,7 +39,6 @@ const MessageArea = ({
     replyToMessage,
     isSwitchingConversation
 }) => {
-    console.log('MessageArea props:', { groupMessagesByDate });
     const [hoveredMessageId, setHoveredMessageId] = useState(null);
     const [reactionMenuAnchorEl, setReactionMenuAnchorEl] = useState(null);
     const [reactionMenuMessageId, setReactionMenuMessageId] = useState(null);
@@ -159,10 +158,10 @@ const MessageArea = ({
                             transition: 'opacity 0.1s ease-in-out',
                         }}
                     >
-                        {/* Scroll to Bottom Button */}
+                        {/* Scroll to Bottom Button - always smooth when user clicks */}
                         <ScrollToBottomButton
                             open={showScrollToBottom}
-                            onClick={scrollToBottom}
+                            onClick={() => scrollToBottom('smooth')}
                             right={scrollToBottomRightOffset ?? 30}
                             bottom={scrollToBottomBottomOffset}
                         />

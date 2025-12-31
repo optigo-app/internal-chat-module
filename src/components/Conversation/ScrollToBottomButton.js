@@ -1,4 +1,3 @@
-import React from 'react';
 import { Box, Zoom } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { ArrowDown } from 'lucide-react';

@@ -11,7 +11,6 @@ const ChatHeader = ({ chatId, isPinned, isFavorite }) => {
     { label: isPinned ? "Unpin" : "Pin", icon: <Pin size={20}/>, action: "TOGGLE_PIN" },
     { label: isFavorite ? "Unfavorite" : "Favorite", icon: <Star size={20}/>, action: "TOGGLE_FAVORITE" },
     { label: "Archive", icon: <Archive size={20}/>, action: "ARCHIVE" },
-    { label: "Add to Customer", icon: <UserPlus size={20}/>, action: "ADD_CUSTOMER" },
   ];
 
   const handleMenuAction = (action, { chatId }) => {
@@ -24,9 +23,6 @@ const ChatHeader = ({ chatId, isPinned, isFavorite }) => {
         break;
       case "ARCHIVE":
         console.log("Archive chat:", chatId);
-        break;
-      case "ADD_CUSTOMER":
-        console.log("Add chat to customer:", chatId);
         break;
       default:
         break;

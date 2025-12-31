@@ -83,7 +83,10 @@ const MessageContextMenu = ({
   };
 
   const handleForward = (e) => {
+    
     e.stopPropagation();
+    console.log("Forwm:", message);
+    console.log("Message type:", message?.Type);
     onForward?.(message, e);
     onClose();
   };
