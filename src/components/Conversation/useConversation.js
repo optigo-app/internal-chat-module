@@ -43,6 +43,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     const [mediaViewerItems, setMediaViewerItems] = useState([]);
     const [showMedia, setShowMedia] = useState(false);
     const [mediaViewerIndex, setMediaViewerIndex] = useState(0);
+    const [mediaViewerMessage, setMediaViewerMessage] = useState(null);
     const { auth } = useContext(LoginContext);
     const selectedCustomerRef = useRef(selectedCustomer);
     const latestRequestRef = useRef(0);
@@ -617,10 +618,12 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                         : 'document',
                 name: item.filename || item.fileName || 'Media',
                 mimeType: item.mimeType,
-                size: item.size
+                size: item.size,
+                attachmentId: item.attachmentId
             }));
             setMediaViewerItems(mediaItems);
             setMediaViewerIndex(index);
+            setMediaViewerMessage(message);
             setMediaViewerOpen(true);
         }
     };
@@ -840,13 +843,16 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
         try {
             const isReply = !!(replySnapshot && replyToMessageId);
+            const targetType = replySnapshot?.MessageType;
+            const messageTypeToSend = targetType === 'image' ? 2 : targetType === 'video' ? 3 : targetType === 'document' ? 4 : 1;
 
             const resp = isReply
                 ? await replyToMessageApi(auth, {
-                    conversationId: selectedCustomer?.ConversationId ?? null,
-                    replyToMessageId,
+                    conversationId: replySnapshot.ConversationId || selectedCustomer?.ConversationId,
+                    replyToMessageId: replySnapshot.Id,
+                    ReplyToAttachmentId: replySnapshot.ReplyToAttachmentId,
                     message: caption,
-                    messageType: 1,
+                    messageType: messageTypeToSend,
                 })
                 : await sendTextMessage(auth, {
                     senderId: auth?.id,
@@ -909,7 +915,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         if (typeof scrollToBottom === 'function') scrollToBottom();
     };
 
-    const handleReply = async (message) => {
+    const handleReply = async (message, attachmentId = null) => {
         setStoreMessData({
             messageId: message?.MessageId,
         })
@@ -932,11 +938,23 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             ? message.Message
             : fallbackLabel;
 
+        let mediaUrl = null;
+        if (attachmentId && message?.mediaItems) {
+            const specificItem = message.mediaItems.find(item =>
+                (item.attachmentId === attachmentId || item.AttachmentId === attachmentId || item.Id === attachmentId || item.id === attachmentId)
+            );
+            if (specificItem) {
+                mediaUrl = specificItem.url || specificItem.src;
+            }
+        }
+
         setReplyToMessage({
             Id: message?.Id,
             sender: message?.Direction === 1 ? 'You' : selectedCustomer?.name || 'Customer',
             text: replyText,
-            MessageType: message?.MessageType
+            MessageType: message?.MessageType,
+            ReplyToAttachmentId: attachmentId,
+            mediaUrl: mediaUrl
         });
     };
 
@@ -1002,17 +1020,36 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         }
     }, [auth, selectedCustomer, forwardMessage, messId]);
 
-    const scrollToMessage = useCallback(async (messageId, containerRef) => {
+    const scrollToMessage = useCallback(async (messageId, containerRef, attachmentId = null) => {
         if (!containerRef.current || !messageId) return;
         const messageElement = containerRef.current.querySelector(`[data-message-id="${messageId}"]`);
+
         if (messageElement) {
             messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
             setBlinkMessageId(messageId);
+
+            // If there's an attachmentId, try to open the MediaViewer at that specific item
+            if (attachmentId) {
+                const messageList = normalizeMessages(messages);
+                const targetMsg = messageList.find(m => (m.Id === messageId || m.MessageId === messageId));
+
+                if (targetMsg && targetMsg.mediaItems) {
+                    const itemIndex = targetMsg.mediaItems.findIndex(item =>
+                        (item.attachmentId === attachmentId || item.AttachmentId === attachmentId || item.Id === attachmentId || item.id === attachmentId)
+                    );
+
+                    if (itemIndex >= 0) {
+                        // Small delay to ensure scroll finishes or just open it directly
+                        handleMediaClick(targetMsg, itemIndex);
+                    }
+                }
+            }
+
             setTimeout(() => {
                 setBlinkMessageId(null);
             }, 3000);
         }
-    }, []);
+    }, [messages, handleMediaClick]);
 
     const getMessageStatusIcon = (msg) => {
         const raw = msg?.Status ?? msg?.status ?? msg?.MessageStatus;
@@ -1072,6 +1109,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         setMediaViewerItems,
         mediaViewerIndex,
         setMediaViewerIndex,
+        mediaViewerMessage,
         groupMessagesByDate,
         currentPage,
         setCurrentPage,

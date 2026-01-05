@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Box, CircularProgress, IconButton, Skeleton, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import { ChevronDown, Download, FileText, CheckCheck, Image as ImageIcon, Video as VideoIcon, Play } from 'lucide-react';
+import { ChevronDown, Download, FileText, CheckCheck, Image as ImageIcon, Video as VideoIcon, Play, FileType, FileSpreadsheet, FileArchive, FileCode } from 'lucide-react';
 import { Emoji } from 'emoji-picker-react';
 import { FormatDateIST } from '../../utils/DateFnc';
 import DynamicTemplate from '../DynamicTemplate/DynamicTemplate';
 import QuickReactionMenu from './QuickReactionMenu';
 import ReactionDetailsMenu from './ReactionMenu';
+import { handleDownloadFile, getCustomerDisplayName, getWhatsAppAvatarConfig, getCustomerAvatarSeed, hasCustomerName, getDocumentMeta } from '../../utils/globalFunc';
 
 const imageDimsCache = new Map();
 
@@ -282,10 +283,17 @@ const MessageContent = ({
                                 ? 'You'
                                 : (original?.SenderInfo || original?.Sender || (msg.SenderInfo != '' ? msg.SenderInfo : msg.Sender));
 
+                            const specificMedia = (msg.ReplyToAttachmentId && original?.mediaItems)
+                                ? original.mediaItems.find(item =>
+                                    (item.attachmentId === msg.ReplyToAttachmentId || item.AttachmentId === msg.ReplyToAttachmentId || item.Id === msg.ReplyToAttachmentId || item.id === msg.ReplyToAttachmentId)
+                                )
+                                : null;
+                            const specificMediaUrl = specificMedia?.url || specificMedia?.src;
+
                             return (
                                 <div className="reply-preview" style={{
                                     display: 'flex',
-                                    flexDirection: "column",
+                                    flexDirection: "row", // Changed to row to allow image on right
                                     gap: '8px',
                                     padding: '8px',
                                     backgroundColor: alpha(theme.palette.primary.main, isOutgoing ? 0.12 : 0.08),
@@ -293,11 +301,12 @@ const MessageContent = ({
                                     marginBottom: '8px',
                                     borderLeft: `3px solid ${theme.palette.primary.main}`,
                                     cursor: msg.ContextId ? 'pointer' : 'default',
-                                    opacity: msg.ContextId ? 1 : 0.7
+                                    opacity: msg.ContextId ? 1 : 0.7,
+                                    alignItems: 'center'
                                 }}
-                                    onClick={() => msg.ContextId && scrollToMessage(msg.ContextId, containerRef)}  // Jump to original message
+                                    onClick={() => msg.ContextId && scrollToMessage(msg.ContextId, containerRef, msg.ReplyToAttachmentId)}  // Jump to original message
                                 >
-                                    <div className="reply-content" style={{ flex: 1 }}>
+                                    <div className="reply-content" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                         <div className="reply-sender" style={{
                                             fontSize: '12px',
                                             fontWeight: 600,
@@ -331,11 +340,38 @@ const MessageContent = ({
                                             </span>
                                         </div>
                                         {!msg.ContextId && (
-                                            <div className="original-not-available">
+                                            <div className="original-not-available" style={{ fontSize: '10px', color: theme.palette.error.main, marginTop: '2px' }}>
                                                 Original message not available
                                             </div>
                                         )}
                                     </div>
+
+                                    {specificMediaUrl && (
+                                        <Box
+                                            sx={{
+                                                width: 40,
+                                                height: 40,
+                                                borderRadius: 1,
+                                                overflow: 'hidden',
+                                                flexShrink: 0,
+                                                backgroundColor: alpha(theme.palette.text.primary, 0.05),
+                                                border: `1px solid ${alpha(theme.palette.text.primary, 0.08)}`
+                                            }}
+                                        >
+                                            {specificMedia.mimeType?.startsWith('video/') || specificMedia.src?.includes('.mp4') ? (
+                                                <video
+                                                    src={specificMediaUrl}
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                />
+                                            ) : (
+                                                <img
+                                                    src={specificMediaUrl}
+                                                    alt="preview"
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                />
+                                            )}
+                                        </Box>
+                                    )}
                                 </div>
                             );
                         })()}
@@ -852,220 +888,171 @@ const MessageContent = ({
                 })()}
 
                 {/* Document */}
-                {msg?.MessageType === "document" && ((_, index) => {
-                    const href = getMediaSrcForMessage(msg);
+                {msg?.MessageType === "document" && (() => {
                     const mediaItems = Array.isArray(msg?.mediaItems) ? msg.mediaItems : [];
-                    const hasGrid = mediaItems.length > 1;
-                    const gridRows = mediaItems.length <= 2 ? '1fr' : '1fr 1fr';
-                    const gridHeight = mediaItems.length <= 2 ? 120 : 160;
 
-                    return (
-                        <div className="message-document" style={{ position: 'relative' }}>
-                            {hasGrid ? (
-                                <div
-                                    style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: '1fr 1fr',
-                                        gridTemplateRows: gridRows,
-                                        gap: 6,
-                                        width: 260,
-                                        height: gridHeight,
-                                    }}
-                                >
-                                    {mediaItems.slice(0, 4).map((item, tileIndex) => {
-                                        const tileHref = item?.url;
-                                        const tileKey = `doc-${msg?.Id || msg?.MessageId || 'msg'}-${tileIndex}`;
-                                        const overflowCount = mediaItems.length - 4;
-                                        const showOverflow = tileIndex === 3 && overflowCount > 0;
+                    const renderDocumentItem = (itemProps, index) => {
+                        const { url: href, filename, fileName, mimeType, fileType } = itemProps;
+                        const name = filename || fileName || 'Document';
+                        const meta = getDocumentMeta(name);
 
-                                        return (
-                                            <div
-                                                key={tileKey}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    e.preventDefault();
-                                                    handleMediaClick(msg, tileIndex);
-                                                }}
-                                                style={{
-                                                    position: 'relative',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: 8,
-                                                    padding: 10,
-                                                    borderRadius: 10,
-                                                    border: `1px solid ${alpha(theme.palette.text.primary, 0.08)}`,
-                                                    backgroundColor: alpha(theme.palette.text.primary, 0.03),
-                                                    cursor: 'pointer',
-                                                    overflow: 'hidden',
-                                                    minWidth: 0,
-                                                }}
-                                                title={item?.filename || item?.fileName || 'Document'}
-                                            >
-                                                <Box
-                                                    sx={{
-                                                        width: 30,
-                                                        height: 30,
-                                                        borderRadius: 2,
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        backgroundColor: alpha(theme.palette.primary.main, 0.12),
-                                                        color: theme.palette.primary.main,
-                                                        flex: '0 0 auto'
-                                                    }}
-                                                >
-                                                    <FileText size={16} />
-                                                </Box>
+                        // Map iconName to Lucide components
+                        const IconMap = {
+                            FileText,
+                            FileType,
+                            FileSpreadsheet,
+                            FileArchive,
+                            FileCode,
+                            File
+                        };
+                        const DocIcon = IconMap[meta.iconName] || File;
 
-                                                <Box sx={{ minWidth: 0, flex: '1 1 auto' }}>
-                                                    <Typography
-                                                        variant="body2"
-                                                        sx={{
-                                                            fontWeight: 600,
-                                                            color: theme.palette.text.primary,
-                                                            lineHeight: 1.2,
-                                                            whiteSpace: 'nowrap',
-                                                            overflow: 'hidden',
-                                                            textOverflow: 'ellipsis'
-                                                        }}
-                                                    >
-                                                        {item?.filename || item?.fileName || 'Document'}
-                                                    </Typography>
-                                                    <Typography
-                                                        variant="caption"
-                                                        sx={{
-                                                            color: alpha(theme.palette.text.primary, 0.7),
-                                                            lineHeight: 1.2,
-                                                            whiteSpace: 'nowrap',
-                                                            overflow: 'hidden',
-                                                            textOverflow: 'ellipsis'
-                                                        }}
-                                                    >
-                                                        {item?.mimeType || 'document'}
-                                                    </Typography>
-                                                </Box>
-
-                                                <IconButton
-                                                    component="a"
-                                                    href={tileHref}
-                                                    download
-                                                    size="small"
-                                                    className="doc-download"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    sx={{
-                                                        color: alpha(theme.palette.text.primary, 0.75),
-                                                        flex: '0 0 auto',
-                                                        '&:hover': {
-                                                            color: theme.palette.text.primary,
-                                                            backgroundColor: alpha(theme.palette.text.primary, 0.06),
-                                                        }
-                                                    }}
-                                                    title="Download"
-                                                >
-                                                    <Download size={18} />
-                                                </IconButton>
-
-                                                {showOverflow && (
-                                                    <div
-                                                        style={{
-                                                            position: 'absolute',
-                                                            inset: 0,
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            backgroundColor: 'rgba(0,0,0,0.45)',
-                                                            color: '#fff',
-                                                            fontWeight: 600,
-                                                            fontSize: 22,
-                                                        }}
-                                                    >
-                                                        +{overflowCount}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
+                        return (
+                            <Box
+                                key={index}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    handleDownloadFile(href, name);
+                                }}
+                                sx={{
+                                    position: 'relative',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1.5,
+                                    padding: '12px 16px',
+                                    borderRadius: '12px',
+                                    backgroundColor: alpha(theme.palette.background.paper, 0.2),
+                                    backdropFilter: 'blur(1px)',
+                                    cursor: 'pointer',
+                                    color: theme.palette.text.primary,
+                                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    '&:hover': {
+                                        transform: 'translateY(-1px)',
+                                        boxShadow: `0 4px 12px ${alpha('#000', 0.08)}`,
+                                        borderColor: alpha(theme.palette.primary.main, 0.3),
+                                        '& .doc-icon-box': {
+                                            transform: 'scale(1.05)',
+                                        },
+                                        '& .doc-download-btn': {
+                                            opacity: 1,
+                                            transform: 'translateX(0)',
+                                        }
+                                    }
+                                }}
+                            >
                                 <Box
+                                    className="doc-icon-box"
                                     sx={{
+                                        width: 30,
+                                        height: 30,
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: 1,
-                                        width: '100%'
+                                        justifyContent: 'center',
+                                        flex: '0 0 auto',
+                                        transition: 'all 0.2s ease',
+                                        overflow: 'hidden'
                                     }}
                                 >
-                                    <Box
+                                    {meta.iconUrl ? (
+                                        <img
+                                            src={meta.iconUrl}
+                                            alt={meta.label}
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: 'contain'
+                                            }}
+                                        />
+                                    ) : (
+                                        <DocIcon size={24} />
+                                    )}
+                                </Box>
+
+                                <Box sx={{ minWidth: 0, flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: 0.2 }}>
+                                    <Typography
+                                        variant="body2"
                                         sx={{
-                                            width: 34,
-                                            height: 34,
-                                            borderRadius: 2,
+                                            fontWeight: 500,
+                                            color: theme.palette.text.primary,
+                                            lineHeight: 1.2,
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                        }}
+                                        title={name}
+                                    >
+                                        {name}
+                                    </Typography>
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            color: alpha(theme.palette.text.secondary, 0.8),
+                                            fontWeight: 500,
+                                            letterSpacing: '0.02em',
                                             display: 'flex',
                                             alignItems: 'center',
-                                            justifyContent: 'center',
-                                            backgroundColor: alpha(theme.palette.primary.main, 0.12),
-                                            color: theme.palette.primary.main,
-                                            flex: '0 0 auto'
+                                            gap: 0.8
                                         }}
                                     >
-                                        <FileText size={18} />
-                                    </Box>
-
-                                    <Box sx={{ minWidth: 0, flex: '1 1 auto', display: 'flex', flexDirection: 'column' }}>
-                                        <Typography
-                                            variant="body2"
-                                            sx={{
-                                                fontWeight: 600,
-                                                color: theme.palette.text.primary,
-                                                lineHeight: 1.2,
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis'
-                                            }}
-                                            title={msg.fileName || 'Document'}
-                                        >
-                                            {msg.fileName || 'Document'}
-                                        </Typography>
-                                        <Typography
-                                            variant="caption"
-                                            sx={{
-                                                color: alpha(theme.palette.text.primary, 0.7),
-                                                lineHeight: 1.2,
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis'
-                                            }}
-                                            title={msg.fileType || 'Unknown type'}
-                                        >
-                                            {msg.fileType || 'Unknown type'}
-                                        </Typography>
-                                    </Box>
-
-                                    <IconButton
-                                        component="a"
-                                        href={href}
-                                        download
-                                        size="small"
-                                        className="doc-download"
-                                        sx={{
-                                            color: alpha(theme.palette.text.primary, 0.75),
-                                            flex: '0 0 auto',
-                                            '&:hover': {
-                                                color: theme.palette.text.primary,
-                                                backgroundColor: alpha(theme.palette.text.primary, 0.06),
-                                            }
-                                        }}
-                                        title="Download"
-                                    >
-                                        <Download size={18} />
-                                    </IconButton>
+                                        <span style={{
+                                            fontSize: '0.7rem',
+                                        }}>
+                                            {meta.label}
+                                        </span>
+                                        {itemProps.size && <span>• {itemProps.size}</span>}
+                                    </Typography>
                                 </Box>
-                            )}
 
+                                <IconButton
+                                    component="a"
+                                    href={href}
+                                    download={name}
+                                    size="small"
+                                    className="doc-download-btn"
+                                    onClick={(e) => e.stopPropagation()}
+                                    sx={{
+                                        color: theme.palette.text.secondary,
+                                        flex: '0 0 auto',
+                                        opacity: 0.6,
+                                        transform: 'translateX(4px)',
+                                        transition: 'all 0.2s ease',
+                                        '&:hover': {
+                                            color: theme.palette.primary.main,
+                                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                        }
+                                    }}
+                                    title="Download"
+                                >
+                                    <Download size={20} />
+                                </IconButton>
+                            </Box>
+                        );
+                    };
+
+                    if (mediaItems.length === 0) {
+                        return (
+                            <div className="message-document" style={{ position: 'relative', maxWidth: 350, width: '100%' }}>
+                                {renderDocumentItem({
+                                    url: getMediaSrcForMessage(msg),
+                                    fileName: msg.fileName,
+                                    fileType: msg.fileType,
+                                    percent: msg.percent
+                                }, 0)}
+                                {msg.isUploading && (
+                                    <UploadProgressOverlay percent={msg.percent} size={40} />
+                                )}
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.2, width: '100%', maxWidth: 350 }}>
+                            {mediaItems.map((item, idx) => renderDocumentItem(item, idx))}
                             {msg.isUploading && (
                                 <UploadProgressOverlay percent={msg.percent} size={40} />
                             )}
-                        </div>
+                        </Box>
                     );
                 })()}
 

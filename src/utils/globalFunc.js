@@ -35,34 +35,36 @@ export const getSoftAvatarColors = (seed) => {
 };
 
 export const hasCustomerName = (customer) => {
-    const name = customer?.CustomerName;
+    const name = customer?.ConversationName;
     return Boolean(String(name ?? '').trim());
 };
 
 export const getCustomerDisplayName = (customer) => {
-    const name = String(customer?.CustomerName ?? '').trim();
+    const name = String(customer?.ConversationName ?? '').trim();
     if (name) return name;
 
     const phone = String(customer?.CustomerPhone ?? '').trim();
     if (phone) return phone;
 
-    const fallback = String(customer?.name ?? '').trim();
+    const fallback = String(customer?.ConversationName ?? '').trim();
     if (fallback) return fallback;
 
     return 'Unknown';
 };
 
 export const getCustomerAvatarSeed = (customer) => {
-    const name = String(customer?.CustomerName ?? '').trim();
+    console.log(customer);
+    const name = String(customer?.ConversationName ?? '').trim();
     if (name) return name;
 
     const phone = String(customer?.CustomerPhone ?? '').trim();
     if (phone) return phone;
 
-    return String(customer?.name ?? '').trim();
+    return String(customer?.ConversationName ?? '').trim();
 };
 
 export const getWhatsAppAvatarConfig = (name, size = 40) => {
+    console.log(name);
     const cleaned = String(name ?? '').trim();
     const { bg, fg } = getSoftAvatarColors(cleaned || 'unknown');
 
@@ -177,4 +179,28 @@ export const getClientIpAddress = async () => {
         console.error("Error fetching IP address:", error);
         return "";
     }
+};
+
+export const getFileExt = (name = '') => {
+    if (!name) return '';
+    const cleaned = String(name).trim().toLowerCase();
+    const idx = cleaned.lastIndexOf('.');
+    return idx >= 0 ? cleaned.slice(idx + 1) : '';
+};
+
+export const getDocumentMeta = (name = '') => {
+    const ext = getFileExt(name);
+
+    if (ext === 'pdf') return { label: 'PDF', tone: 'pdf', iconName: 'FileText', iconUrl: '/pdf.png' };
+    if (ext === 'doc' || ext === 'docx') return { label: 'DOCS', tone: 'doc', iconName: 'FileType', iconUrl: '/doc.png' };
+    if (ext === 'xls' || ext === 'xlsx' || ext === 'csv') return { label: 'EXCEL', tone: 'sheet', iconName: 'FileSpreadsheet', iconUrl: '/xls.png' };
+    if (ext === 'ppt' || ext === 'pptx') return { label: 'PPT', tone: 'ppt', iconName: 'FileType', iconUrl: '/ppt.png' };
+    if (ext === 'zip' || ext === 'rar' || ext === '7z') return { label: 'ZIP', tone: 'archive', iconName: 'FileArchive', iconUrl: '/docs.png' };
+    if (ext === 'psd') return { label: 'PSD', tone: 'psd', iconName: 'FileType', iconUrl: '/docs.png' };
+    if (ext === 'txt') return { label: 'TEXT', tone: 'default', iconName: 'FileText', iconUrl: '/txt.png' };
+    if (ext === 'json' || ext === 'xml' || ext === 'html' || ext === 'js' || ext === 'ts' || ext === 'css') {
+        return { label: 'CODE', tone: 'code', iconName: 'FileCode', iconUrl: '/docs.png' };
+    }
+
+    return { label: ext.toUpperCase() || 'FILE', tone: 'default', iconName: 'File', iconUrl: '/docs.png' };
 };

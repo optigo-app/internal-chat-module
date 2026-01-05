@@ -2,8 +2,8 @@ import { io } from 'socket.io-client';
 
 // Socket server configuration
 const SOCKET_URLS = {
-    production: 'https://nxt27.optigoapps.com',
-    development: 'http://192.168.1.71:3001',
+    production: 'http://newnextjs.web',
+    development: 'http://newnextjs.web',
 };
 
 // Pick correct URL

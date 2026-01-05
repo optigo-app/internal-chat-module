@@ -84,6 +84,35 @@ const ReplyPreview = ({ message, onCancel }) => {
           </Typography>
         </Box>
 
+        {message.mediaUrl && (
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: 1.5,
+              overflow: 'hidden',
+              flexShrink: 0,
+              backgroundColor: alpha(theme.palette.text.primary, 0.05),
+              border: `1px solid ${alpha(theme.palette.text.primary, 0.08)}`,
+              position: 'relative',
+              ml: 1
+            }}
+          >
+            {message.MessageType === 'video' ? (
+              <video
+                src={message.mediaUrl}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <img
+                src={message.mediaUrl}
+                alt="preview"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            )}
+          </Box>
+        )}
+
         <IconButton
           className="cancel-reply-btn"
           size="small"

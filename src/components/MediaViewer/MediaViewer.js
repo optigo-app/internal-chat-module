@@ -1,35 +1,25 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Dialog, IconButton } from '@mui/material';
-import { X, Download, ChevronLeft, ChevronRight, FileText, FileType, FileSpreadsheet, FileArchive, FileCode, File } from 'lucide-react';
+import { Dialog, IconButton, Tooltip, Avatar, Skeleton } from '@mui/material';
+import { X, Download, ChevronLeft, ChevronRight, FileText, FileType, FileSpreadsheet, FileArchive, FileCode, File, ZoomIn, ZoomOut, Reply, Star, Pin, Smile, Forward, Trash2, ExternalLink } from 'lucide-react';
 import { Swiper, SwiperSlide } from 'swiper/react';
-import { Keyboard } from 'swiper/modules';
+import { Keyboard, Mousewheel, Navigation } from 'swiper/modules';
 import 'swiper/css';
+import 'swiper/css/navigation';
 import './MediaViewer.scss';
-import { handleDownloadFile } from '../../utils/globalFunc';
+import { handleDownloadFile, getCustomerDisplayName, getWhatsAppAvatarConfig, getCustomerAvatarSeed, hasCustomerName, getFileExt, getDocumentMeta } from '../../utils/globalFunc';
+import PersonIcon from '@mui/icons-material/Person';
 
-const getFileExt = (name = '') => {
-  const cleaned = String(name ?? '').trim().toLowerCase();
-  const idx = cleaned.lastIndexOf('.');
-  return idx >= 0 ? cleaned.slice(idx + 1) : '';
-};
-
-const getDocumentVisual = (name = '') => {
-  const ext = getFileExt(name);
-
-  if (ext === 'pdf') return { Icon: FileText, tone: 'pdf' };
-  if (ext === 'doc' || ext === 'docx') return { Icon: FileType, tone: 'doc' };
-  if (ext === 'xls' || ext === 'xlsx' || ext === 'csv') return { Icon: FileSpreadsheet, tone: 'sheet' };
-  if (ext === 'ppt' || ext === 'pptx') return { Icon: FileType, tone: 'ppt' };
-  if (ext === 'zip' || ext === 'rar' || ext === '7z') return { Icon: FileArchive, tone: 'archive' };
-  if (ext === 'json' || ext === 'xml' || ext === 'html' || ext === 'js' || ext === 'ts') return { Icon: FileCode, tone: 'code' };
-
-  return { Icon: File, tone: 'default' };
-};
-
-const MediaViewer = ({ mediaItems, initialIndex = 0, onClose }) => {
+const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, onReply }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [loading, setLoading] = useState({});
+  const [loading, setLoading] = useState(() => {
+    const initialState = {};
+    mediaItems.forEach((_, idx) => {
+      initialState[idx] = true;
+    });
+    return initialState;
+  });
   const swiperRef = useRef(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   const pauseVideosInElement = useCallback((rootEl) => {
     if (!rootEl || typeof rootEl.querySelectorAll !== 'function') return;
@@ -42,6 +32,17 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose }) => {
       } catch (e) {
       }
     });
+  }, []);
+
+  useEffect(() => {
+    const handleResizeError = (e) => {
+      if (e.message === 'ResizeObserver loop completed with undelivered notifications.') {
+        e.stopImmediatePropagation();
+      }
+    };
+
+    window.addEventListener('error', handleResizeError);
+    return () => window.removeEventListener('error', handleResizeError);
   }, []);
 
   useEffect(() => {
@@ -82,6 +83,9 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose }) => {
 
   const enableLoop = mediaItems.length > 1;
 
+  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.2, 3));
+  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.2, 0.5));
+
   return (
     <Dialog
       open
@@ -95,7 +99,7 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose }) => {
       slotProps={{
         backdrop: {
           sx: {
-            backgroundColor: 'rgba(0, 0, 0, 0.45)',
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
           },
         },
       }}
@@ -105,22 +109,60 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose }) => {
         sx: { m: 0 },
       }}
       maxWidth={false}
+      fullScreen
     >
       {/* Header */}
       <div className="media-viewer-header">
         <div className="media-viewer-header-left">
-          <div className="media-viewer-title">
-            {currentMedia?.name || `Media ${currentIndex + 1}`}
+          {!hasCustomerName(selectedCustomer) ? (
+            <Avatar
+              {...getWhatsAppAvatarConfig(getCustomerAvatarSeed(selectedCustomer))}
+            >
+              <PersonIcon fontSize="small" />
+            </Avatar>
+          ) : (
+            <Avatar {...selectedCustomer.avatarConfig} />
+          )}
+          <div className="media-viewer-user-info">
+            <div className="media-viewer-username">{getCustomerDisplayName(selectedCustomer)}</div>
+            <div className="media-viewer-timestamp">Today at {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()}</div>
           </div>
         </div>
 
         <div className="media-viewer-header-right">
-          <IconButton className="media-viewer-download" onClick={() => handleDownloadFile(currentMedia?.src, currentMedia?.name)}>
-            <Download size={20} />
-          </IconButton>
-          <IconButton className="media-viewer-close" onClick={() => onClose?.()}>
-            <X size={20} />
-          </IconButton>
+          <div className="media-viewer-toolbar">
+            <Tooltip title="Zoom In" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
+              <IconButton className="toolbar-btn" onClick={handleZoomIn}><ZoomIn size={18} /></IconButton>
+            </Tooltip>
+            <Tooltip title="Zoom Out" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
+              <IconButton className="toolbar-btn" onClick={handleZoomOut}><ZoomOut size={18} /></IconButton>
+            </Tooltip>
+            <div className="toolbar-divider" />
+            <Tooltip title="Reply" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
+              <IconButton className="toolbar-btn" onClick={() => onReply(currentMedia?.attachmentId)}><Reply size={18} /></IconButton>
+            </Tooltip>
+            <Tooltip title="Star" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
+              <IconButton className="toolbar-btn"><Star size={18} /></IconButton>
+            </Tooltip>
+            <Tooltip title="Pin" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
+              <IconButton className="toolbar-btn"><Pin size={18} /></IconButton>
+            </Tooltip>
+            <Tooltip title="React" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
+              <IconButton className="toolbar-btn"><Smile size={18} /></IconButton>
+            </Tooltip>
+            <Tooltip title="Forward" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
+              <IconButton className="toolbar-btn"><Forward size={18} /></IconButton>
+            </Tooltip>
+            <Tooltip title="Download" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
+              <IconButton className="toolbar-btn" onClick={() => handleDownloadFile(currentMedia?.src, currentMedia?.name)}><Download size={18} /></IconButton>
+            </Tooltip>
+            <div className="toolbar-divider" />
+            <Tooltip title="Close" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
+              <IconButton className="toolbar-btn media-viewer-close" onClick={() => onClose?.()}>
+                <X size={20} />
+              </IconButton>
+            </Tooltip>
+          </div>
         </div>
       </div>
 
@@ -153,7 +195,8 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose }) => {
               setCurrentIndex(nextIndex);
             }}
             keyboard={{ enabled: true }}
-            modules={[Keyboard]}
+            mousewheel={true}
+            modules={[Keyboard, Mousewheel, Navigation]}
           >
             {mediaItems.map((item, index) => {
               const slideLoading = loading[index];
@@ -164,9 +207,19 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose }) => {
                     {item?.type === 'image' && (
                       <>
                         {slideLoading && (
-                          <div className="media-loading">
-                            <div className="spinner"></div>
-                          </div>
+                          <Skeleton
+                            variant="rectangular"
+                            width="100%"
+                            height="100%"
+                            sx={{
+                              bgcolor: 'rgba(255, 255, 255, 0.05)',
+                              borderRadius: '12px',
+                              position: 'absolute',
+                              maxWidth: 'min(900px, 90%)',
+                              maxHeight: 'min(700px, 80%)'
+                            }}
+                            animation="wave"
+                          />
                         )}
                         <img
                           src={item.src}
@@ -174,30 +227,61 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose }) => {
                           className={`media-content ${slideLoading ? 'loading' : 'loaded'}`}
                           onLoad={() => markLoaded(index)}
                           onError={() => markLoaded(index)}
-                          style={{ display: slideLoading ? 'none' : 'block' }}
+                          style={{
+                            display: slideLoading ? 'none' : 'block',
+                            transform: `scale(${zoomLevel})`,
+                            transition: 'transform 0.2s ease-in-out'
+                          }}
                         />
                       </>
                     )}
 
                     {item?.type === 'video' && (
-                      <video
-                        src={item.src}
-                        className="media-content"
-                        controls
-                        onLoadedData={() => markLoaded(index)}
-                        onError={() => markLoaded(index)}
-                      />
+                      <>
+                        {slideLoading && (
+                          <Skeleton
+                            variant="rectangular"
+                            width="100%"
+                            height="100%"
+                            sx={{
+                              bgcolor: 'rgba(255, 255, 255, 0.05)',
+                              borderRadius: '12px',
+                              position: 'absolute',
+                              maxWidth: 'min(800px, 90%)',
+                              maxHeight: 'min(600px, 80%)'
+                            }}
+                            animation="wave"
+                          />
+                        )}
+                        <video
+                          src={item.src}
+                          className="media-content"
+                          controls
+                          onLoadedData={() => markLoaded(index)}
+                          onCanPlay={() => markLoaded(index)}
+                          onError={() => markLoaded(index)}
+                          style={{
+                            display: slideLoading ? 'none' : 'block'
+                          }}
+                        />
+                      </>
                     )}
 
                     {item?.type === 'document' && (
                       (() => {
-                        const { Icon: DocIcon, tone } = getDocumentVisual(item?.name);
+                        const meta = getDocumentMeta(item?.name);
+                        const IconMap = { FileText, FileType, FileSpreadsheet, FileArchive, FileCode, File };
+                        const DocIcon = IconMap[meta.iconName] || File;
 
                         return (
                           <div className="document-preview">
                             <div className="document-header">
-                              <div className={`document-icon ${tone}`}>
-                                <DocIcon size={36} />
+                              <div className={`document-icon ${meta.iconUrl ? '' : meta.tone}`} style={meta.iconUrl ? { background: 'none', padding: 0 } : {}}>
+                                {meta.iconUrl ? (
+                                  <img src={meta.iconUrl} alt={meta.label} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                ) : (
+                                  <DocIcon size={36} />
+                                )}
                               </div>
                               <div className="document-info">
                                 <div className="document-name">{item.name || 'Document'}</div>
@@ -234,53 +318,65 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose }) => {
         )}
       </div>
 
-      {/* Thumbnails */}
-      {mediaItems.length > 1 && (
-        <div className="media-viewer-thumbnails">
-          {mediaItems.map((item, index) => (
-            <div
-              key={index}
-              className={`thumbnail ${index === currentIndex ? 'active' : ''}`}
-              onClick={() => {
-                if (swiperRef.current) {
-                  if (typeof swiperRef.current.slideToLoop === 'function') {
-                    swiperRef.current.slideToLoop(index);
-                    return;
-                  }
-
-                  if (typeof swiperRef.current.slideTo === 'function') {
-                    swiperRef.current.slideTo(index);
-                    return;
-                  }
-                }
-
-                setCurrentIndex(index);
-              }}
-            >
-              {item.type === 'image' && (
-                <img src={item.src} alt={`Thumbnail ${index}`} />
-              )}
-              {item.type === 'video' && (
-                <div className="thumbnail-video">
-                  <div className="thumbnail-icon">🎬</div>
-                </div>
-              )}
-              {item.type === 'document' && (
-                (() => {
-                  const { Icon: DocIcon, tone } = getDocumentVisual(item?.name);
-                  return (
-                    <div className="thumbnail-document">
-                      <div className={`thumbnail-icon ${tone}`}>
-                        <DocIcon size={22} />
-                      </div>
-                    </div>
-                  );
-                })()
-              )}
-            </div>
-          ))}
+      {/* Footer / Thumbnails */}
+      <div className="media-viewers-footer">
+        <div className="media-count">
+          {currentIndex + 1} of {mediaItems.length}
         </div>
-      )}
+        {mediaItems.length > 1 && (
+          <div className="media-viewer-thumbnails">
+            {mediaItems.map((item, index) => (
+              <div
+                key={index}
+                className={`thumbnail ${index === currentIndex ? 'active' : ''}`}
+                onClick={() => {
+                  if (swiperRef.current) {
+                    if (typeof swiperRef.current.slideToLoop === 'function') {
+                      swiperRef.current.slideToLoop(index);
+                      return;
+                    }
+
+                    if (typeof swiperRef.current.slideTo === 'function') {
+                      swiperRef.current.slideTo(index);
+                      return;
+                    }
+                  }
+
+                  setCurrentIndex(index);
+                }}
+              >
+                {item.type === 'image' && (
+                  <img src={item.src} alt={`Thumbnail ${index}`} />
+                )}
+                {item.type === 'video' && (
+                  <div className="thumbnail-video">
+                    <div className="thumbnail-icon">🎬</div>
+                  </div>
+                )}
+                {item.type === 'document' && (
+                  (() => {
+                    const meta = getDocumentMeta(item?.name);
+                    const IconMap = { FileText, FileType, FileSpreadsheet, FileArchive, FileCode, File };
+                    const DocIcon = IconMap[meta.iconName] || File;
+
+                    return (
+                      <div className="thumbnail-document">
+                        <div className={`thumbnail-icon ${meta.iconUrl ? '' : meta.tone}`} style={meta.iconUrl ? { background: 'none', padding: 0 } : {}}>
+                          {meta.iconUrl ? (
+                            <img src={meta.iconUrl} alt={meta.label} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                          ) : (
+                            <DocIcon size={22} />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </Dialog>
   );
 };

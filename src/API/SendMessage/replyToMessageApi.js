@@ -5,6 +5,7 @@ export const replyToMessageApi = async (
     {
         conversationId,
         replyToMessageId,
+        ReplyToAttachmentId,
         message,
         messageType = 1,
         fLabel = "Reply ( Reply to Message )",
@@ -19,6 +20,7 @@ export const replyToMessageApi = async (
             SenderId: auth.id ?? 0,
             ConversationId: conversationId,
             ReplyToMessageId: replyToMessageId,
+            ReplyToAttachmentId: ReplyToAttachmentId || 0,
             Message: message,
             MessageType: messageType,
         };

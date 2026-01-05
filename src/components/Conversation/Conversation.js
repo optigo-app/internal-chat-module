@@ -64,6 +64,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         setMediaViewerOpen,
         mediaViewerItems,
         mediaViewerIndex,
+        mediaViewerMessage,
         groupMessagesByDate,
         currentPage,
         forwardAnchorEl,
@@ -463,7 +464,12 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 <MediaViewer
                     mediaItems={mediaViewerItems}
                     initialIndex={mediaViewerIndex}
+                    selectedCustomer={selectedCustomer}
                     onClose={() => setMediaViewerOpen(false)}
+                    onReply={(attachmentId) => {
+                        handleReply(mediaViewerMessage, attachmentId);
+                        setMediaViewerOpen(false);
+                    }}
                 />
             )}
             <div className="conversation-layout">

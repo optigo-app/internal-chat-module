@@ -78,6 +78,7 @@ export const normalizeServerMessages = (messagesArray, auth) => {
                     filename: fileName,
                     fileName,
                     size: a?.size,
+                    attachmentId: a?.attachmentId || a?.AttachmentId || a?.Id || a?.id
                 };
             })
             .filter(Boolean);
