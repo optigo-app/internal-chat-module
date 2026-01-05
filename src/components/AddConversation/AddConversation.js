@@ -27,22 +27,11 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
     const containerRef = useRef(null);
     const pageSize = 100;
     const searchTimeoutRef = useRef(null);
-    const { auth, PERMISSION_SET } = useContext(LoginContext);
-
-    const can = (perm) => PERMISSION_SET?.has(perm);
+    const { auth } = useContext(LoginContext);
 
     const transformMemberData = useCallback((items) => {
         return items?.map((item) => {
-            // New API shape example:
-            // {
-            //   UserId: 3,
-            //   UserName: 'salesrep salesrep salesrep',
-            //   UserEmail: 'www@optigoapps.com',
-            //   ProfileImageUrl: null
-            // }
-
             const name = item.UserName || getCustomerDisplayName(item);
-
             return {
                 ...item,
                 UserId: item.UserId,
@@ -86,7 +75,6 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
 
     useEffect(() => {
         loadMembers(1, true);
-
         return () => {
             if (searchTimeoutRef.current) {
                 clearTimeout(searchTimeoutRef.current);
@@ -98,7 +86,6 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
         }
-
         searchTimeoutRef.current = setTimeout(() => {
             loadMembers(1, true, value);
         }, 500);

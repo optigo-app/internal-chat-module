@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, memo, useRef } from 'react'
+import React, { useState, useEffect, memo, useRef } from 'react'
 import ReplyPreview from '../ReplyToComponents/ReplyPreview'
 import { IconButton, Menu, MenuItem, ListItemIcon, ListItemText, Popper, Paper, Box } from '@mui/material'
 import AttachFile from '@mui/icons-material/AttachFile'
@@ -8,7 +8,6 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import EmojiPicker from 'emoji-picker-react'
 import TextField from '@mui/material/TextField'
 import { SendHorizontal, Smile } from 'lucide-react'
-import debounce from 'lodash.debounce'
 
 const ChatBox = ({
     mediaFiles,
@@ -44,22 +43,16 @@ const ChatBox = ({
     }, [replyToMessage]);
 
     const [tempQuery, setTempQuery] = useState(inputValue || '')
+    const prevInputValueRef = useRef(inputValue)
 
-    // ✅ Debounce updates to parent setInputValue (100ms after typing stops)
-    const debouncedUpdateInputValue = useMemo(
-        () =>
-            debounce((value) => {
-                setInputValue(value)
-            }, 100),
-        [setInputValue]
-    )
-
+    // Sync tempQuery when parent explicitly clears inputValue (after sending)
     useEffect(() => {
-        debouncedUpdateInputValue(tempQuery)
-        return () => {
-            debouncedUpdateInputValue.cancel()
+        // Only clear local state if parent went from non-empty to empty
+        if (prevInputValueRef.current !== '' && inputValue === '') {
+            setTempQuery('')
         }
-    }, [tempQuery, debouncedUpdateInputValue])
+        prevInputValueRef.current = inputValue
+    }, [inputValue])
 
     const onEmojiClick = (emojiData) => {
         const emoji = emojiData?.emoji || '';
@@ -246,8 +239,13 @@ const ChatBox = ({
                     onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault()
-                            handleKeyPress(e)
-                            setTempQuery('')
+                            // Pass the current value directly to avoid async state issues
+                            if (tempQuery.trim() || (mediaFiles && mediaFiles.length > 0)) {
+                                setInputValue(tempQuery)
+                                // Call handleSendMessage directly with tempQuery
+                                handleSendMessage(tempQuery)
+                                setTempQuery('')
+                            }
                         }
                     }}
                     placeholder={
@@ -268,8 +266,12 @@ const ChatBox = ({
 
                 <IconButton
                     onClick={() => {
-                        handleSendMessage()
-                        setTempQuery('')
+                        if (tempQuery.trim() || (mediaFiles && mediaFiles.length > 0)) {
+                            setInputValue(tempQuery)
+                            // Pass tempQuery directly to handleSendMessage
+                            handleSendMessage(tempQuery)
+                            setTempQuery('')
+                        }
                     }}
                     disabled={!tempQuery.trim() && (!mediaFiles || mediaFiles.length === 0)}
                     className="send-button"

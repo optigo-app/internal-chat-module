@@ -176,23 +176,18 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [handleClose, mediaItems.length]);
 
-    const handleAddMore = () => fileInputRef.current?.click();
 
     const removeMedia = (id) => {
-        // Remove from mediaItems
         setMediaItems((prev) => {
             const filtered = prev.filter((item) => item.id !== id);
             if (filtered.length === 0) {
                 setCurrentIndex(0);
-                // If this was the last item, close the preview
                 handleClose();
             } else {
                 setCurrentIndex((prevIndex) => Math.min(prevIndex, filtered.length - 1));
             }
             return filtered;
         });
-
-        // Also remove from mediaFiles if setMediaFiles is provided
         if (typeof setMediaFiles === 'function') {
             setMediaFiles((prev) => {
                 const filtered = (prev || []).filter((file) => `${file.name}-${file.size}-${file.lastModified}` !== id);
@@ -233,9 +228,6 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                         >
                             <Trash2 size={20} />
                         </button>
-                        {/* <button className="icon-btn" style={{ visibility: 'hidden' }} onClick={handleAddMore} aria-label="Add more">
-                            <Paperclip size={20} />
-                        </button> */}
                     </div>
                 </div>
 

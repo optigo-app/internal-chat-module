@@ -1,4 +1,3 @@
-import { addMessageHandler, addMessageHandlerFromAssigningUser, addStatusHandler } from '../../socket';
 import { FileText, Image, Video, ArrowLeft, Pin, ChevronDown, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CheckCheck } from "lucide-react";
@@ -29,6 +28,7 @@ import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig,
 import WhatsAppMenu from '../ReusableComponent/WhatsAppMenu';
 import { getMessagePreview, processApiResponse, getCustomerListMenuItems } from './CustomerListFunc';
 import { updateConversationApi } from '../../API/SendMessage/updateConversationApi';
+import { addInternalMessageHandler, addInternalStatusHandler } from '../../socket';
 
 const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, selectedStatus = 'All', selectedTag = 'All', isConversationRead = false, viewConversationRead = false, onConversationList = () => { } }) => {
     const location = useLocation();
@@ -53,7 +53,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         setAnchorEl(null);
     };
 
-
     const loadMembers = useCallback(async (page = 1, reset = false, search = null) => {
         if (loading || (!reset && !hasMore)) return;
         if (!auth?.token || !auth?.userId) {
@@ -72,6 +71,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 ...customer,
                 ConversationId: customer.CustomerId,
                 Id: customer.CustomerId,
+                ReceiverId: customer.ReceiverId,
                 name: customer.CustomerName || customer.CustomerPhone,
                 lastMessage: '',
                 lastMessageText: '',
@@ -125,6 +125,173 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     useEffect(() => {
         loadMembersRef.current = loadMembers;
     }, [loadMembers]);
+
+    const selectedConversationIdRef = useRef(selectedCustomer?.ConversationId);
+    const isConversationReadingRef = useRef(false);
+    useEffect(() => {
+        selectedConversationIdRef.current = selectedCustomer?.ConversationId;
+        isConversationReadingRef.current = Boolean(isConversationRead || viewConversationRead);
+    }, [selectedCustomer?.ConversationId, isConversationRead, viewConversationRead]);
+
+    const normalizeMessageType = (type) => {
+        if (typeof type === 'string') return type;
+        switch (Number(type)) {
+            case 1: return 'text';
+            case 2: return 'image';
+            case 3: return 'video';
+            case 4: return 'document';
+            case 5: return 'file';
+            default: return 'text';
+        }
+    };
+
+    const mapMessageTypeToCode = (type) => {
+        const t = normalizeMessageType(type);
+        switch (t) {
+            case 'text': return 1;
+            case 'image': return 2;
+            case 'video': return 3;
+            case 'document': return 4;
+            case 'file': return 5;
+            default: return 1;
+        }
+    };
+
+    const handleSocketUpdate = useCallback((incoming, isStatusChange = false) => {
+        setChatMembers((prev) => {
+            if (!prev?.data) return prev;
+
+            const conversationId = incoming?.ConversationId ?? incoming?.conversationId;
+            if (conversationId == null) return prev;
+
+            const resolvedName = (() => {
+                const candidate = String(
+                    incoming?.CustomerName ??
+                    incoming?.ConversationName ??
+                    incoming?.UserName ??
+                    incoming?.name ??
+                    incoming?.DisplayEmail ??
+                    ''
+                ).trim();
+                return candidate || getCustomerDisplayName(incoming);
+            })();
+
+            const updatedData = [...prev.data];
+            const index = updatedData.findIndex(
+                (member) => Number(member.ConversationId) === Number(conversationId)
+            );
+
+            const normalizedType = normalizeMessageType(incoming?.MessageType ?? incoming?.LastMessageType);
+            const previewMsg = {
+                ...incoming,
+                MessageType: normalizedType,
+            };
+            const messagePreview = getMessagePreview(previewMsg);
+            const messagePreviewText = messagePreview?.text ?? '';
+            const messagePreviewNode = messagePreview?.node ?? '';
+            const formattedTime = formatChatTimestamp(incoming?.DateTime || incoming?.LastMessageDate || incoming?.LastUpdatedDate);
+
+            const myId = Number(auth?.id ?? auth?.userId);
+            const senderId = Number(incoming?.SenderId ?? incoming?.Sender);
+            const isOutgoing = myId && senderId && myId === senderId;
+            const normalizedDirection = isOutgoing ? 1 : 0;
+
+            const isOpenConversation =
+                Number(selectedConversationIdRef.current) === Number(conversationId) &&
+                Boolean(isConversationReadingRef.current);
+
+            const nextUnreadCount = (currentCount) => {
+                if (isStatusChange) return currentCount;
+                if (isOutgoing) return currentCount;
+                if (isOpenConversation) return 0;
+                return (currentCount || 0) + 1;
+            };
+
+            const nextUnreadOnStatus = (currentCount) => {
+                if (!isStatusChange) return currentCount;
+                if (Number(incoming?.Status) === 1) return 0;
+                return currentCount;
+            };
+
+            if (index !== -1) {
+                const currentChat = updatedData[index];
+                const currentUnread = currentChat.unreadCount ?? currentChat.UnreadCount ?? 0;
+
+                const isSameMessage =
+                    currentChat.lastMessageText === messagePreviewText &&
+                    currentChat.lastMessageTime === formattedTime;
+                if (isSameMessage && !isStatusChange) {
+                    return prev;
+                }
+
+                const unreadAfterMsg = nextUnreadCount(currentUnread);
+                const unreadFinal = nextUnreadOnStatus(unreadAfterMsg);
+
+                const updatedChat = {
+                    ...currentChat,
+                    name: (String(currentChat?.name ?? '').trim() && String(currentChat?.name).trim() !== 'Unknown')
+                        ? currentChat.name
+                        : resolvedName,
+                    lastMessage: messagePreviewNode,
+                    lastMessageText: messagePreviewText,
+                    lastMessageTime: formattedTime,
+                    lastMessageTimeValue: incoming?.DateTime || currentChat.lastMessageTimeValue,
+                    unreadCount: unreadFinal,
+                    UnreadCount: unreadFinal,
+                    LastMessage: incoming?.Message ?? currentChat.LastMessage,
+                    LastMessageType: mapMessageTypeToCode(normalizedType),
+                    LastMessageStatus: incoming?.Status ?? incoming?.status ?? currentChat.LastMessageStatus,
+                    LastMessageDirection: normalizedDirection,
+                };
+
+                updatedData.splice(index, 1);
+                updatedData.unshift(updatedChat);
+            } else {
+                const unread = isStatusChange || isOutgoing ? 0 : (isOpenConversation ? 0 : 1);
+                const avatarSeed = getCustomerAvatarSeed(incoming) || resolvedName;
+                const newChat = {
+                    ConversationId: conversationId,
+                    name: resolvedName,
+                    lastMessage: messagePreviewNode,
+                    lastMessageText: messagePreviewText,
+                    lastMessageTime: formattedTime,
+                    lastMessageTimeValue: incoming?.DateTime,
+                    unreadCount: unread,
+                    UnreadCount: unread,
+                    LastMessage: incoming?.Message ?? '',
+                    LastMessageType: mapMessageTypeToCode(normalizedType),
+                    LastMessageStatus: incoming?.Status ?? incoming?.status,
+                    LastMessageDirection: normalizedDirection,
+                    ReceiverId: incoming?.ReceiverId,
+                    avatar: null,
+                    avatarConfig: getWhatsAppAvatarConfig(avatarSeed),
+                };
+                updatedData.unshift(newChat);
+            }
+
+            return { ...prev, data: updatedData };
+        });
+    }, [auth?.id, auth?.userId]);
+
+    useEffect(() => {
+        if (!auth?.token || !auth?.userId) return;
+
+        const removeInternalMessageHandler = addInternalMessageHandler((data) => {
+            if (!data || typeof data !== 'object') return;
+            handleSocketUpdate(data, false);
+        });
+        const handleStatusChange = (data) => handleSocketUpdate(data, true);
+        const removeStatusHandler = addInternalStatusHandler(handleStatusChange);
+
+        return () => {
+            if (typeof removeInternalMessageHandler === 'function') {
+                removeInternalMessageHandler();
+            }
+            if (typeof removeStatusHandler === 'function') {
+                removeStatusHandler();
+            }
+        };
+    }, [auth?.token, auth?.userId]);
 
     const debouncedSearch = useCallback((value) => {
         if (searchTimeoutRef.current) {
@@ -285,94 +452,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         }
         handleCloseMenu();
     };
-
-    const handleSocketUpdate = (data, isStatusChange = false) => {
-        setChatMembers((prev) => {
-            if (!prev?.data) return prev;
-
-            const updatedData = [...prev.data];
-            const index = updatedData.findIndex(
-                (member) => Number(member.ConversationId) === Number(data?.ConversationId)
-            );
-
-            const messagePreview = getMessagePreview(data);
-            const messagePreviewText = messagePreview?.text ?? '';
-            const messagePreviewNode = messagePreview?.node ?? '';
-            const formattedTime = formatChatTimestamp(data?.DateTime);
-
-            if (index !== -1) {
-                const currentChat = updatedData[index];
-
-                const isSameMessage =
-                    currentChat.lastMessageText === messagePreviewText &&
-                    currentChat.lastMessageTime === formattedTime;
-
-                if (isSameMessage && !isStatusChange) {
-                    return prev;
-                }
-
-                const updatedChat = {
-                    ...currentChat,
-                    lastMessage: messagePreviewNode,
-                    lastMessageText: messagePreviewText,
-                    lastMessageTime: formattedTime,
-                    lastMessageStatus: data?.Status ?? data?.status ?? currentChat.lastMessageStatus,
-                    lastMessageDirection: data?.Direction ?? currentChat.lastMessageDirection,
-                };
-
-                if (!isStatusChange) {
-                    updatedChat.unreadCount = (currentChat.unreadCount || 0) + 1;
-                }
-
-                if (isStatusChange && data?.Status === 1) {
-                    updatedChat.unreadCount = 0;
-                }
-
-                updatedData.splice(index, 1);
-                if (!isStatusChange) {
-                    updatedData.unshift(updatedChat);
-                } else {
-                    updatedData.splice(index, 0, updatedChat);
-                }
-            } else {
-                const newChat = {
-                    ConversationId: data?.ConversationId,
-                    name: getCustomerDisplayName(data),
-                    lastMessage: messagePreviewNode,
-                    lastMessageText: messagePreviewText,
-                    lastMessageTime: formattedTime,
-                    lastMessageStatus: data?.Status ?? data?.status,
-                    lastMessageDirection: data?.Direction,
-                    unreadCount: isStatusChange ? 0 : 1,
-                    avatar: null,
-                    avatarConfig: getWhatsAppAvatarConfig(getCustomerAvatarSeed(data)),
-                };
-                updatedData.unshift(newChat);
-            }
-
-            return { ...prev, data: updatedData };
-        });
-    };
-
-    // Optimized socket listener setup - only depend on auth token, not currentPage
-    useEffect(() => {
-        if (!auth?.token || !auth?.userId) return;
-
-        const handleNewMessage = (data) => handleSocketUpdate(data, false);
-        const handleStatusChange = (data) => handleSocketUpdate(data, true);
-        const handleNewMessageFromAssigningUser = (data) => handleSocketUpdate(data, false);
-
-        const removeMessageHandler = addMessageHandler(handleNewMessage);
-        const removeStatusHandler = addStatusHandler(handleStatusChange);
-        const removeMessageHandlerFromAssigningUser =
-            addMessageHandlerFromAssigningUser(handleNewMessageFromAssigningUser);
-
-        return () => {
-            removeMessageHandler();
-            removeStatusHandler();
-            removeMessageHandlerFromAssigningUser();
-        };
-    }, [auth?.token, auth?.userId]);
 
     useEffect(() => {
         const conversationId = selectedCustomer?.ConversationId;
@@ -620,7 +699,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                                             <div className="member-trailing">
                                                                 {shouldShowUnreadBadge && (
                                                                     <Badge
-                                                                        badgeContent={member?.UnreadCount}
+                                                                        badgeContent={member?.unreadCount ?? member?.UnreadCount}
                                                                         color="primary"
                                                                         className="unread-badge"
                                                                     />

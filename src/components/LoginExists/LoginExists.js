@@ -6,7 +6,6 @@ import warning from "../../assets/lotties/warning.json";
 import loader from "../../assets/lotties/loader.json";
 import Lottie from "lottie-react";
 import { LogoutApi } from "../../API/Logout/Logout";
-import { savePlayerId } from "../../API/SavePlayerId/SavePlayerId";
 import { initializeSocket } from "../../socket";
 import { Button } from "@mui/material";
 
@@ -35,9 +34,7 @@ const LoginExists = () => {
 
             sessionStorage.setItem("isLoggedIn", true);
             sessionStorage.setItem("userData", JSON.stringify(getId));
-            await savePlayerId(socket?.id, getId?.userId, getId?.id);
             sessionStorage.removeItem("hasSocketId");
-
             navigate("/");
         } catch (error) {
             console.error("Error staying logged in:", error);

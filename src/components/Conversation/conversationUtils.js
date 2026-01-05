@@ -37,16 +37,41 @@ export const normalizeServerMessages = (messagesArray, auth) => {
 
         const attachmentsArray = Array.isArray(parsedAttachments) ? parsedAttachments : [];
         const firstAttachment = attachmentsArray?.[0] || null;
-        const attachmentUrl = firstAttachment?.url || firstAttachment?.Url || firstAttachment?.fileUrl || firstAttachment?.fileURL || null;
-        const attachmentMime = firstAttachment?.mimeType || firstAttachment?.mimetype || firstAttachment?.fileType || msg?.fileType || '';
-        const attachmentName = firstAttachment?.fileName || firstAttachment?.filename || msg?.fileName || '';
+        const attachmentUrl =
+            firstAttachment?.url ||
+            firstAttachment?.Url ||
+            firstAttachment?.fileUrl ||
+            firstAttachment?.fileURL ||
+            firstAttachment?.FileUrl ||
+            firstAttachment?.FileURL ||
+            null;
+        const attachmentMime =
+            firstAttachment?.mimeType ||
+            firstAttachment?.mimetype ||
+            firstAttachment?.fileType ||
+            firstAttachment?.MimeType ||
+            msg?.fileType ||
+            '';
+        const attachmentName =
+            firstAttachment?.fileName ||
+            firstAttachment?.filename ||
+            firstAttachment?.FileName ||
+            msg?.fileName ||
+            '';
 
         const mediaItems = attachmentsArray
             .map((a) => {
-                const url = a?.url || a?.Url || a?.fileUrl || a?.fileURL || null;
+                const url =
+                    a?.url ||
+                    a?.Url ||
+                    a?.fileUrl ||
+                    a?.fileURL ||
+                    a?.FileUrl ||
+                    a?.FileURL ||
+                    null;
                 if (!url) return null;
-                const mimeType = a?.mimeType || a?.mimetype || a?.fileType || '';
-                const fileName = a?.fileName || a?.filename || a?.name || '';
+                const mimeType = a?.mimeType || a?.mimetype || a?.fileType || a?.MimeType || '';
+                const fileName = a?.fileName || a?.filename || a?.FileName || a?.name || '';
                 return {
                     url,
                     mimeType,

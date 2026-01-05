@@ -33,14 +33,15 @@
     "sass": "^1.90.0",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
+    "swiper": "^12.0.3",
     "web-vitals": "^2.1.4",
     "xlsx": "^0.18.5"
   },
   "scripts": {
-    "start": "cross-env PORT=4000 react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "start": "npx fix-react2shell-next && cross-env PORT=4000 react-scripts start",
+    "build": "npx fix-react2shell-next && react-scripts build",
+    "test": "npx fix-react2shell-next && react-scripts test",
+    "eject": "npx fix-react2shell-next && react-scripts eject"
   },
   "eslintConfig": {
     "extends": [

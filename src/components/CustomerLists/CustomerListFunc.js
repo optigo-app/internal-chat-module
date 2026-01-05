@@ -68,17 +68,6 @@ export const processApiResponse = (apiData) => {
       }
       : null;
 
-    let tags = [];
-    if (conversation.TagList) {
-      try {
-        tags =
-          typeof conversation.TagList === 'string'
-            ? JSON.parse(conversation.TagList)
-            : conversation.TagList;
-      } catch (e) {
-        console.error('Error parsing TagList:', e);
-      }
-    }
 
     const preview = lastMessage ? getMessagePreview(lastMessage) : { text: '', node: '' };
 
@@ -92,16 +81,14 @@ export const processApiResponse = (apiData) => {
     return {
       ...conversation,
       ConversationId: conversation.ConversationId ?? conversation.Id,
+      ReceiverId: conversation.ReceiverId ?? "",
       lastMessage: preview.node,
       lastMessageText: preview.text,
       lastMessageTimeValue,
       lastMessageTime: formatChatTimestamp(
         lastMessageTimeValue
       ),
-      lastMessageStatus: lastMessage?.Status,
-      lastMessageDirection: lastMessage?.Direction,
       unreadCount: conversation.UnreadCount ?? conversation.UnReadMsgCount ?? 0,
-      tags: tags,
       name: conversation.ConversationName || getCustomerDisplayName(conversation),
       avatar: null,
       avatarConfig: getWhatsAppAvatarConfig(getCustomerAvatarSeed(conversation)),

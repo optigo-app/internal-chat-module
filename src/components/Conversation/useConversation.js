@@ -3,13 +3,13 @@ import { conversationView } from '../../API/ConversationView/ConversationView';
 import { sendDocumentMessage, sendImageMessage, sendTextMessage, sendVideoMessage } from '../../API/SendMessage/SendMessageApi';
 import { normalizeServerMessages as normalizeServerMessagesHelper, groupMessagesByDateHelper } from './conversationUtils';
 
-import { addMessageHandler, addMessageHandlerFromAssigningUser, addMessageReactionHandler, addStatusHandler } from '../../socket';
+import { addMessageReactionHandler, addInternalMessageHandler, emitInternalMessageSend, addInternalStatusHandler, emitInternalMessageRead } from '../../socket';
 import { readMessage } from '../../API/ReadMessage/ReadMessage';
 import { uploadMediaAPi } from '../../API/FileUpload/uploadHelpers';
-import { MediaApi } from '../../API/InitialApi/MediaApi';
 import { toast } from 'react-hot-toast';
 import { LoginContext } from '../../context/LoginData';
 import { formatDateHeader } from '../../utils/DateFnc';
+
 import { forwardMessageApi } from '../../API/SendMessage/forwardMessageApi';
 import { replyToMessageApi } from '../../API/SendMessage/replyToMessageApi';
 
@@ -43,12 +43,10 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     const [mediaViewerItems, setMediaViewerItems] = useState([]);
     const [showMedia, setShowMedia] = useState(false);
     const [mediaViewerIndex, setMediaViewerIndex] = useState(0);
-    const { auth, PERMISSION_SET } = useContext(LoginContext);
+    const { auth } = useContext(LoginContext);
     const selectedCustomerRef = useRef(selectedCustomer);
     const latestRequestRef = useRef(0);
     const abortControllerRef = useRef(null);
-
-    const can = (perm) => PERMISSION_SET.has(perm);
 
     useEffect(() => {
         selectedCustomerRef.current = selectedCustomer;
@@ -85,13 +83,10 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
     useEffect(() => {
         if (!selectedCustomer?.CustomerId) return;
-        // Removed: fetchAssigneeList();
-        // Removed: fetchEscalatedList();
     }, [selectedCustomer?.CustomerId]);
 
     useEffect(() => {
         if (!selectedCustomer?.CustomerId) return;
-        // Removed: handleFetchtags();
     }, [selectedCustomer?.CustomerId]);
 
     const processedMessageIds = useRef(new Set());
@@ -102,7 +97,18 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         const [normalized] = normalizeServerMessagesHelper([rawData], auth) || [];
         if (!normalized) return;
 
-        const incomingId = normalized.MessageId || normalized.Id;
+        const rawSenderId = Number(rawData?.SenderId ?? rawData?.Sender);
+        const myId = Number(auth?.id ?? auth?.userId);
+        const derivedDirection = (rawSenderId && myId && rawSenderId === myId) ? 1 : 0;
+        const normalizedDirection = (typeof normalized?.Direction === 'number')
+            ? (normalized.Direction === 1 ? 1 : 0)
+            : derivedDirection;
+        const normalizedWithDirection = {
+            ...normalized,
+            Direction: normalizedDirection,
+        };
+
+        const incomingId = normalizedWithDirection.MessageId || normalizedWithDirection.Id;
         if (!incomingId) return;
 
         if (processedMessageIds.current.has(incomingId)) return;
@@ -123,12 +129,12 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                 nextData = [...prevData];
                 nextData[idx] = {
                     ...existing,
-                    ...normalized,
+                    ...normalizedWithDirection,
                     isUploading: existing.isUploading,
                     percent: existing.percent,
                 };
             } else {
-                nextData = [...prevData, normalized];
+                nextData = [...prevData, normalizedWithDirection];
             }
 
             return Array.isArray(prevMessages)
@@ -238,19 +244,26 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         if (!auth?.token || !auth?.userId) {
             return;
         }
+
+        // Handler for status changes - only update when backend sends status changes
         const handleChangeStatus = (data) => {
             if (!data || typeof data !== "object") return;
             setMessId(data?.MessageId);
+
+            // Store message data for later use
             if (data?.MessageId) {
                 setStoreMessData(prev => ({
                     ...prev,
                     messageId: data.MessageId
                 }));
             }
+
             setTempConversationId(data?.ConversationId);
             const currentSelectedCustomer = selectedCustomerRef.current;
+
             setMessages((prevMessages) => {
                 const prevData = Array.isArray(prevMessages) ? prevMessages : prevMessages?.data || [];
+
                 const messageExists = (msg) => {
                     return (
                         msg?.Id === data?.Id ||
@@ -261,43 +274,56 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                             Math.abs(new Date(msg?.DateTime || msg?.dateTime) - new Date(data?.DateTime || data?.dateTime)) < 60000)
                     );
                 };
+
+                const conversationId = data?.ConversationId;
+                const shouldMarkAllInConversation = Boolean(conversationId) && !data?.MessageId;
+
                 return {
                     ...prevMessages,
                     data: prevData.map((msg) => {
-                        if (!messageExists(msg) || msg?.Direction !== 1) {
+                        if (msg?.Direction !== 1) {
                             return msg;
                         }
-                        const newStatus = parseInt(data.status ?? data.Status, 10);
-                        const currentStatus = parseInt(msg.Status, 10);
-                        const isValidTransition = (current, next) => {
-                            if (current === next) return true;
-                            const validTransitions = {
-                                // Queue (0) can transition to any status
-                                0: [1, 2, 3, 4],
-                                // Sent (1) can transition to delivered, read, or failed
-                                1: [2, 3, 4],
-                                // Delivered (2) can transition to read or failed
-                                2: [3, 4],
-                                // Read (3) is a terminal state
-                                3: [],
-                                // Failed (4) is a terminal state
-                                4: []
-                            };
-                            if (!(current in validTransitions)) return true;
-                            return validTransitions[current].includes(next);
-                        };
-                        if (isValidTransition(isNaN(currentStatus) ? 0 : currentStatus, newStatus)) {
+
+                        if (shouldMarkAllInConversation) {
+                            if (Number(msg?.ConversationId) !== Number(conversationId)) return msg;
+                            const currentStatus = typeof msg?.Status === 'number' ? msg.Status : parseInt(msg?.Status, 10);
+                            if (currentStatus === 3) return msg;
+                            return { ...msg, Status: 3 };
+                        }
+
+                        if (!messageExists(msg)) {
+                            return msg;
+                        }
+
+                        const rawStatus = data?.status ?? data?.Status;
+                        const parsed = typeof rawStatus === 'number'
+                            ? rawStatus
+                            : parseInt(rawStatus, 10);
+
+                        const isRead = parsed === 3 || String(rawStatus || '').toLowerCase() === 'read';
+                        const nextStatus = isRead ? 3 : 1;
+
+                        const currentStatus = typeof msg?.Status === 'number' ? msg.Status : parseInt(msg?.Status, 10);
+                        if (currentStatus === 3) {
+                            return msg;
+                        }
+
+                        if (nextStatus === 1) {
                             return {
                                 ...msg,
-                                Status: newStatus,
+                                Status: 1,
                                 SenderInfo: msg.SenderInfo || data.SenderInfo,
-                                ...(data.MessageId && { messageId: data.MessageId }),
-                                ...(data.timestamp && { timestamp: data.timestamp }),
                                 DateTime: data.DateTime || msg.DateTime
                             };
                         }
 
-                        return msg;
+                        return {
+                            ...msg,
+                            Status: 3,
+                            SenderInfo: msg.SenderInfo || data.SenderInfo,
+                            DateTime: data.DateTime || msg.DateTime
+                        };
                     })
                 };
             });
@@ -306,42 +332,44 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             }
         };
 
-        const handleNewMessage = (data) => {
+        const handleInternalMessage = (data) => {
+            debugger;
             if (!data || typeof data !== 'object') return;
-            if (selectedCustomerRef.current?.ConversationId == data?.ConversationId) {
-                setMessId(data?.MessageId)
-                addUniqueMessage(data);
-                handleReadMessage(data?.ConversationId);
-            }
-        };
-
-        const handleNewMessageFromAssigningUser = (data) => {
-            if (Number(data?.Sender) === auth?.id) return;
-            if (selectedCustomerRef.current?.ConversationId == data?.ConversationId) {
-                setMessId(data?.MessageId)
+            if (Number(data?.Sender) === auth?.id || Number(data?.SenderId) === auth?.id) return;
+            if (selectedCustomerRef.current?.ConversationId == data[0]?.ConversationId) {
+                setMessId(data?.MessageId);
                 addUniqueMessage(data);
                 handleReadMessage(data?.ConversationId);
             }
         };
 
         // Add handlers using the new optimized approach
-        const removeMessageHandler = addMessageHandler(handleNewMessage);
-        const removeStatusHandler = addStatusHandler(handleChangeStatus);
-        const removeMessageHandlerFromAssigningUser = addMessageHandlerFromAssigningUser(handleNewMessageFromAssigningUser);
         const removeMessageReactionHandler = addMessageReactionHandler(handleReactionMessage);
+        const removeStatusHandler = addInternalStatusHandler(handleChangeStatus);
+        const removeInternalMessageHandler = addInternalMessageHandler(handleInternalMessage);
 
         // Cleanup function
         return () => {
-            removeMessageHandler();
-            removeStatusHandler();
-            removeMessageHandlerFromAssigningUser();
             removeMessageReactionHandler();
+            removeStatusHandler();
+            removeInternalMessageHandler();
         };
     }, [auth?.token, auth?.userId]);
 
     const handleReadMessage = async (custConverId) => {
         if (!custConverId) return;
         const response = await readMessage(custConverId, auth?.userId);
+
+        const currentConvId = selectedCustomerRef.current?.ConversationId;
+        const receiverId = selectedCustomerRef.current?.ReceiverId || selectedCustomer?.ReceiverId;
+        if (receiverId && currentConvId && Number(currentConvId) === Number(custConverId)) {
+            emitInternalMessageRead({
+                ufcc: auth?.ufcc,
+                ReceiverId: receiverId,
+                ConversationId: custConverId,
+                Status: 3,
+            });
+        }
         if (response?.rd) {
             return response?.rd;
         } else {
@@ -529,29 +557,6 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     }, [selectedCustomer]);
 
     useEffect(() => {
-        const list = Array.isArray(messages?.data) ? messages.data : (Array.isArray(messages) ? messages : []);
-        const idsToFetch = Array.from(new Set(
-            list
-                .filter(m => m && m.MessageType && m.MessageType !== 'text' && (m.MediaUrl))
-                .map(m => m.MediaUrl)
-        )).filter(id => id && !mediaCache[id]);
-
-        if (idsToFetch.length === 0) return;
-
-        idsToFetch.forEach(async (id) => {
-            try {
-                const blob = await MediaApi(auth?.whatsappKey, auth?.whatsappNumber, id);
-                if (blob) {
-                    const objectUrl = URL.createObjectURL(blob);
-                    setMediaCache(prev => ({ ...prev, [id]: objectUrl }));
-                }
-            } catch (err) {
-                console.error('Media fetch failed for', id, err);
-            }
-        });
-    }, [messages, selectedCustomer?.ConversationId]);
-
-    useEffect(() => {
         if (selectedCustomer && onConversationRead) {
             onConversationRead(true);
         }
@@ -605,9 +610,14 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         if (message.mediaItems && message.mediaItems.length > 0) {
             const mediaItems = message.mediaItems.map(item => ({
                 src: item.url,
-                type: item.mimeType?.startsWith('image/') ? 'image' : 'video',
+                type: item.mimeType?.startsWith('image/')
+                    ? 'image'
+                    : item.mimeType?.startsWith('video/')
+                        ? 'video'
+                        : 'document',
                 name: item.filename || item.fileName || 'Media',
-                mimeType: item.mimeType
+                mimeType: item.mimeType,
+                size: item.size
             }));
             setMediaViewerItems(mediaItems);
             setMediaViewerIndex(index);
@@ -631,112 +641,109 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             }),
             date: new Date(
                 now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
-            ).toISOString().split("T")[0]
+            ).toISOString().split("T")[0],
+            dateTime: now.toISOString()
         };
     };
 
     const normalizeMessages = (prev) =>
         Array.isArray(prev) ? prev : (prev?.data || []);
 
-    const uploadAndSendMedia = async ({ files, caption, type, tempId }) => {
-        const safeFiles = Array.isArray(files) ? files.filter((f) => f instanceof File) : [];
-        if (safeFiles.length === 0) return;
+    const uploadAndSendMedia = async ({ files, caption, type, tempId, time, date, dateTime }) => {
+        const safeFiles = Array.isArray(files) ? files.filter(f => f instanceof File) : [];
+        if (!safeFiles.length) return;
+
+        const getUrl = u => u?.url ?? u?.Url ?? u?.fileUrl ?? u?.fileURL ?? u?.FileUrl ?? u?.FileURL ?? u?.path ?? u?.Path ?? null;
+        const getName = u => u?.fileName ?? u?.filename ?? u?.FileName ?? u?.name ?? u?.originalName ?? u?.originalname ?? null;
 
         try {
-            const uploadResp = await uploadMediaAPi({
-                folderName: "ChatMedia",
-                files: safeFiles,
-            });
+            const resp = await uploadMediaAPi({ folderName: "ChatMedia", files: safeFiles });
+            const uploaded = Array.isArray(resp) ? resp : [];
 
-            const uploadedItems = Array.isArray(uploadResp) ? uploadResp : [];
-            const extractUrl = (u) => u?.url ?? u?.Url ?? u?.fileUrl ?? u?.fileURL ?? u?.path ?? u?.Path ?? null;
-            const extractName = (u) => u?.fileName ?? u?.filename ?? u?.name ?? u?.originalName ?? u?.originalname ?? null;
+            const uploadedUrls = safeFiles
+                .map((f, i) => {
+                    const match = uploaded.find(u => {
+                        const n = getName(u);
+                        return n && String(n).toLowerCase() === String(f?.name).toLowerCase();
+                    });
+                    return getUrl(match || uploaded[i]);
+                })
+                .filter(Boolean);
 
-            const uploadedUrls = safeFiles.map((f, idx) => {
-                const byName = uploadedItems.find((u) => {
-                    const n = extractName(u);
-                    return n && String(n).toLowerCase() === String(f?.name).toLowerCase();
-                });
-                return extractUrl(byName || uploadedItems[idx]);
-            }).filter(Boolean);
+            if (uploadedUrls.length !== safeFiles.length) throw new Error("Some uploaded urls are missing");
 
-            if (uploadedUrls.length !== safeFiles.length) {
-                throw new Error("Some uploaded urls are missing");
-            }
-
-            const attachments = safeFiles.map((f, idx) => ({
-                url: uploadedUrls[idx],
-                filename: f?.name,
-                mimeType: f?.type,
-            }));
+            const attachments = safeFiles.map((f, i) => ({ FileUrl: uploadedUrls[i], FileName: f?.name, MimeType: f?.type }));
+            const mediaItems = safeFiles.map((f, i) => ({ url: uploadedUrls[i], filename: f?.name, mimeType: f?.type }));
 
             const receiverId = selectedCustomer?.CustomerId || selectedCustomer?.UserId;
             const conversationId = selectedCustomer?.ConversationId ?? null;
 
-            let resp = null;
-            if (type === "image") {
-                resp = await sendImageMessage(auth, {
-                    senderId: auth?.id,
-                    receiverId,
-                    conversationId,
-                    caption,
-                    attachments,
-                });
-            } else if (type === "video") {
-                resp = await sendVideoMessage(auth, {
-                    senderId: auth?.id,
-                    receiverId,
-                    conversationId,
-                    caption,
-                    attachments,
-                });
-            } else {
-                resp = await sendDocumentMessage(auth, {
-                    senderId: auth?.id,
-                    receiverId,
-                    conversationId,
-                    caption,
-                    attachments,
+            const sendFn =
+                type === "image" ? sendImageMessage :
+                    type === "video" ? sendVideoMessage :
+                        sendDocumentMessage;
+
+            const res = await sendFn(auth, { senderId: auth?.id, receiverId, conversationId, caption, attachments });
+            const sentId = res?.Data?.rd?.[0]?.MessageId;
+
+            const ReceiverId = selectedCustomer?.ReceiverId;
+            if (ReceiverId) {
+                emitInternalMessageSend({
+                    ReceiverId,
+                    Id: sentId || tempId,
+                    ufcc: auth?.ufcc,
+                    MessageId: sentId,
+                    SenderId: auth?.id,
+                    Direction: 2,
+                    Status: 1,
+                    MessageType: type,
+                    Message: caption,
+                    Time: time,
+                    Date: date,
+                    DateTime: dateTime,
+                    mediaItems,
+                    previewUrl: uploadedUrls[0],
+                    fileName: mediaItems?.[0]?.filename,
+                    fileType: mediaItems?.[0]?.mimeType,
+                    ConversationId: selectedCustomer?.ConversationId || tempConversationId,
                 });
             }
 
-            const sentId = resp?.Data?.rd?.[0]?.MessageId;
-
-            setMessages((prev) => ({
-                data: normalizeMessages(prev).map((m) =>
+            setMessages(prev => ({
+                data: normalizeMessages(prev).map(m =>
                     m.Id === tempId
                         ? {
                             ...m,
-                            ...(sentId ? { Id: sentId, MessageId: sentId } : {}),
-                            previewUrl: uploadedUrls?.[0] || m.previewUrl,
-                            mediaItems: attachments,
-                            fileName: attachments?.[0]?.filename || m.fileName,
-                            fileType: attachments?.[0]?.mimeType || m.fileType,
+                            ...(sentId && { Id: sentId, MessageId: sentId }),
+                            previewUrl: uploadedUrls[0] || m.previewUrl,
+                            mediaItems,
+                            fileName: mediaItems[0]?.filename || m.fileName,
+                            fileType: mediaItems[0]?.mimeType || m.fileType,
                             isUploading: false,
                             percent: 100,
-                            Status: 1,
+                            Status: 1
                         }
                         : m
                 ),
-                total: prev?.total || 0,
+                total: (prev?.total || 0) + 1,
             }));
         } catch (err) {
             console.error("uploadAndSendMedia error:", err);
             toast.error("Failed to send media");
-
-            setMessages((prev) => ({
-                data: normalizeMessages(prev).map((m) =>
+            setMessages(prev => ({
+                data: normalizeMessages(prev).map(m =>
                     m.Id === tempId ? { ...m, Status: 3, isUploading: false } : m
                 ),
-                total: prev?.total || 0,
+                total: prev?.total || 0
             }));
         }
     };
 
-    const handleSendMessage = async (containerRef, scrollToBottom) => {
-        const caption = inputValue.trim();
-        const { time, date } = getISTTime();
-
+    const handleSendMessage = async (containerRef, scrollToBottom, messageOverride = null) => {
+        debugger;
+        const caption = (messageOverride !== null ? messageOverride : inputValue).trim();
+        const { time, date, dateTime } = getISTTime();
+        console.log("Sending message:", { date, time, dateTime });
         if (mediaFiles?.length) {
             const selected = [...mediaFiles];
             setInputValue("");
@@ -775,6 +782,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                             percent: 0,
                             Time: time,
                             Date: date,
+                            DateTime: dateTime,
                             mediaItems: files.map((f) => ({
                                 url: URL.createObjectURL(f),
                                 fileName: f?.name,
@@ -789,12 +797,15 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                 }));
 
                 if (typeof scrollToBottom === 'function') scrollToBottom();
-                await uploadAndSendMedia({ files, caption, type, tempId });
+                await uploadAndSendMedia({ files, caption, type, tempId, time, date, dateTime });
             }
 
             if (typeof scrollToBottom === 'function') scrollToBottom();
             return;
         }
+
+        const replySnapshot = replyToMessage;
+        const replyToMessageId = storeMessData?.messageId;
 
         const tempId = Date.now();
         setMessages((prev) => ({
@@ -805,10 +816,20 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                     Message: caption,
                     Time: time,
                     Date: date,
+                    DateTime: dateTime,
                     Direction: 1,
                     Status: "pending",
                     MessageType: "text",
                     ConversationId: selectedCustomer?.ConversationId || tempConversationId,
+                    ...(replySnapshot && replyToMessageId
+                        ? {
+                            ContextType: 2,
+                            ContextId: replyToMessageId,
+                            ReplyContextMsg: replySnapshot?.text || 'Media',
+                            SenderInfo: replySnapshot?.sender || '',
+                            Sender: replySnapshot?.sender || '',
+                        }
+                        : {}),
                 },
             ],
             total: (prev?.total || 0) + 1,
@@ -818,14 +839,55 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         if (typeof scrollToBottom === 'function') scrollToBottom();
 
         try {
-            const resp = await sendTextMessage(auth, {
-                senderId: auth?.id,
-                receiverId: selectedCustomer?.CustomerId || selectedCustomer?.UserId,
-                conversationId: selectedCustomer?.ConversationId ?? null,
-                message: caption,
-            });
+            const isReply = !!(replySnapshot && replyToMessageId);
+
+            const resp = isReply
+                ? await replyToMessageApi(auth, {
+                    conversationId: selectedCustomer?.ConversationId ?? null,
+                    replyToMessageId,
+                    message: caption,
+                    messageType: 1,
+                })
+                : await sendTextMessage(auth, {
+                    senderId: auth?.id,
+                    receiverId: selectedCustomer?.CustomerId || selectedCustomer?.UserId,
+                    conversationId: selectedCustomer?.ConversationId ?? null,
+                    message: caption,
+                });
+
             const sentId = resp?.Data?.rd?.[0]?.MessageId;
+            const conversationId = resp?.Data?.rd?.[0]?.ConversationId || selectedCustomer?.ConversationId;
             if (sentId) {
+                const ReceiverId = selectedCustomer?.ReceiverId || selectedCustomer?.UserId;
+                if (ReceiverId) {
+                    emitInternalMessageSend({
+                        ReceiverId,
+                        ufcc: auth?.ufcc,
+                        Id: auth.SocketId,
+                        MessageId: sentId,
+                        SenderId: auth?.id,
+                        Direction: 2,
+                        Status: 1,
+                        MessageType: "text",
+                        Message: caption,
+                        Time: time,
+                        Date: date,
+                        DateTime: dateTime,
+                        ConversationId: conversationId || tempConversationId,
+                        ...(!selectedCustomer?.ReceiverId
+                            ? { ConversationName: auth?.username || auth?.userId }
+                            : {}),
+                        ...(replySnapshot && replyToMessageId
+                            ? {
+                                ContextType: 2,
+                                ContextId: replyToMessageId,
+                                ReplyContextMsg: replySnapshot?.text || 'Media',
+                                SenderInfo: replySnapshot?.sender || '',
+                                Sender: replySnapshot?.sender || '',
+                            }
+                            : {}),
+                    });
+                }
                 setMessages((prev) => ({
                     data: normalizeMessages(prev).map((m) =>
                         m.Id === tempId ? { ...m, Id: sentId, Status: 1 } : m
@@ -833,27 +895,47 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                     total: prev?.total || 0,
                 }));
             }
-        } catch {
+        } catch (err) {
+            console.error("sendTextMessage error:", err);
+            toast.error("Failed to send message");
             setMessages((prev) => ({
                 data: normalizeMessages(prev).map((m) =>
                     m.Id === tempId ? { ...m, Status: 3 } : m
                 ),
                 total: prev?.total || 0,
             }));
-        } finally {
-            if (typeof scrollToBottom === 'function') scrollToBottom();
         }
+
+        if (typeof scrollToBottom === 'function') scrollToBottom();
     };
 
     const handleReply = async (message) => {
         setStoreMessData({
             messageId: message?.MessageId,
-        });
+        })
+        const replyType = message?.MessageType;
+        const mediaCount = Array.isArray(message?.mediaItems) ? message.mediaItems.length : 0;
+        const fileName =
+            message?.fileName ||
+            message?.mediaItems?.[0]?.filename ||
+            message?.mediaItems?.[0]?.fileName ||
+            '';
+
+        const fallbackLabel = (() => {
+            if (replyType === 'image') return mediaCount > 1 ? `${mediaCount} Photos` : 'Photo';
+            if (replyType === 'video') return mediaCount > 1 ? `${mediaCount} Videos` : 'Video';
+            if (replyType === 'document') return fileName || 'Document';
+            return 'Media';
+        })();
+
+        const replyText = (message?.Message && String(message.Message).trim().length > 0)
+            ? message.Message
+            : fallbackLabel;
 
         setReplyToMessage({
             Id: message?.Id,
             sender: message?.Direction === 1 ? 'You' : selectedCustomer?.name || 'Customer',
-            text: message?.Message || 'Media',
+            text: replyText,
             MessageType: message?.MessageType
         });
     };
@@ -877,7 +959,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
     const handleSendForward = useCallback(async (selectedContacts = []) => {
         if (!selectedContacts.length || !forwardMessage) {
-            toast.error("Please select at least one contact to forward the message.");
+            toast.error("Please select at least one contact to forward message.");
             return;
         }
 
@@ -920,7 +1002,6 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         }
     }, [auth, selectedCustomer, forwardMessage, messId]);
 
-
     const scrollToMessage = useCallback(async (messageId, containerRef) => {
         if (!containerRef.current || !messageId) return;
         const messageElement = containerRef.current.querySelector(`[data-message-id="${messageId}"]`);
@@ -934,16 +1015,22 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     }, []);
 
     const getMessageStatusIcon = (msg) => {
-        const status = typeof msg?.Status === 'number' ? msg.Status : -1;
-        if (status === 3) {
-            return 'read';
+        const raw = msg?.Status ?? msg?.status ?? msg?.MessageStatus;
+
+        // Accept numeric or string statuses, but UI supports only 2 states
+        if (typeof raw === 'string') {
+            const lowered = raw.toLowerCase();
+            if (lowered === 'read') return 'read';
+            if (lowered === 'sent') return 'sent';
         }
-        if (status === 1) {
-            return 'sent';
-        }
+
+        const parsed = typeof raw === 'number' ? raw : parseInt(raw, 10);
+
+        // In some payloads MessageStatus=0 means sent
+        if (parsed === 3) return 'read';
+        if (parsed === 1 || parsed === 0) return 'sent';
         return null;
     };
-
 
     return {
         inputValue,
@@ -1011,6 +1098,5 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         scrollToMessage,
         getMessageStatusIcon,
         formatDateHeader,
-        can
     };
-};
+}

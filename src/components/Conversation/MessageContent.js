@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Box, CircularProgress, IconButton, Skeleton, Typography, Menu, MenuItem } from '@mui/material';
+import { Box, CircularProgress, IconButton, Skeleton, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import { ChevronDown, Download, FileText, CheckCheck } from 'lucide-react';
+import { ChevronDown, Download, FileText, CheckCheck, Image as ImageIcon, Video as VideoIcon, Play } from 'lucide-react';
 import { Emoji } from 'emoji-picker-react';
 import { FormatDateIST } from '../../utils/DateFnc';
 import DynamicTemplate from '../DynamicTemplate/DynamicTemplate';
 import QuickReactionMenu from './QuickReactionMenu';
-import ReactionMenu from './ReactionMenu';
 import ReactionDetailsMenu from './ReactionMenu';
 
 const imageDimsCache = new Map();
@@ -19,7 +18,7 @@ const charToUnified = (char) => {
     if (!char) return null;
     return Array.from(char)
         .map(c => c.codePointAt(0).toString(16))
-        .filter(hex => hex !== 'fe0f') // Remove variations selector
+        .filter(hex => hex !== 'fe0f')
         .join('-');
 };
 
@@ -46,6 +45,7 @@ const MessageContent = ({
     markLoaded,
     handleMediaClick,
     getMessageStatusIcon,
+    getMessageById,
 }) => {
     const theme = useTheme();
 
@@ -55,7 +55,6 @@ const MessageContent = ({
         { emoji: "👍", users: ["You", "Alice"] },
         { emoji: "❤️", users: ["Bob"] }
     ];
-
 
     useEffect(() => {
         setImageDims(null);
@@ -150,10 +149,6 @@ const MessageContent = ({
                             ? alpha(theme.palette.primary.main, 0.15)
                             : theme.palette.background.paper) + ' !important',
                         color: theme.palette.text.primary + ' !important',
-                        // border: (`1px solid ${isOutgoing
-                        //     ? alpha(theme.palette.primary.main, 0.22)
-                        //     : (theme.palette.borderColor?.extraLight || theme.palette.divider)
-                        //     }`) + ' !important',
                         boxShadow: (`0 2px 10px ${alpha('#000', 0.08)}`) + ' !important',
                     },
 
@@ -247,47 +242,103 @@ const MessageContent = ({
                 {/* Reply Preview (Quoted message) */}
                 {msg.ContextType === 2 && (
                     <div className="">
-                        <div className="reply-preview" style={{
-                            display: 'flex',
-                            flexDirection: "column",
-                            gap: '8px',
-                            padding: '8px',
-                            backgroundColor: alpha(theme.palette.primary.main, isOutgoing ? 0.12 : 0.08),
-                            borderRadius: '8px',
-                            marginBottom: '8px',
-                            borderLeft: `3px solid ${theme.palette.primary.main}`,
-                            cursor: msg.ContextId ? 'pointer' : 'default',
-                            opacity: msg.ContextId ? 1 : 0.7
-                        }}
-                            onClick={() => msg.ContextId && scrollToMessage(msg.ContextId, containerRef)}  // Jump to original message
-                        >
-                            <div className="reply-content" style={{ flex: 1 }}>
-                                <div className="reply-sender" style={{
-                                    fontSize: '12px',
-                                    fontWeight: 600,
-                                    color: theme.palette.text.primary,
-                                    marginBottom: '2px'
-                                }}>
-                                    {msg.SenderInfo != '' ? msg.SenderInfo : msg.Sender}
-                                </div>
-                                <div className="reply-text" style={{
-                                    fontSize: '12px',
-                                    color: theme.palette.text.secondary,
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap'
-                                }}>
-                                    {msg?.ReplyContextMsg?.length > 50
-                                        ? `${msg?.ReplyContextMsg.substring(0, 50)}...`
-                                        : msg?.ReplyContextMsg}
-                                </div>
-                                {!msg.ContextId && (
-                                    <div className="original-not-available">
-                                        Original message not available
+                        {(() => {
+                            const original = typeof getMessageById === 'function' && msg?.ContextId
+                                ? getMessageById(msg.ContextId)
+                                : null;
+
+                            const isGenericReply = !msg?.ReplyContextMsg || String(msg.ReplyContextMsg).trim() === '' || String(msg.ReplyContextMsg).trim().toLowerCase() === 'media';
+
+                            const mediaCount = Array.isArray(original?.mediaItems) ? original.mediaItems.length : 0;
+                            const originalType = original?.MessageType;
+                            const originalFileName = original?.fileName || original?.mediaItems?.[0]?.filename || original?.mediaItems?.[0]?.fileName;
+
+                            const computedIcon = (() => {
+                                if (!original) return null;
+                                if (originalType === 'image') return ImageIcon;
+                                if (originalType === 'video') return VideoIcon;
+                                if (originalType === 'document') return FileText;
+                                return null;
+                            })();
+
+                            const computedReplyText = (() => {
+                                if (!original) return msg?.ReplyContextMsg;
+                                if (!isGenericReply) return msg?.ReplyContextMsg;
+
+                                if (originalType === 'image') {
+                                    const suffix = mediaCount > 1 ? `${mediaCount} Photos` : 'Photo';
+                                    return `Media ${suffix}`;
+                                }
+                                if (originalType === 'video') {
+                                    const suffix = mediaCount > 1 ? `${mediaCount} Videos` : 'Video';
+                                    return `Media ${suffix}`;
+                                }
+                                if (originalType === 'document') return originalFileName || 'Document';
+                                if (originalType === 'text') return original?.Message || msg?.ReplyContextMsg;
+                                return msg?.ReplyContextMsg;
+                            })();
+
+                            const computedSender = original?.Direction === 1
+                                ? 'You'
+                                : (original?.SenderInfo || original?.Sender || (msg.SenderInfo != '' ? msg.SenderInfo : msg.Sender));
+
+                            return (
+                                <div className="reply-preview" style={{
+                                    display: 'flex',
+                                    flexDirection: "column",
+                                    gap: '8px',
+                                    padding: '8px',
+                                    backgroundColor: alpha(theme.palette.primary.main, isOutgoing ? 0.12 : 0.08),
+                                    borderRadius: '8px',
+                                    marginBottom: '8px',
+                                    borderLeft: `3px solid ${theme.palette.primary.main}`,
+                                    cursor: msg.ContextId ? 'pointer' : 'default',
+                                    opacity: msg.ContextId ? 1 : 0.7
+                                }}
+                                    onClick={() => msg.ContextId && scrollToMessage(msg.ContextId, containerRef)}  // Jump to original message
+                                >
+                                    <div className="reply-content" style={{ flex: 1 }}>
+                                        <div className="reply-sender" style={{
+                                            fontSize: '12px',
+                                            fontWeight: 600,
+                                            color: theme.palette.text.primary,
+                                            marginBottom: '2px'
+                                        }}>
+                                            {computedSender}
+                                        </div>
+                                        <div className="reply-text" style={{
+                                            fontSize: '12px',
+                                            color: theme.palette.text.secondary,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                        }}>
+                                            {computedIcon && (
+                                                <span style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center' }}>
+                                                    {React.createElement(computedIcon, { size: 14 })}
+                                                </span>
+                                            )}
+                                            <span style={{
+                                                minWidth: 0,
+                                                flex: '1 1 auto',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap'
+                                            }}>
+                                                {computedReplyText?.length > 50
+                                                    ? `${computedReplyText.substring(0, 50)}...`
+                                                    : computedReplyText}
+                                            </span>
+                                        </div>
+                                        {!msg.ContextId && (
+                                            <div className="original-not-available">
+                                                Original message not available
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        </div>
+                                </div>
+                            );
+                        })()}
                         {msg?.MessageType === "text" && (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
                                 <Typography variant="body2" className="message-text" style={{ flex: 1, marginRight: 0 }}>
@@ -319,8 +370,8 @@ const MessageContent = ({
                                             fontSize: 11,
                                         }}
                                     >
-                                        {msg.dateTime
-                                            ? msg.dateTime
+                                        {msg?.Time || msg.dateTime
+                                            ? msg?.Time || msg.dateTime
                                             : msg.DateTime && FormatDateIST(msg.DateTime, "dd-mm-yyyy").time}
                                     </Typography>
                                     {msg.Direction == 1 && !msg.isUploading && (
@@ -560,62 +611,238 @@ const MessageContent = ({
                 {msg?.MessageType === "video" && ((_, index) => {
                     const mediaKey = getMediaKey(msg, index);
                     const src = getMediaSrcForMessage(msg);
+
+                    const mediaItems = Array.isArray(msg?.mediaItems) ? msg.mediaItems : [];
+                    const hasGrid = mediaItems.length > 1;
+                    const gridRows = mediaItems.length <= 2 ? '1fr' : '1fr 1fr';
+                    const gridHeight = mediaItems.length <= 2 ? 160 : 220;
+
                     return (
                         <div
                             className="message-video"
                             style={{
                                 position: 'relative',
                                 width: 220,
-                                height: 220,
+                                height: hasGrid ? gridHeight : 'auto',
                                 borderRadius: 12,
                                 overflow: 'hidden',
                             }}
                         >
-                            {!loadedMedia[mediaKey] && (
-                                <Skeleton
-                                    variant="rounded"
-                                    className="media-skeleton"
-                                    sx={{
-                                        borderRadius: 0,
-                                        position: 'absolute',
-                                        inset: 0,
+                            {hasGrid ? (
+                                <div
+                                    style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 1fr',
+                                        gridTemplateRows: gridRows,
+                                        gap: 2,
                                         width: '100%',
                                         height: '100%',
+                                        cursor: 'pointer',
+                                        backgroundColor: 'rgba(0,0,0,0.04)',
                                     }}
-                                />
-                            )}
+                                >
+                                    {mediaItems.slice(0, 4).map((item, tileIndex) => {
+                                        const tileKey = `${mediaKey}-${tileIndex}`;
+                                        const tileSrc = item?.url;
+                                        const overflowCount = mediaItems.length - 4;
+                                        const showOverflow = tileIndex === 3 && overflowCount > 0;
 
-                            <div onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                if (msg?.mediaItems?.length) {
-                                    handleMediaClick(msg, 0);
-                                } else {
-                                    handleMediaClick({
-                                        mediaItems: [{
-                                            url: src,
-                                            mimeType: 'video/*',
-                                            filename: 'video'
-                                        }]
-                                    }, 0);
-                                }
-                            }} style={{ cursor: 'pointer' }}>
-                                {src &&
-                                    <video
-                                        src={src}
-                                        controls
-                                        onLoadedData={() => markLoaded(mediaKey)}
-                                        onError={() => markLoaded(mediaKey)}
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            objectFit: 'cover',
-                                            opacity: loadedMedia[mediaKey] ? 1 : 0,
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
-                                    />
-                                }
-                            </div>
+                                        return (
+                                            <div
+                                                key={tileKey}
+                                                style={{
+                                                    position: 'relative',
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    overflow: 'hidden',
+                                                    borderRadius: 8,
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    e.preventDefault();
+                                                    handleMediaClick(msg, tileIndex);
+                                                }}
+                                            >
+                                                {!loadedMedia[tileKey] && (
+                                                    <Skeleton
+                                                        variant="rounded"
+                                                        className="media-skeleton"
+                                                        sx={{
+                                                            borderRadius: 0,
+                                                            position: 'absolute',
+                                                            inset: 0,
+                                                            width: '100%',
+                                                            height: '100%',
+                                                        }}
+                                                    />
+                                                )}
+
+                                                {tileSrc && (
+                                                    <video
+                                                        src={tileSrc}
+                                                        muted
+                                                        playsInline
+                                                        preload="metadata"
+                                                        onLoadedData={() => markLoaded(tileKey)}
+                                                        onError={() => markLoaded(tileKey)}
+                                                        style={{
+                                                            display: 'block',
+                                                            width: '100%',
+                                                            height: '100%',
+                                                            objectFit: 'cover',
+                                                            opacity: loadedMedia[tileKey] ? 1 : 0,
+                                                            pointerEvents: 'none',
+                                                        }}
+                                                    />
+                                                )}
+
+                                                {tileSrc && !showOverflow && (
+                                                    <div
+                                                        style={{
+                                                            position: 'absolute',
+                                                            inset: 0,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            backgroundColor: 'rgba(0,0,0,0.45)',
+                                                            color: '#fff',
+                                                            borderRadius: '4px',
+                                                        }}
+                                                    >
+                                                        <IconButton
+                                                            size="small"
+                                                            sx={{
+                                                                backgroundColor: 'rgba(255,255,255,0.9)',
+                                                                color: '#000',
+                                                                '&:hover': {
+                                                                    backgroundColor: 'rgba(255,255,255,1)',
+                                                                },
+                                                            }}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                e.preventDefault();
+                                                                handleMediaClick(msg, tileIndex);
+                                                            }}
+                                                        >
+                                                            <Play size={16} />
+                                                        </IconButton>
+                                                    </div>
+                                                )}
+
+                                                {showOverflow && (
+                                                    <div
+                                                        style={{
+                                                            position: 'absolute',
+                                                            inset: 0,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            backgroundColor: 'rgba(0,0,0,0.45)',
+                                                            color: '#fff',
+                                                            fontWeight: 600,
+                                                            fontSize: 22,
+                                                        }}
+                                                    >
+                                                        +{overflowCount}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <>
+                                    {!loadedMedia[mediaKey] && (
+                                        <Skeleton
+                                            variant="rounded"
+                                            className="media-skeleton"
+                                            sx={{
+                                                borderRadius: 0,
+                                                position: 'absolute',
+                                                inset: 0,
+                                                width: '100%',
+                                                height: '100%',
+                                            }}
+                                        />
+                                    )}
+
+                                    <div onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        if (msg?.mediaItems?.length) {
+                                            handleMediaClick(msg, 0);
+                                        } else {
+                                            handleMediaClick({
+                                                mediaItems: [{
+                                                    url: src,
+                                                    mimeType: 'video/*',
+                                                    filename: 'video'
+                                                }]
+                                            }, 0);
+                                        }
+                                    }} style={{ cursor: 'pointer', position: 'relative' }}>
+                                        {src &&
+                                            <video
+                                                src={src}
+                                                muted
+                                                playsInline
+                                                preload="metadata"
+                                                onLoadedData={() => markLoaded(mediaKey)}
+                                                onError={() => markLoaded(mediaKey)}
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'cover',
+                                                    opacity: loadedMedia[mediaKey] ? 1 : 0,
+                                                    pointerEvents: 'none',
+                                                }}
+                                            />
+                                        }
+                                        {src && (
+                                            <div
+                                                style={{
+                                                    position: 'absolute',
+                                                    inset: 0,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    backgroundColor: 'rgba(0,0,0,0.45)',
+                                                    color: '#fff',
+                                                    borderRadius: '4px',
+                                                }}
+                                            >
+                                                <IconButton
+                                                    size="small"
+                                                    sx={{
+                                                        backgroundColor: 'rgba(255,255,255,0.9)',
+                                                        color: '#000',
+                                                        '&:hover': {
+                                                            backgroundColor: 'rgba(255,255,255,1)',
+                                                        },
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        e.preventDefault();
+                                                        if (msg?.mediaItems?.length) {
+                                                            handleMediaClick(msg, 0);
+                                                        } else {
+                                                            handleMediaClick({
+                                                                mediaItems: [{
+                                                                    url: src,
+                                                                    mimeType: 'video/*',
+                                                                    filename: 'video'
+                                                                }]
+                                                            }, 0);
+                                                        }
+                                                    }}
+                                                >
+                                                    <Play size={20} />
+                                                </IconButton>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
 
                             {msg.isUploading && (
                                 <UploadProgressOverlay percent={msg.percent} />
@@ -627,83 +854,213 @@ const MessageContent = ({
                 {/* Document */}
                 {msg?.MessageType === "document" && ((_, index) => {
                     const href = getMediaSrcForMessage(msg);
+                    const mediaItems = Array.isArray(msg?.mediaItems) ? msg.mediaItems : [];
+                    const hasGrid = mediaItems.length > 1;
+                    const gridRows = mediaItems.length <= 2 ? '1fr' : '1fr 1fr';
+                    const gridHeight = mediaItems.length <= 2 ? 120 : 160;
 
-                    // For docs we can still show a brief skeleton bar for polish
                     return (
                         <div className="message-document" style={{ position: 'relative' }}>
-                            <Box
-                                sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 1,
-                                    width: '100%'
-                                }}
-                            >
+                            {hasGrid ? (
+                                <div
+                                    style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 1fr',
+                                        gridTemplateRows: gridRows,
+                                        gap: 6,
+                                        width: 260,
+                                        height: gridHeight,
+                                    }}
+                                >
+                                    {mediaItems.slice(0, 4).map((item, tileIndex) => {
+                                        const tileHref = item?.url;
+                                        const tileKey = `doc-${msg?.Id || msg?.MessageId || 'msg'}-${tileIndex}`;
+                                        const overflowCount = mediaItems.length - 4;
+                                        const showOverflow = tileIndex === 3 && overflowCount > 0;
+
+                                        return (
+                                            <div
+                                                key={tileKey}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    e.preventDefault();
+                                                    handleMediaClick(msg, tileIndex);
+                                                }}
+                                                style={{
+                                                    position: 'relative',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 8,
+                                                    padding: 10,
+                                                    borderRadius: 10,
+                                                    border: `1px solid ${alpha(theme.palette.text.primary, 0.08)}`,
+                                                    backgroundColor: alpha(theme.palette.text.primary, 0.03),
+                                                    cursor: 'pointer',
+                                                    overflow: 'hidden',
+                                                    minWidth: 0,
+                                                }}
+                                                title={item?.filename || item?.fileName || 'Document'}
+                                            >
+                                                <Box
+                                                    sx={{
+                                                        width: 30,
+                                                        height: 30,
+                                                        borderRadius: 2,
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                                                        color: theme.palette.primary.main,
+                                                        flex: '0 0 auto'
+                                                    }}
+                                                >
+                                                    <FileText size={16} />
+                                                </Box>
+
+                                                <Box sx={{ minWidth: 0, flex: '1 1 auto' }}>
+                                                    <Typography
+                                                        variant="body2"
+                                                        sx={{
+                                                            fontWeight: 600,
+                                                            color: theme.palette.text.primary,
+                                                            lineHeight: 1.2,
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis'
+                                                        }}
+                                                    >
+                                                        {item?.filename || item?.fileName || 'Document'}
+                                                    </Typography>
+                                                    <Typography
+                                                        variant="caption"
+                                                        sx={{
+                                                            color: alpha(theme.palette.text.primary, 0.7),
+                                                            lineHeight: 1.2,
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis'
+                                                        }}
+                                                    >
+                                                        {item?.mimeType || 'document'}
+                                                    </Typography>
+                                                </Box>
+
+                                                <IconButton
+                                                    component="a"
+                                                    href={tileHref}
+                                                    download
+                                                    size="small"
+                                                    className="doc-download"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    sx={{
+                                                        color: alpha(theme.palette.text.primary, 0.75),
+                                                        flex: '0 0 auto',
+                                                        '&:hover': {
+                                                            color: theme.palette.text.primary,
+                                                            backgroundColor: alpha(theme.palette.text.primary, 0.06),
+                                                        }
+                                                    }}
+                                                    title="Download"
+                                                >
+                                                    <Download size={18} />
+                                                </IconButton>
+
+                                                {showOverflow && (
+                                                    <div
+                                                        style={{
+                                                            position: 'absolute',
+                                                            inset: 0,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            backgroundColor: 'rgba(0,0,0,0.45)',
+                                                            color: '#fff',
+                                                            fontWeight: 600,
+                                                            fontSize: 22,
+                                                        }}
+                                                    >
+                                                        +{overflowCount}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
                                 <Box
                                     sx={{
-                                        width: 34,
-                                        height: 34,
-                                        borderRadius: 2,
                                         display: 'flex',
                                         alignItems: 'center',
-                                        justifyContent: 'center',
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.12),
-                                        color: theme.palette.primary.main,
-                                        flex: '0 0 auto'
+                                        gap: 1,
+                                        width: '100%'
                                     }}
                                 >
-                                    <FileText size={18} />
-                                </Box>
-
-                                <Box sx={{ minWidth: 0, flex: '1 1 auto', display: 'flex', flexDirection: 'column' }}>
-                                    <Typography
-                                        variant="body2"
+                                    <Box
                                         sx={{
-                                            fontWeight: 600,
-                                            color: theme.palette.text.primary,
-                                            lineHeight: 1.2,
-                                            whiteSpace: 'nowrap',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis'
+                                            width: 34,
+                                            height: 34,
+                                            borderRadius: 2,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                                            color: theme.palette.primary.main,
+                                            flex: '0 0 auto'
                                         }}
-                                        title={msg.fileName || 'Document'}
                                     >
-                                        {msg.fileName || 'Document'}
-                                    </Typography>
-                                    <Typography
-                                        variant="caption"
-                                        sx={{
-                                            color: alpha(theme.palette.text.primary, 0.7),
-                                            lineHeight: 1.2,
-                                            whiteSpace: 'nowrap',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis'
-                                        }}
-                                        title={msg.fileType || 'Unknown type'}
-                                    >
-                                        {msg.fileType || 'Unknown type'}
-                                    </Typography>
-                                </Box>
+                                        <FileText size={18} />
+                                    </Box>
 
-                                <IconButton
-                                    component="a"
-                                    href={href}
-                                    download
-                                    size="small"
-                                    className="doc-download"
-                                    sx={{
-                                        color: alpha(theme.palette.text.primary, 0.75),
-                                        flex: '0 0 auto',
-                                        '&:hover': {
-                                            color: theme.palette.text.primary,
-                                            backgroundColor: alpha(theme.palette.text.primary, 0.06),
-                                        }
-                                    }}
-                                    title="Download"
-                                >
-                                    <Download size={18} />
-                                </IconButton>
-                            </Box>
+                                    <Box sx={{ minWidth: 0, flex: '1 1 auto', display: 'flex', flexDirection: 'column' }}>
+                                        <Typography
+                                            variant="body2"
+                                            sx={{
+                                                fontWeight: 600,
+                                                color: theme.palette.text.primary,
+                                                lineHeight: 1.2,
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis'
+                                            }}
+                                            title={msg.fileName || 'Document'}
+                                        >
+                                            {msg.fileName || 'Document'}
+                                        </Typography>
+                                        <Typography
+                                            variant="caption"
+                                            sx={{
+                                                color: alpha(theme.palette.text.primary, 0.7),
+                                                lineHeight: 1.2,
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis'
+                                            }}
+                                            title={msg.fileType || 'Unknown type'}
+                                        >
+                                            {msg.fileType || 'Unknown type'}
+                                        </Typography>
+                                    </Box>
+
+                                    <IconButton
+                                        component="a"
+                                        href={href}
+                                        download
+                                        size="small"
+                                        className="doc-download"
+                                        sx={{
+                                            color: alpha(theme.palette.text.primary, 0.75),
+                                            flex: '0 0 auto',
+                                            '&:hover': {
+                                                color: theme.palette.text.primary,
+                                                backgroundColor: alpha(theme.palette.text.primary, 0.06),
+                                            }
+                                        }}
+                                        title="Download"
+                                    >
+                                        <Download size={18} />
+                                    </IconButton>
+                                </Box>
+                            )}
 
                             {msg.isUploading && (
                                 <UploadProgressOverlay percent={msg.percent} size={40} />
@@ -755,8 +1112,8 @@ const MessageContent = ({
                                 fontSize: 11,
                             }}
                         >
-                            {msg.dateTime
-                                ? msg.dateTime
+                            {msg?.Time || msg.dateTime
+                                ? msg?.Time || msg.dateTime
                                 : msg.DateTime && FormatDateIST(msg.DateTime, "dd-mm-yyyy").time}
                         </Typography>
 

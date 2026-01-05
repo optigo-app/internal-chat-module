@@ -1,9 +1,7 @@
-import React, { useState, useRef, useContext, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Box, CircularProgress, Typography, Avatar } from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
-import { CheckCheck } from 'lucide-react';
+import {useTheme } from '@mui/material/styles';
 import MediaPreview from '../MediaPreview/MediaPreview';
-import { LoginContext } from '../../context/LoginData';
 import { getCustomerAvatarSeed, getWhatsAppAvatarConfig, hasCustomerName } from '../../utils/globalFunc';
 import MessageContent from './MessageContent';
 import PersonIcon from '@mui/icons-material/Person';
@@ -47,7 +45,6 @@ const MessageArea = ({
     const hoveredMessageIdRef = useRef(null);
     const reactionMenuMessageIdRef = useRef(null);
     const reactionMenuAnchorElRef = useRef(null);
-    const theme = useTheme();
 
     const isMediaPreviewOpen = (mediaFiles?.length || 0) > 0;
     const scrollToBottomBottomOffset = replyToMessage ? 170 : 110;
@@ -76,6 +73,19 @@ const MessageArea = ({
         setReactionMenuAnchorEl(null);
         setReactionMenuMessageId(null);
     }, []);
+
+    const messageById = useMemo(() => {
+        const map = new Map();
+        const groups = groupMessagesByDate || {};
+        Object.values(groups).forEach((arr) => {
+            if (!Array.isArray(arr)) return;
+            arr.forEach((m) => {
+                const key = m?.Id ?? m?.MessageId;
+                if (key != null) map.set(key, m);
+            });
+        });
+        return map;
+    }, [groupMessagesByDate]);
 
     useEffect(() => {
         if (mediaFiles?.length > 0) {
@@ -145,9 +155,7 @@ const MessageArea = ({
                             overflowX: 'hidden',
                             transition: 'filter 0.3s ease-in-out',
                             position: 'relative',
-                            // backgroundImage: 'linear-gradient(rgba(247, 245, 243, 0.65), rgba(247, 245, 243, 0.65)), url(/bg-3.jpg)',
-                            backgroundImage:
-                                'linear-gradient(rgba(249, 250, 251, 0.78), rgba(249, 250, 251, 0.78)), url(/bg-3.jpg)',
+                            backgroundImage: 'linear-gradient(rgba(249, 250, 251, 0.78), rgba(249, 250, 251, 0.78)), url(/bg-3.jpg)',
                             backgroundSize: 'auto, contain',
                             backgroundPosition: 'center, center',
                             backgroundRepeat: 'repeat, repeat',
@@ -283,6 +291,7 @@ const MessageArea = ({
                                                                 markLoaded={markLoaded}
                                                                 handleMediaClick={handleMediaClick}
                                                                 getMessageStatusIcon={getMessageStatusIcon}
+                                                                getMessageById={(id) => messageById.get(id)}
                                                             />
                                                         </div>
                                                     )

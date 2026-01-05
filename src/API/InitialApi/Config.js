@@ -5,11 +5,11 @@ const isLocal = ["localhost", "nzen", '9511a53f910a.ngrok-free.app'].includes(wi
 // Base URLs
 const API_BASE_URL = isLocal
     ? "http://newnextjs.web/api"
-    : "https://nxtapi.optigoapps.com/api";
+    : "https://nxt27.optigoapps.com/api";
 
 const WHATSAPP_BASE_URL = isLocal
     ? "http://192.168.1.71:3001/api"
-    : "https://nxtapi.optigoapps.com/api";
+    : "https://nxt27.optigoapps.com/api";
 
 const MEDIA_BASE_URL =
     "https://crmapp.mpillarapi.com/api/meta/v19.0/622385334300738/Media/";

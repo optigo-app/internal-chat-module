@@ -15,6 +15,7 @@ import ViewContext from './ViewContext';
 import { useConversation } from './useConversation';
 import PersonIcon from '@mui/icons-material/Person';
 import { addReactionApi } from '../../API/SendMessage/addReactionApi';
+import { emitSendReaction } from '../../socket';
 
 const Conversation = ({ selectedCustomer, onConversationRead, onViewConversationRead, onCustomerSelect }) => {
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -155,6 +156,25 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     emoji: JSON.parse(reactionPayload || "[]")?.find(r => r.Direction === 1)?.Reaction || ""
                 }
             );
+
+            const receiverId = selectedCustomer?.ReceiverId;
+            const senderId = auth?.id ?? auth?.userId;
+            if (receiverId && senderId && auth?.ufcc) {
+                const socketReactionEmojis = reactionPayload === ""
+                    ? JSON.stringify([{ Reaction: "", Direction: 0 }])
+                    : JSON.stringify([{ Reaction: emoji, Unified: unified, Direction: 0 }]);
+
+                emitSendReaction({
+                    ufcc: auth?.ufcc,
+                    userId: senderId,
+                    SenderId: senderId,
+                    ReceiverId: receiverId,
+                    ConversationId: selectedCustomer?.ConversationId,
+                    MessageId: messageIdToUse,
+                    ReactionEmojis: socketReactionEmojis,
+                });
+            }
+
             setMessages(prev => {
                 const prevData = Array.isArray(prev) ? prev : prev?.data || [];
                 const updatedData = prevData.map(msg => {
@@ -408,7 +428,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             if (inputValue.trim() || (mediaFiles && mediaFiles.length > 0)) {
-                handleSendMessage(containerRef, scrollToBottom, toast);
+                handleSendMessage(containerRef, scrollToBottom, inputValue);
                 setInputValue("");
             }
         }
@@ -527,7 +547,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                         inputValue={inputValue}
                         setInputValue={setInputValue}
                         handleKeyPress={handleKeyPress}
-                        handleSendMessage={() => handleSendMessage(containerRef, scrollToBottom, toast)}
+                        handleSendMessage={(messageOverride) => handleSendMessage(containerRef, scrollToBottom, messageOverride)}
                         mediaFiles={mediaFiles}
                     />
                 </div>

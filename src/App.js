@@ -57,25 +57,16 @@ function Layout({ children, onStatusSelect, selectedStatus, onTagSelect, selecte
 
 function App() {
   const navigate = useNavigate();
-  const { auth, setAuth, token, setToken, isSyncing } = useContext(LoginContext);
+  const { auth, isSyncing } = useContext(LoginContext);
 
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [selectedTag, setSelectedTag] = useState('All');
   const [isConnected, setIsConnected] = useState(false);
   const [socketStatus, setSocketStatus] = useState('disconnected');
 
-  const [credentials, setCredentials] = useState(null);
-
-  // useEffect(() => {
-  //   const creds = GetCredentialsFromCookie();
-  //   setCredentials(creds);
-  // }, []);
-
-  /** ------------------------------
-   * Initialize socket after login
-   * ------------------------------ */
   useEffect(() => {
     let isMounted = true;
+    let socketCleanup = null;
 
     const checkAndInitializeSocket = async () => {
       let token = auth?.token;
@@ -104,40 +95,48 @@ function App() {
       }
 
       try {
-        console.log('🔄 Initializing socket connection...');
         const socket = initializeSocket(token);
+        console.log('🔄 Initializing socket connection...');
 
         if (!socket) {
           console.error('❌ Failed to initialize socket');
           return;
         }
 
-        /** 🔗 On successful connection */
-        socket.on('connect', async () => {
+        const emitStoreSocketData = async () => {
           if (!isMounted) return;
-          console.log('✅ Socket connected:', socket.id);
-
           try {
-            await registerSocketId(socket.id, userId, auth?.id); // <-- your API
+            const data = {
+              userId: auth?.id ?? auth?.userId ?? userId,
+              ufcc: auth?.ufcc
+            };
+            if (!data.userId || !data.ufcc) return;
+            await registerSocketId(data);
             console.log('📡 Player ID saved successfully');
           } catch (err) {
             console.error('❌ Failed to save Player ID:', err);
           }
+        };
 
+        /** 🔗 On successful connection (also fires after reconnect) */
+        const onConnect = async () => {
+          if (!isMounted) return;
+          console.log('✅ Socket connected:', socket.id);
+          await emitStoreSocketData();
           setIsConnected(true);
           setSocketStatus('connected');
-        });
+        };
 
         /** ⚠️ On disconnect */
-        socket.on('disconnect', (reason) => {
+        const onDisconnect = (reason) => {
           if (!isMounted) return;
           console.warn('⚠️ Socket disconnected:', reason);
           setIsConnected(false);
           setSocketStatus('disconnected');
-        });
+        };
 
         /** 🔐 Handle session logout */
-        socket.on('sessionLogout', () => {
+        const onSessionLogout = () => {
           if (!isMounted) return;
           console.log('🔒 Session logout received');
 
@@ -154,15 +153,25 @@ function App() {
           toast.error('Your session has been logged out from another device', {
             duration: 3000,
           });
-        });
+        };
 
         /** ❌ On error */
-        socket.on('connect_error', (err) => {
+        const onConnectError = (err) => {
           if (!isMounted) return;
           console.error('❌ Socket connection error:', err.message);
           setIsConnected(false);
           setSocketStatus('error');
-        });
+        };
+
+        socket.on('connect', onConnect);
+        socket.on('disconnect', onDisconnect);
+        socket.on('sessionLogout', onSessionLogout);
+        socket.on('connect_error', onConnectError);
+
+        // Reload case: socket may already be connected (restoreConnection ran before App mounted)
+        if (socket.connected) {
+          onConnect();
+        }
 
         // Periodic connection status check
         const interval = setInterval(() => {
@@ -172,9 +181,12 @@ function App() {
           setSocketStatus(connected ? 'connected' : 'disconnected');
         }, 5000);
 
-        return () => {
+        socketCleanup = () => {
           clearInterval(interval);
-          isMounted = false;
+          socket.off('connect', onConnect);
+          socket.off('disconnect', onDisconnect);
+          socket.off('sessionLogout', onSessionLogout);
+          socket.off('connect_error', onConnectError);
         };
 
       } catch (err) {
@@ -188,13 +200,12 @@ function App() {
 
     return () => {
       isMounted = false;
+      if (typeof socketCleanup === 'function') {
+        socketCleanup();
+      }
     };
-  }, [auth?.token]);
+  }, [auth?.token, auth?.id, auth?.userId, auth?.ufcc, navigate]);
 
-
-  /** ------------------------------
-   * Redirect to login if not logged in
-   * ------------------------------ */
   useEffect(() => {
     const timeout = setTimeout(() => {
       const isLoggedIn = sessionStorage.getItem('isLoggedIn');
@@ -203,18 +214,15 @@ function App() {
 
       if (!isLoggedIn) {
         if (hasExistingSocket) {
-          // Existing socket session → redirect to session check
           navigate('/session-check');
         } else if (userData?.id) {
-          // userData exists → go to home
           navigate('/');
         } else {
-          // No session → disconnect and go to login
           disconnectSocket(true);
           navigate('/login');
         }
       }
-    }, 500); // wait 500ms (adjust if needed)
+    }, 500);
 
     return () => clearTimeout(timeout);
   }, [navigate]);
@@ -223,8 +231,6 @@ function App() {
   return (
     <>
       <Toaster position="top-right" toastOptions={toastConfig} />
-
-      {/* Global Sync Loader Overlay */}
       {isSyncing && (
         <Box
           sx={{
@@ -253,32 +259,11 @@ function App() {
           </Box>
         </Box>
       )}
-
-      {/* Prototype Banner */}
-      {/* <div
-        style={{
-          position: 'fixed',
-          top: '10px',
-          right: '50%',
-          background: 'red',
-          color: 'white',
-          padding: '6px 40px',
-          fontWeight: 'bold',
-          fontSize: '20px',
-          zIndex: 10,
-          whiteSpace: 'nowrap',
-          boxShadow: '2px 2px 10px rgba(0,0,0,0.2)',
-        }}
-      >
-        Prototype
-      </div> */}
-
-
       <div className="app_mainDiv">
         <Routes>
           <Route path="/login" element={<LoginPage1 />} />
           <Route path="/session-check" element={<LoginExists />} />
-            <Route path="/test" element={<ChatHeader chatId="123" />} />
+          <Route path="/test" element={<ChatHeader chatId="123" />} />
           <Route
             path="*"
             element={
@@ -299,7 +284,7 @@ function App() {
                   <Route path="*" element={<PagenotFound />} />
                 </Routes>
               </Layout>
-            } 
+            }
           />
         </Routes>
       </div>

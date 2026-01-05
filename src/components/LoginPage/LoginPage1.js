@@ -15,11 +15,9 @@ import { Eye, EyeOff } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import loginPageLottie from "../../assets/lotties/loginPage.json";
-import { initializeSocket, disconnectSocket } from "../../socket";
+import { emitInternalStoreSocketData, initializeSocket } from "../../socket";
 import { LoginContext } from "../../context/LoginData";
-import { savePlayerId } from "../../API/SavePlayerId/SavePlayerId";
 import { getToken } from "../../API/GetToken/GetToken";
-import LoginExists from "../LoginExists/LoginExists";
 import Lottie from "lottie-react";
 
 export const commonTextFieldProps = {
@@ -36,11 +34,7 @@ const LoginPage1 = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [credentials, setCredentials] = useState({ companycode: "", userId: "", password: "" });
     const [errors, setErrors] = useState({});
-    const { setAuth, setPermissions, auth, token, setToken } = useContext(LoginContext);
-
-    function connect(token) {
-        initializeSocket(token);
-    }
+    const { setAuth, token, setToken } = useContext(LoginContext);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -113,25 +107,47 @@ const LoginPage1 = () => {
                 return setIsLoading(false);
             }
 
+            const socket = initializeSocket(userInfo.token)
+            const username = [
+                userInfo.firstname,
+                userInfo.middlename,
+                userInfo.lastname
+            ]
+                .filter(namePart => namePart)
+                .join(' ');
             const userData = {
                 userId: userInfo.userid,
-                username: userInfo.customercode,
+                username: username,
                 ukey: userInfo.ukey,
                 token: userInfo.token,
                 id: userInfo.id,
+                SocketId: userInfo.SocketId || "",
+                ufcc: userInfo.companycode ?? ''
             };
 
-            const sessionData = {
-                data: true,
-                ...userData,
-            };
+            // ✅ Wait for socket to actually connect
+            socket.on("connect", async () => {
+                const data = {
+                    userId: userData.id ?? '',
+                    ufcc: userData.ufcc ?? ''
+                }
+                emitInternalStoreSocketData(data);
 
-            sessionStorage.setItem("hasSocketId", JSON.stringify(sessionData));
-            console.log("⚠️ Redirecting to session check page...");
-            setPermissions(loginData?.rd1);
-            navigate("/session-check");
-            setIsLoading(false);
-            return;
+                const updatedUserData = { ...userData };
+                sessionStorage.setItem("userData", JSON.stringify(updatedUserData));
+                sessionStorage.setItem("isLoggedIn", true);
+                setAuth(updatedUserData);
+                toast.success("Login successful! Welcome back!", { icon: "🎉" });
+                navigate("/");
+                setIsLoading(false);
+            });
+
+            // ❌ Handle connection failure
+            socket.on("connect_error", (err) => {
+                console.error("❌ Socket connect error:", err.message);
+                toast.error("Socket connection failed");
+                setIsLoading(false);
+            });
 
         } catch (err) {
             console.error("Login error:", err);

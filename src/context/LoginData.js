@@ -39,26 +39,21 @@ export const LoginData = ({ children }) => {
                     ukey: parsed?.ukey || "",
                     token: parsed?.token || "",
                     id: parsed?.id,
-                    whatsappKey: parsed?.whatsappKey,
-                    whatsappNumber: parsed?.whatsappNumber,
+                    ufcc: parsed?.ufcc || parsed?.companycode || ""
                 };
             }
         } catch (error) {
             console.error('❌ LoginContext: Error parsing userData from sessionStorage:', error);
-            // Clear corrupted data
             sessionStorage.removeItem('userData');
             sessionStorage.removeItem('isLoggedIn');
         }
-
-        console.log('📝 LoginContext: No valid auth data found, using empty state');
         return {
             userId: "",
             username: "",
             ukey: "",
             token: "",
             id: "",
-            whatsappKey: "",
-            whatsappNumber: "",
+            ufcc: "",
         };
     });
 

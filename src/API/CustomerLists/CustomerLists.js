@@ -16,6 +16,7 @@ export const fetchCustomerLists = async (
         };
 
         const body = buildCommonBody("GetEmployeeList", auth, payload, fLabel);
+
         const response = await CommonAPI(body);
 
         if (response?.Data) {
