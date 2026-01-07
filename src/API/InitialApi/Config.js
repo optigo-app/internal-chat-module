@@ -1,6 +1,4 @@
-import { GetCredentialsFromCookie } from "../../utils/FetchToken";
-
-const isLocal = ["localhost", "nzen", 'internalchat.web', 'web'].includes(window.location.hostname);
+const isLocal = ["localhost", "nzen", 'tecochat.web', 'web'].includes(window.location.hostname);
 
 // Base URLs
 const API_BASE_URL = isLocal
@@ -21,8 +19,6 @@ export const UPLOAD_URL = `${API_BASE_URL}/upload`;
 export const REMOVE_FILE_URL = `${API_BASE_URL}/removefile`;
 
 // WhatsApp APIs
-export const MESSAGEAPIURL = `${WHATSAPP_BASE_URL}/whatsapp/chat/send`;
-export const MESSAGEAPIURLBULK = `${WHATSAPP_BASE_URL}/whatsapp/chat/send-bulk`;
 export const LOGOUTAPI = `${WHATSAPP_BASE_URL}/whatsapp/chat/logout`;
 
 // Report / Common APIs
@@ -31,57 +27,40 @@ export const GETCONVERSATIONURL = `${API_BASE_URL}/report`;
 export const SAVEPLAYERID = `${API_BASE_URL}/report`;
 
 
-export const getHeaders = () => {
-    let credentials = GetCredentialsFromCookie();
-    const version = "R50B3";
+export const getApiHeaders = (init = {}) => {
+    const normalizedInit = init && typeof init === "object" ? init : {};
+    const { version = "R50B3" } = normalizedInit;
 
-    if (!credentials) {
-        const sessionToken = JSON.parse(sessionStorage.getItem("token"));
-        if (sessionToken) {
-            credentials = {
-                yc: sessionToken.yc,
-                sv: sessionToken.sv,
-            };
-        }
+    let credentials = null;
+
+    const sessionToken = JSON.parse(sessionStorage.getItem("token"));
+    if (sessionToken) {
+        credentials = {
+            yc: sessionToken.yc,
+            sv: sessionToken.sv,
+        };
     }
 
     const headers = {
         Version: version,
         sp: "80",
-        whatsappNumber: "622385334300738",
     };
 
-    if (credentials && credentials.yc && credentials.sv) {
+    if (credentials && credentials.yc) {
         headers.Yearcode = credentials.yc;
+    }
+
+    if (credentials && credentials.sv) {
         headers.sv = credentials.sv;
     }
 
     return headers;
 };
 
+export const getHeaders = (init = {}) => {
+    return getApiHeaders(init);
+};
+
 export const getLoginHeaders = (init = {}) => {
-    let credentials = GetCredentialsFromCookie();
-    const { version = "R50B3" } = init;
-
-    if (!credentials) {
-        const sessionToken = JSON.parse(sessionStorage.getItem("token"));
-        if (sessionToken) {
-            credentials = {
-                yc: sessionToken.yc,
-                sv: sessionToken.sv,
-            };
-        }
-    }
-
-    const headers = {
-        Version: version,
-        sp: "80",
-    };
-
-    if (credentials && credentials.yc && credentials.sv) {
-        headers.Yearcode = credentials.yc;
-        headers.sv = credentials.sv;
-    }
-
-    return headers;
+    return getApiHeaders(init);
 };

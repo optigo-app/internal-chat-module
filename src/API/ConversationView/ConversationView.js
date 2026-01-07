@@ -19,7 +19,7 @@ export const conversationView = async (
 
         const body = buildCommonBody("GetMessages", auth, payload, fLabel);
 
-        const response = await CommonAPI(body, pageName, signal);
+        const response = await CommonAPI(body, { pageName, signal });
         if (response?.Data) {
             return {
                 data: response?.Data || [],

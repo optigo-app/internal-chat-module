@@ -328,16 +328,12 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                     })
                 };
             });
-            if (currentSelectedCustomer?.ConversationId === data?.ConversationId) {
-                handleReadMessage(data?.ConversationId);
-            }
         };
 
         const handleInternalMessage = (data) => {
-            debugger;
             if (!data || typeof data !== 'object') return;
             if (Number(data?.Sender) === auth?.id || Number(data?.SenderId) === auth?.id) return;
-            if (selectedCustomerRef.current?.ConversationId == data[0]?.ConversationId) {
+            if (selectedCustomerRef.current?.ConversationId == data?.ConversationId) {
                 setMessId(data?.MessageId);
                 addUniqueMessage(data);
                 handleReadMessage(data?.ConversationId);
@@ -660,7 +656,24 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         const getName = u => u?.fileName ?? u?.filename ?? u?.FileName ?? u?.name ?? u?.originalName ?? u?.originalname ?? null;
 
         try {
-            const resp = await uploadMediaAPi({ folderName: "ChatMedia", files: safeFiles });
+            const resp = await uploadMediaAPi({
+                folderName: "ChatMedia",
+                files: safeFiles,
+                onProgress: (percent) => {
+                    setMessages((prev) => ({
+                        data: normalizeMessages(prev).map((m) =>
+                            m.Id === tempId
+                                ? {
+                                    ...m,
+                                    isUploading: true,
+                                    percent: Math.max(0, Math.min(99, Number(percent) || 0)),
+                                }
+                                : m
+                        ),
+                        total: prev?.total || 0,
+                    }));
+                },
+            });
             const uploaded = Array.isArray(resp) ? resp : [];
 
             const uploadedUrls = safeFiles
@@ -693,8 +706,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             if (ReceiverId) {
                 emitInternalMessageSend({
                     ReceiverId,
-                    Id: sentId || tempId,
                     ufcc: auth?.ufcc,
+                    Id: sentId || tempId,
                     MessageId: sentId,
                     SenderId: auth?.id,
                     Direction: 2,
@@ -743,7 +756,6 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     };
 
     const handleSendMessage = async (containerRef, scrollToBottom, messageOverride = null) => {
-        debugger;
         const caption = (messageOverride !== null ? messageOverride : inputValue).trim();
         const { time, date, dateTime } = getISTTime();
         console.log("Sending message:", { date, time, dateTime });
@@ -840,11 +852,9 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         setInputValue("");
         setReplyToMessage(null);
         if (typeof scrollToBottom === 'function') scrollToBottom();
-
         try {
             const isReply = !!(replySnapshot && replyToMessageId);
-            const targetType = replySnapshot?.MessageType;
-            const messageTypeToSend = targetType === 'image' ? 2 : targetType === 'video' ? 3 : targetType === 'document' ? 4 : 1;
+            const messageTypeToSend = 1;
 
             const resp = isReply
                 ? await replyToMessageApi(auth, {

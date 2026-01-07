@@ -20,7 +20,7 @@ export const replyToMessageApi = async (
             SenderId: auth.id ?? 0,
             ConversationId: conversationId,
             ReplyToMessageId: replyToMessageId,
-            ReplyToAttachmentId: ReplyToAttachmentId || 0,
+            ReplyToAttachmentId: ReplyToAttachmentId || null,
             Message: message,
             MessageType: messageType,
         };

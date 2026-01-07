@@ -15,6 +15,7 @@ import ViewContext from './ViewContext';
 import { useConversation } from './useConversation';
 import PersonIcon from '@mui/icons-material/Person';
 import { addReactionApi } from '../../API/SendMessage/addReactionApi';
+import { removeReactionApi } from '../../API/SendMessage/removeReactionApi';
 import { emitSendReaction } from '../../socket';
 
 const Conversation = ({ selectedCustomer, onConversationRead, onViewConversationRead, onCustomerSelect }) => {
@@ -35,6 +36,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const [showScrollToBottom, setShowScrollToBottom] = useState(false);
     const { auth } = useContext(LoginContext);
     const [isSwitchingConversation, setIsSwitchingConversation] = useState(false);
+    const reactionRequestStateRef = useRef(new Map());
+    const messagesRef = useRef(null);
     const isNarrowScreen = useMediaQuery('(max-width: 992px)');
     const isCompactDockedPanel = useMediaQuery('(max-width: 1200px)');
     const isDetailsPanelDocked = drawerOpen === true && !isNarrowScreen;
@@ -87,6 +90,10 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         getMessageStatusIcon,
     } = useConversation(selectedCustomer, onConversationRead, onViewConversationRead);
 
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
+
     const docsParams = ".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.csv";
     const videoParams = "video/*";
     const imageParams = "image/*";
@@ -111,96 +118,171 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
 
             const emoji = emojiObject?.emoji || emojiObject;
             const unified = emojiObject?.unified;
-            let currentReactions = [];
 
-            if (message.ReactionEmojis) {
-                if (typeof message.ReactionEmojis === "string") {
-                    try {
-                        currentReactions = JSON.parse(message.ReactionEmojis);
-                    } catch (e) {
-                        currentReactions = message.ReactionEmojis.split(",").map(r => ({
-                            Reaction: r,
-                            Direction: 1
-                        }));
-                    }
-                } else if (Array.isArray(message.ReactionEmojis)) {
-                    currentReactions = message.ReactionEmojis;
-                }
-            }
-
-            const existingIndex = currentReactions.findIndex(
-                r => r.Direction === 1 && r.Reaction === emoji
-            );
-
-            let updatedReactions;
-            let reactionPayload; // Value to send to API
-
-            if (existingIndex >= 0) {
-                currentReactions.splice(existingIndex, 1);
-                updatedReactions = currentReactions;
-                reactionPayload = ""; // send empty string to API
-            } else {
-                const filtered = currentReactions.filter(r => r.Direction !== 1);
-                const newReaction = { Reaction: emoji, Unified: unified, Direction: 1 };
-                updatedReactions = [...filtered, newReaction];
-                reactionPayload = JSON.stringify(updatedReactions);
-            }
-            const messageIdToUse = message.MessageId;
+            const messageIdToUse = message?.MessageId ?? message?.Id;
             if (!messageIdToUse) {
                 toast.error("Failed to send reaction: Message ID missing");
                 return;
             }
-            await addReactionApi(
-                auth,
-                {
-                    messageId: messageIdToUse,
-                    emoji: JSON.parse(reactionPayload || "[]")?.find(r => r.Direction === 1)?.Reaction || ""
-                }
-            );
 
-            const receiverId = selectedCustomer?.ReceiverId;
-            const senderId = auth?.id ?? auth?.userId;
-            if (receiverId && senderId && auth?.ufcc) {
-                const socketReactionEmojis = reactionPayload === ""
-                    ? JSON.stringify([{ Reaction: "", Direction: 0 }])
-                    : JSON.stringify([{ Reaction: emoji, Unified: unified, Direction: 0 }]);
+            const key = String(messageIdToUse);
+            const now = Date.now();
+            const prevState = reactionRequestStateRef.current.get(key) || { inFlight: false, lastSentAt: 0, lastEmoji: null };
+            if (prevState.inFlight) return;
+            if (now - (prevState.lastSentAt || 0) < 700) return;
 
-                emitSendReaction({
-                    ufcc: auth?.ufcc,
-                    userId: senderId,
-                    SenderId: senderId,
-                    ReceiverId: receiverId,
-                    ConversationId: selectedCustomer?.ConversationId,
-                    MessageId: messageIdToUse,
-                    ReactionEmojis: socketReactionEmojis,
-                });
-            }
+            prevState.inFlight = true;
+            prevState.lastSentAt = now;
+            prevState.lastEmoji = emoji;
+            reactionRequestStateRef.current.set(key, prevState);
 
-            setMessages(prev => {
-                const prevData = Array.isArray(prev) ? prev : prev?.data || [];
-                const updatedData = prevData.map(msg => {
-                    if ((msg.MessageId && msg.MessageId === message.MessageId) ||
-                        (msg.Id && msg.Id === message.Id)) {
-                        return {
-                            ...msg,
-                            ReactionEmojis: reactionPayload,
-                            _isFromCurrentUser: true // Flag to identify current user's update
-                        };
+            const processOnce = async ({ emoji: nextEmoji, unified: nextUnified }) => {
+                const snapshot = messagesRef.current;
+                const list = Array.isArray(snapshot) ? snapshot : (snapshot?.data || []);
+                const latestMsg = list.find(
+                    (m) => String(m?.MessageId ?? m?.Id) === String(messageIdToUse)
+                ) || message;
+
+                let currentReactions = [];
+                if (latestMsg?.ReactionEmojis) {
+                    if (typeof latestMsg.ReactionEmojis === "string") {
+                        try {
+                            currentReactions = JSON.parse(latestMsg.ReactionEmojis);
+                        } catch (e) {
+                            currentReactions = latestMsg.ReactionEmojis.split(",").map(r => ({
+                                Reaction: r,
+                                Direction: 1
+                            }));
+                        }
+                    } else if (Array.isArray(latestMsg.ReactionEmojis)) {
+                        currentReactions = latestMsg.ReactionEmojis;
                     }
-                    return msg;
+                }
+
+                const existingIndex = currentReactions.findIndex(
+                    r => r.Direction === 1 && r.Reaction === nextEmoji
+                );
+
+                let updatedReactions;
+                let reactionPayload;
+                let apiEmoji;
+
+                if (existingIndex >= 0) {
+                    currentReactions.splice(existingIndex, 1);
+                    updatedReactions = currentReactions;
+                    reactionPayload = "";
+                    apiEmoji = "";
+                } else {
+                    const filtered = currentReactions.filter(r => r.Direction !== 1);
+                    const newReaction = { Reaction: nextEmoji, Unified: nextUnified, Direction: 1 };
+                    updatedReactions = [...filtered, newReaction];
+                    reactionPayload = JSON.stringify(updatedReactions);
+                    apiEmoji = nextEmoji;
+                }
+
+                await addReactionApi(auth, { messageId: messageIdToUse, emoji: apiEmoji });
+
+                const receiverId = selectedCustomer?.ReceiverId;
+                const senderId = auth?.id ?? auth?.userId;
+                if (receiverId && senderId && auth?.ufcc) {
+                    const socketReactionEmojis = reactionPayload === ""
+                        ? JSON.stringify([{ Reaction: "", Direction: 0 }])
+                        : JSON.stringify([{ Reaction: nextEmoji, Unified: nextUnified, Direction: 0 }]);
+
+                    emitSendReaction({
+                        ufcc: auth?.ufcc,
+                        userId: senderId,
+                        SenderId: senderId,
+                        ReceiverId: receiverId,
+                        ConversationId: selectedCustomer?.ConversationId,
+                        MessageId: messageIdToUse,
+                        ReactionEmojis: socketReactionEmojis,
+                    });
+                }
+
+                setMessages(prev => {
+                    const prevData = Array.isArray(prev) ? prev : prev?.data || [];
+                    const updatedData = prevData.map(msg => {
+                        if (String(msg?.MessageId ?? msg?.Id) === String(messageIdToUse)) {
+                            return {
+                                ...msg,
+                                ReactionEmojis: reactionPayload,
+                                _isFromCurrentUser: true
+                            };
+                        }
+                        return msg;
+                    });
+                    return Array.isArray(prev)
+                        ? updatedData
+                        : { ...prev, data: updatedData };
                 });
-                return Array.isArray(prev)
-                    ? updatedData
-                    : { ...prev, data: updatedData };
-            });
-            if (reactionPayload === "") {
-                toast("Reaction removed!");
-            } else {
-                toast.success("Reaction sent!");
+
+                if (reactionPayload === "") {
+                    toast("Reaction removed!");
+                } else {
+                    toast.success("Reaction sent!");
+                }
+            };
+
+            await processOnce({ emoji, unified });
+
+            const finalState = reactionRequestStateRef.current.get(key);
+            if (finalState) {
+                finalState.inFlight = false;
+                reactionRequestStateRef.current.set(key, finalState);
             }
         } catch (error) {
             console.error("Error sending reaction:", error);
             toast.error("Failed to send reaction");
+            const messageIdToUse = message?.MessageId ?? message?.Id;
+            if (messageIdToUse != null) {
+                const key = String(messageIdToUse);
+                const state = reactionRequestStateRef.current.get(key);
+                if (state) {
+                    state.inFlight = false;
+                    reactionRequestStateRef.current.set(key, state);
+                }
+            }
+        }
+    };
+
+    const handleRemoveReactionAction = async (reaction, message) => {
+        try {
+            const messageIdToUse = message?.MessageId ?? message?.Id;
+            if (!messageIdToUse || !auth) return;
+
+            const response = await removeReactionApi(auth, { messageId: messageIdToUse });
+            if (response) {
+                setMessages(prev => {
+                    const prevData = Array.isArray(prev) ? prev : prev?.data || [];
+                    const updatedData = prevData.map(m => {
+                        if (String(m?.MessageId ?? m?.Id) === String(messageIdToUse)) {
+                            let currentReactions = [];
+                            try {
+                                currentReactions = JSON.parse(m.ReactionEmojis || "[]");
+                            } catch (e) {
+                                currentReactions = [];
+                            }
+
+                            const newReactions = currentReactions.filter(r =>
+                                !(String(r.UserId) === String(auth?.id ?? auth?.userId) && (r.Emoji === (reaction.Emoji || reaction.Reaction) || r.Reaction === (reaction.Emoji || reaction.Reaction)))
+                            );
+
+                            return {
+                                ...m,
+                                ReactionEmojis: JSON.stringify(newReactions),
+                                ReactionCount: Math.max(0, (m.ReactionCount || 0) - 1)
+                            };
+                        }
+                        return m;
+                    });
+                    return Array.isArray(prev) ? updatedData : { ...prev, data: updatedData };
+                });
+                toast.success("Reaction removed!");
+            }
+        } catch (error) {
+            console.error("Error removing reaction:", error);
+            toast.error("Failed to remove reaction");
         }
     };
 
@@ -501,6 +583,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     </div>
                     {/* Messages Area - Using the MessageArea component */}
                     <MessageArea
+                        auth={auth}
                         showMedia={showMedia}
                         setShowMedia={setShowMedia}
                         loading={loading}
@@ -532,6 +615,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                         getMediaKey={getMediaKeyCallback}
                         markLoaded={markLoadedCallback}
                         uploadProgress={uploadProgress}
+                        handleRemoveReaction={handleRemoveReactionAction}
                         replyToMessage={replyToMessage}
                         isSwitchingConversation={isSwitchingConversation}
                     />

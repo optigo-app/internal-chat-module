@@ -30,7 +30,7 @@ const ReplyPreview = ({ message, onCancel }) => {
           display: 'flex',
           alignItems: 'center',
           gap: 1.5,
-          maxWidth: '100%',
+          maxWidth: '100%', 
         }}
       >
         <Box

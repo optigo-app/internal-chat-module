@@ -35,6 +35,8 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
             return {
                 ...item,
                 UserId: item.UserId,
+                ConversationName: item.ConversationName || item.UserName || item.CustomerName || item.name || '',
+                CustomerPhone: item.CustomerPhone || item.UserPhone || item.MobileNo || item.Phone || '',
                 name,
                 email: item.UserEmail || '',
                 avatar: null,

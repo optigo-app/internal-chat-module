@@ -7,7 +7,7 @@ import { FormatDateIST } from '../../utils/DateFnc';
 import DynamicTemplate from '../DynamicTemplate/DynamicTemplate';
 import QuickReactionMenu from './QuickReactionMenu';
 import ReactionDetailsMenu from './ReactionMenu';
-import { handleDownloadFile, getCustomerDisplayName, getWhatsAppAvatarConfig, getCustomerAvatarSeed, hasCustomerName, getDocumentMeta } from '../../utils/globalFunc';
+import { handleDownloadFile, getDocumentMeta } from '../../utils/globalFunc';
 
 const imageDimsCache = new Map();
 
@@ -24,6 +24,8 @@ const charToUnified = (char) => {
 };
 
 const MessageContent = ({
+    auth,
+    handleRemoveReaction,
     msg,
     isOutgoing,
     shouldShowActions,
@@ -48,14 +50,22 @@ const MessageContent = ({
     getMessageStatusIcon,
     getMessageById,
 }) => {
+
     const theme = useTheme();
 
     const [imageDims, setImageDims] = useState(null);
     const [anchorEl, setAnchorEl] = React.useState(null);
-    const reactions = [
-        { emoji: "👍", users: ["You", "Alice"] },
-        { emoji: "❤️", users: ["Bob"] }
-    ];
+
+    const parsedReactions = React.useMemo(() => {
+        try {
+            if (!msg?.ReactionEmojis || msg.ReactionEmojis === "" || msg.ReactionEmojis === "[]") return [];
+            const raw = JSON.parse(msg.ReactionEmojis);
+            return Array.isArray(raw) ? raw : [];
+        } catch (e) {
+            console.error("Error parsing reactions:", e);
+            return [];
+        }
+    }, [msg?.ReactionEmojis]);
 
     useEffect(() => {
         setImageDims(null);
@@ -78,8 +88,9 @@ const MessageContent = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 2,
-                    backgroundColor: alpha(theme.palette.background.paper, 0.92),
-                    backdropFilter: 'blur(4px)',
+                    backgroundColor: alpha(theme.palette.common.black, 0.35),
+                    backdropFilter: 'blur(2px)',
+                    border: `1px solid ${alpha(theme.palette.common.white, 0.18)}`,
                     borderRadius: 2,
                 }}
             >
@@ -116,7 +127,8 @@ const MessageContent = ({
                             variant="caption"
                             sx={{
                                 fontWeight: 700,
-                                color: theme.palette.text.primary,
+                                color: theme.palette.common.white,
+                                textShadow: '0 1px 2px rgba(0,0,0,0.65)',
                                 lineHeight: 1,
                                 fontSize: labelFontSize,
                             }}
@@ -212,34 +224,32 @@ const MessageContent = ({
                     />
                 </Box>
 
-                {msg?.MessageType !== 'template' && (
-                    <IconButton
-                        className="menu-btn"
-                        size="small"
-                        onClick={(e) => {
-                            handleMenuClick(e, msg);
-                            handleContextMenu(e, msg);
-                        }}
-                        sx={{
-                            '&&': {
-                                position: 'absolute !important',
-                                top: '3px !important',
-                                right: '3px !important',
-                                left: 'auto !important',
-                                padding: '0px !important',
-                                color: theme.palette.text.secondary + ' !important',
-                                opacity: shouldShowActions ? 1 : 0,
-                                pointerEvents: shouldShowActions ? 'auto' : 'none',
-                                backgroundColor: alpha(theme.palette.primary.main, 0.10),
-                                boxShadow: '0 6px 14px ' + alpha('#000', 0.12),
-                                transition: 'opacity 160ms ease',
-                                zIndex: 3,
-                            },
-                        }}
-                    >
-                        <ChevronDown size={24} />
-                    </IconButton>
-                )}
+                <IconButton
+                    className="menu-btn"
+                    size="small"
+                    onClick={(e) => {
+                        handleMenuClick(e, msg);
+                        handleContextMenu(e, msg);
+                    }}
+                    sx={{
+                        '&&': {
+                            position: 'absolute !important',
+                            top: '3px !important',
+                            right: '3px !important',
+                            left: 'auto !important',
+                            padding: '0px !important',
+                            color: theme.palette.text.secondary + ' !important',
+                            opacity: shouldShowActions ? 1 : 0,
+                            pointerEvents: shouldShowActions ? 'auto' : 'none',
+                            backgroundColor: alpha(theme.palette.primary.main, 0.10),
+                            boxShadow: '0 6px 14px ' + alpha('#000', 0.12),
+                            transition: 'opacity 160ms ease',
+                            zIndex: 3,
+                        },
+                    }}
+                >
+                    <ChevronDown size={24} />
+                </IconButton>
                 {/* Reply Preview (Quoted message) */}
                 {msg.ContextType === 2 && (
                     <div className="">
@@ -289,6 +299,8 @@ const MessageContent = ({
                                 )
                                 : null;
                             const specificMediaUrl = specificMedia?.url || specificMedia?.src;
+                            const fallbackMediaUrl = original?.previewUrl || original?.mediaItems?.[0]?.url || original?.mediaItems?.[0]?.src;
+                            const replyMediaUrl = specificMediaUrl || fallbackMediaUrl;
 
                             return (
                                 <div className="reply-preview" style={{
@@ -346,7 +358,70 @@ const MessageContent = ({
                                         )}
                                     </div>
 
-                                    {specificMediaUrl && (
+                                    {replyMediaUrl && originalType === 'image' && (() => {
+                                        const allThumbs = Array.isArray(original?.mediaItems) && original.mediaItems.length
+                                            ? original.mediaItems
+                                                .map((item) => item?.url || item?.src)
+                                                .filter(Boolean)
+                                            : [replyMediaUrl];
+
+                                        const thumbsToShow = allThumbs.slice(0, 2);
+                                        const overflowCount = allThumbs.length - 2;
+
+                                        return (
+                                            <Box
+                                                sx={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 0.5,
+                                                    flexShrink: 0,
+                                                }}
+                                            >
+                                                {thumbsToShow.map((thumbSrc, idx) => {
+                                                    const showOverflow = idx === 1 && overflowCount > 0;
+                                                    return (
+                                                        <Box
+                                                            key={`${msg?.Id || msg?.MessageId || msg?.ContextId || 'reply'}-thumb-${idx}`}
+                                                            sx={{
+                                                                position: 'relative',
+                                                                width: 40,
+                                                                height: 40,
+                                                                borderRadius: 1,
+                                                                overflow: 'hidden',
+                                                                backgroundColor: alpha(theme.palette.text.primary, 0.05),
+                                                                border: `1px solid ${alpha(theme.palette.text.primary, 0.08)}`,
+                                                            }}
+                                                        >
+                                                            <img
+                                                                src={thumbSrc}
+                                                                alt="preview"
+                                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                            />
+                                                            {showOverflow && (
+                                                                <Box
+                                                                    sx={{
+                                                                        position: 'absolute',
+                                                                        inset: 0,
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        backgroundColor: alpha('#000', 0.45),
+                                                                        color: '#fff',
+                                                                        fontWeight: 700,
+                                                                        fontSize: 14,
+                                                                    }}
+                                                                >
+                                                                    +{overflowCount}
+                                                                </Box>
+                                                            )}
+                                                        </Box>
+                                                    );
+                                                })}
+                                            </Box>
+                                        );
+                                    })()}
+
+                                    {replyMediaUrl && originalType !== 'image' && (
                                         <Box
                                             sx={{
                                                 width: 40,
@@ -358,14 +433,14 @@ const MessageContent = ({
                                                 border: `1px solid ${alpha(theme.palette.text.primary, 0.08)}`
                                             }}
                                         >
-                                            {specificMedia.mimeType?.startsWith('video/') || specificMedia.src?.includes('.mp4') ? (
+                                            {specificMedia?.mimeType?.startsWith('video/') || String(replyMediaUrl).includes('.mp4') ? (
                                                 <video
-                                                    src={specificMediaUrl}
+                                                    src={replyMediaUrl}
                                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                 />
                                             ) : (
                                                 <img
-                                                    src={specificMediaUrl}
+                                                    src={replyMediaUrl}
                                                     alt="preview"
                                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                 />
@@ -1166,10 +1241,14 @@ const MessageContent = ({
                 <ReactionDetailsMenu
                     anchorEl={anchorEl}
                     onClose={() => setAnchorEl(null)}
-                    reactions={reactions}
-                    currentUser="You"
-                    onAddReaction={() => console.log("add reaction")}
-                    onRemoveReaction={() => console.log("remove reaction")}
+                    reactions={parsedReactions}
+                    auth={auth}
+                    onRemoveReaction={(reaction) => {
+                        if (typeof handleRemoveReaction === 'function') {
+                            handleRemoveReaction(reaction, msg);
+                        }
+                        setAnchorEl(null);
+                    }}
                 />
             )}
             {/* {msg?.Direction == 1 && (

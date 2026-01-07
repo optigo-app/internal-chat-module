@@ -1,7 +1,19 @@
 
 // Map numeric MessageType from new API to string types used in UI
 export const mapTypeCodeToMessageType = (code) => {
-    switch (code) {
+    const normalized = (() => {
+        if (typeof code === 'string') {
+            const trimmed = code.trim();
+            if (/^\d+$/.test(trimmed)) {
+                const parsed = parseInt(trimmed, 10);
+                return Number.isFinite(parsed) ? parsed : code;
+            }
+            return trimmed;
+        }
+        return code;
+    })();
+
+    switch (normalized) {
         case 1:
             return 'text';
         case 2:
@@ -13,13 +25,13 @@ export const mapTypeCodeToMessageType = (code) => {
         case 5:
             return 'file';
         default:
-            return typeof code === 'string' ? code : 'text';
+            return typeof normalized === 'string' ? normalized : 'text';
     }
 };
 
 // Normalize messages coming from conversationView / GetMessages API
 export const normalizeServerMessages = (messagesArray, auth) => {
-    if (!Array.isArray(messagesArray)) return [];
+    if (!Array.isArray(messagesArray)) return []
 
     return messagesArray.map((msg) => {
         if (!msg || typeof msg !== 'object') return msg;
@@ -84,21 +96,42 @@ export const normalizeServerMessages = (messagesArray, auth) => {
             .filter(Boolean);
 
         const isNewShape = msg.MessageId && msg.SenderId && (msg.SentAt || msg.LastUpdatedDate);
+
+        const contextTypeRaw = msg?.ContextType;
+        const parsedContextType = typeof contextTypeRaw === 'string'
+            ? parseInt(contextTypeRaw, 10)
+            : contextTypeRaw;
+
+        const replyToRaw = msg?.ReplyTo;
+        const parsedReplyTo = typeof replyToRaw === 'string'
+            ? parseInt(replyToRaw, 10)
+            : replyToRaw;
+
+        const hasReplyLegacy = parsedContextType === 2;
+        const hasReplyNew = Number(parsedReplyTo || 0) !== 0;
+        const isReplyMessage = hasReplyNew || hasReplyLegacy;
+        const hasTextBody = String(msg?.Message ?? '').trim().length > 0;
+        const forceTextReply = isReplyMessage && hasTextBody;
+
         if (!isNewShape) {
-            return {
-                ...msg,
-                MessageType: (() => {
+            const resolvedType = forceTextReply
+                ? 'text'
+                : (() => {
                     if (attachmentUrl) {
                         if ((attachmentMime || '').startsWith('image/')) return 'image';
                         if ((attachmentMime || '').startsWith('video/')) return 'video';
                         return 'document';
                     }
                     return mapTypeCodeToMessageType(msg.MessageType);
-                })(),
-                ...(attachmentUrl ? { previewUrl: attachmentUrl } : {}),
-                ...(attachmentName ? { fileName: attachmentName } : {}),
-                ...(attachmentMime ? { fileType: attachmentMime } : {}),
-                ...(mediaItems.length ? { mediaItems } : {}),
+                })();
+
+            return {
+                ...msg,
+                MessageType: resolvedType,
+                ...(!forceTextReply && attachmentUrl ? { previewUrl: attachmentUrl } : {}),
+                ...(!forceTextReply && attachmentName ? { fileName: attachmentName } : {}),
+                ...(!forceTextReply && attachmentMime ? { fileType: attachmentMime } : {}),
+                ...(!forceTextReply && mediaItems.length ? { mediaItems } : {}),
             };
         }
 
@@ -134,20 +167,24 @@ export const normalizeServerMessages = (messagesArray, auth) => {
             normalizedStatus = msg.MessageStatus === 0 ? 1 : 3; // 1: sent, 3: read
         }
 
-        return {
-            ...msg,
-            Id: msg.Id ?? msg.MessageId,
-            MessageId: msg.MessageId ?? msg.Id,
-            IsMyMessage: typeof msg.IsMyMessage === 'boolean' ? msg.IsMyMessage : isMyMessage,
-            Direction: typeof msg.Direction === 'number' ? msg.Direction : (isMyMessage ? 1 : 0),
-            MessageType: (() => {
+        const resolvedMessageType = forceTextReply
+            ? 'text'
+            : (() => {
                 if (attachmentUrl) {
                     if ((attachmentMime || '').startsWith('image/')) return 'image';
                     if ((attachmentMime || '').startsWith('video/')) return 'video';
                     return 'document';
                 }
                 return mapTypeCodeToMessageType(msg.MessageType);
-            })(),
+            })();
+
+        return {
+            ...msg,
+            Id: msg.Id ?? msg.MessageId,
+            MessageId: msg.MessageId ?? msg.Id,
+            IsMyMessage: typeof msg.IsMyMessage === 'boolean' ? msg.IsMyMessage : isMyMessage,
+            Direction: typeof msg.Direction === 'number' ? msg.Direction : (isMyMessage ? 1 : 0),
+            MessageType: resolvedMessageType,
             Status: normalizedStatus,
             DateTime: dateTime,
             Date: date,
@@ -156,10 +193,10 @@ export const normalizeServerMessages = (messagesArray, auth) => {
             ContextType: contextType,
             ContextId: contextId,
             ReplyContextMsg: replyContextMsg,
-            ...(attachmentUrl ? { previewUrl: attachmentUrl } : {}),
-            ...(attachmentName ? { fileName: attachmentName } : {}),
-            ...(attachmentMime ? { fileType: attachmentMime } : {}),
-            ...(mediaItems.length ? { mediaItems } : {}),
+            ...(!forceTextReply && attachmentUrl ? { previewUrl: attachmentUrl } : {}),
+            ...(!forceTextReply && attachmentName ? { fileName: attachmentName } : {}),
+            ...(!forceTextReply && attachmentMime ? { fileType: attachmentMime } : {}),
+            ...(!forceTextReply && mediaItems.length ? { mediaItems } : {}),
         };
     });
 };

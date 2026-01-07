@@ -1,18 +1,40 @@
 import axios from "axios";
-import { APIURL, getHeaders, getLoginHeaders } from "./Config";
+import { APIURL, getApiHeaders } from "./Config";
 import { getClientIpAddress } from "../../utils/globalFunc";
 
 // Helper to build standard body with con/p/f fields
 export const buildCommonBody = (mode, auth, payloadObject, fLabel) => {
+    const appUserId = typeof auth === "string" ? auth : auth?.userId ?? "";
     return {
-        con: `{"id":"","mode":"${mode}","appuserid":"${auth?.userId ?? ""}"}`,
+        con: `{"id":"","mode":"${mode}","appuserid":"${appUserId}"}`,
         p: JSON.stringify(payloadObject ?? {}),
         f: fLabel ?? "",
     };
 };
 
+export const buildLoginBody = (mode, appUserId, payloadObject, fLabel) => {
+    return buildCommonBody(mode, appUserId ?? "", payloadObject, fLabel);
+};
+
 export const CommonAPI = async (body, version, pageName, signal) => {
     try {
+        let options = {};
+
+        if (version && typeof version === "object") {
+            options = version;
+        } else {
+            const looksLikeSignal = (value) =>
+                value && typeof value === "object" && ("aborted" in value || typeof value.addEventListener === "function");
+
+            if (version === "login") {
+                options = { authType: "login", pageName, signal };
+            } else if (looksLikeSignal(pageName) && typeof version === "string") {
+                options = { authType: "default", pageName: version, signal: pageName };
+            } else {
+                options = { authType: "default", pageName, signal };
+            }
+        }
+
         if (body && typeof body === "object" && typeof body.con === "string") {
             try {
                 const ipAddress = await getClientIpAddress();
@@ -26,16 +48,20 @@ export const CommonAPI = async (body, version, pageName, signal) => {
             }
         }
 
-        const headers = getHeaders();
-        const loginHeader = getLoginHeaders();
+        const headers = {
+            ...getApiHeaders({ version: options?.apiVersion }),
+            ...(options?.headers ?? {}),
+        };
 
-        const { data } = await axios.post(APIURL, body, {
-            headers: version === "login" ? loginHeader : headers,
-            ...(signal && { signal })
+        const url = options?.url ?? APIURL;
+
+        const { data } = await axios.post(url, body, {
+            headers,
+            ...(options?.signal && { signal: options.signal }),
         });
         return data;
     } catch (error) {
-        if (axios.isCancel(error)) {
+        if (axios.isCancel(error) || error?.code === "ERR_CANCELED") {
             console.log('Request canceled:', error.message);
             throw new Error('AbortError');
         }

@@ -13,22 +13,33 @@ import AddReactionIcon from "@mui/icons-material/AddReaction";
 export default function ReactionDetailsMenu({
     anchorEl,
     onClose,
-    reactions,
-    currentUser,
-    onAddReaction,
+    reactions = [],
+    auth,
     onRemoveReaction
 }) {
     const open = Boolean(anchorEl);
     const [filter, setFilter] = React.useState("all");
 
-    const allUsers = reactions.flatMap(r =>
-        r.users.map(user => ({ user, emoji: r.emoji }))
-    );
+    // reactions is now an array of objects like:
+    // { Id, UserId, Emoji, UserName, ... }
 
-    const filteredUsers =
-        filter === "all"
-            ? allUsers
-            : allUsers.filter(u => u.emoji === filter);
+    const reactionGroups = React.useMemo(() => {
+        const groups = {};
+        reactions.forEach(r => {
+            const emoji = r.Emoji || r.Reaction;
+            if (!groups[emoji]) {
+                groups[emoji] = [];
+            }
+            groups[emoji].push(r);
+        });
+        return groups;
+    }, [reactions]);
+
+    const filteredReactions = filter === "all"
+        ? reactions
+        : (reactionGroups[filter] || []);
+
+    const currentUserId = auth?.id ?? auth?.userId;
 
     return (
         <Menu
@@ -38,12 +49,11 @@ export default function ReactionDetailsMenu({
             PaperProps={{
                 sx: {
                     width: 320,
-                    borderRadius: 2
+                    borderRadius: 2,
+                    maxHeight: 400
                 }
             }}
         >
-            {/* Header */}
-
             {/* Emoji filters */}
             <Box
                 px={2}
@@ -52,48 +62,51 @@ export default function ReactionDetailsMenu({
                 alignItems="center"
                 justifyContent="space-between"
             >
-                <Box display="flex" gap={1}>
+                <Box display="flex" gap={1} sx={{ overflowX: 'auto', pb: 0.5 }}>
                     <Chip
-                        label={`All ${allUsers.length}`}
+                        label={`All ${reactions.length}`}
                         size="small"
                         clickable
                         color={filter === "all" ? "primary" : "default"}
                         onClick={() => setFilter("all")}
                     />
 
-                    {reactions.map(r => (
+                    {Object.entries(reactionGroups).map(([emoji, group]) => (
                         <Chip
-                            key={r.emoji}
-                            label={`${r.emoji} ${r.users.length}`}
+                            key={emoji}
+                            label={`${emoji} ${group.length}`}
                             size="small"
                             clickable
-                            color={filter === r.emoji ? "primary" : "default"}
-                            onClick={() => setFilter(r.emoji)}
+                            color={filter === emoji ? "primary" : "default"}
+                            onClick={() => setFilter(emoji)}
                         />
                     ))}
                 </Box>
-                <IconButton size="small" onClick={onAddReaction}>
-                    <AddReactionIcon fontSize="small" />
-                </IconButton>
             </Box>
 
             <Divider />
 
             {/* User list */}
             <Box sx={{ maxHeight: 240, overflowY: "auto" }}>
-                {filteredUsers.map((u, i) => {
-                    const isCurrentUser = u.user === currentUser;
+                {filteredReactions.map((r, i) => {
+                    const isCurrentUser = String(r.UserId) === String(currentUserId);
+                    const emojiValue = r.Emoji || r.Reaction;
 
                     return (
                         <MenuItem
-                            key={i}
-                            onClick={isCurrentUser ? onRemoveReaction : undefined}
+                            key={r.Id || i}
+                            onClick={isCurrentUser ? () => onRemoveReaction(r) : undefined}
                             sx={{
-                                cursor: isCurrentUser ? "pointer" : "default"
+                                cursor: isCurrentUser ? "pointer" : "default",
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1
                             }}
                         >
                             <Box flex={1}>
-                                <Typography>{u.user}</Typography>
+                                <Typography fontWeight={isCurrentUser ? 600 : 400}>
+                                    {isCurrentUser ? "You" : (r.UserName || "User")}
+                                </Typography>
 
                                 {isCurrentUser && (
                                     <Typography
@@ -105,12 +118,12 @@ export default function ReactionDetailsMenu({
                                 )}
                             </Box>
 
-                            <Typography fontSize={18}>{u.emoji}</Typography>
+                            <Typography fontSize={18}>{emojiValue}</Typography>
                         </MenuItem>
                     );
                 })}
 
-                {filteredUsers.length === 0 && (
+                {filteredReactions.length === 0 && (
                     <MenuItem disabled>
                         <Typography color="text.secondary">
                             No reactions

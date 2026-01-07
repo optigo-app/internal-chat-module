@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Box, CircularProgress, Typography, Avatar } from '@mui/material';
-import {useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material/styles';
 import MediaPreview from '../MediaPreview/MediaPreview';
 import { getCustomerAvatarSeed, getWhatsAppAvatarConfig, hasCustomerName } from '../../utils/globalFunc';
 import MessageContent from './MessageContent';
@@ -8,6 +8,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import ScrollToBottomButton from './ScrollToBottomButton';
 
 const MessageArea = ({
+    auth,
     showMedia,
     setShowMedia,
     loading,
@@ -35,8 +36,10 @@ const MessageArea = ({
     getMediaKey,
     markLoaded,
     replyToMessage,
+    handleRemoveReaction,
     isSwitchingConversation
 }) => {
+    console.log('groupMessagesByDate', groupMessagesByDate)
     const [hoveredMessageId, setHoveredMessageId] = useState(null);
     const [reactionMenuAnchorEl, setReactionMenuAnchorEl] = useState(null);
     const [reactionMenuMessageId, setReactionMenuMessageId] = useState(null);
@@ -269,6 +272,7 @@ const MessageArea = ({
                                                             )}
 
                                                             <MessageContent
+                                                                auth={auth}
                                                                 msg={msg}
                                                                 isOutgoing={isOutgoing}
                                                                 shouldShowActions={shouldShowActions}
@@ -291,6 +295,7 @@ const MessageArea = ({
                                                                 markLoaded={markLoaded}
                                                                 handleMediaClick={handleMediaClick}
                                                                 getMessageStatusIcon={getMessageStatusIcon}
+                                                                handleRemoveReaction={handleRemoveReaction}
                                                                 getMessageById={(id) => messageById.get(id)}
                                                             />
                                                         </div>

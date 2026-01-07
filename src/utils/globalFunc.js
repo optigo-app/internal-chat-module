@@ -1,3 +1,6 @@
+import { SHA1 } from "crypto-js";
+import Hex from "crypto-js/enc-hex";
+
 const hashString = (value) => {
     const str = String(value ?? '');
     let hash = 0;
@@ -35,18 +38,18 @@ export const getSoftAvatarColors = (seed) => {
 };
 
 export const hasCustomerName = (customer) => {
-    const name = customer?.ConversationName;
+    const name = customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName;
     return Boolean(String(name ?? '').trim());
 };
 
 export const getCustomerDisplayName = (customer) => {
-    const name = String(customer?.ConversationName ?? '').trim();
+    const name = String(customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? '').trim();
     if (name) return name;
 
     const phone = String(customer?.CustomerPhone ?? '').trim();
     if (phone) return phone;
 
-    const fallback = String(customer?.ConversationName ?? '').trim();
+    const fallback = String(customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? '').trim();
     if (fallback) return fallback;
 
     return 'Unknown';
@@ -54,13 +57,13 @@ export const getCustomerDisplayName = (customer) => {
 
 export const getCustomerAvatarSeed = (customer) => {
     console.log(customer);
-    const name = String(customer?.ConversationName ?? '').trim();
+    const name = String(customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? '').trim();
     if (name) return name;
 
     const phone = String(customer?.CustomerPhone ?? '').trim();
     if (phone) return phone;
 
-    return String(customer?.ConversationName ?? '').trim();
+    return String(customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? '').trim();
 };
 
 export const getWhatsAppAvatarConfig = (name, size = 40) => {
@@ -81,14 +84,11 @@ export const getWhatsAppAvatarConfig = (name, size = 40) => {
     };
 };
 
-// convert password to sha1
-export async function passwordToSha1(password) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest("SHA-1", data);
-    return Array.from(new Uint8Array(hashBuffer))
-        .map(b => b.toString(16).padStart(2, "0"))
-        .join("");
+// convert password to sha1 (HTTP + HTTPS safe)
+export function passwordToSha1(password) {
+    if (password === null || password === undefined) return "";
+
+    return SHA1(password.toString()).toString(Hex);
 }
 
 export const handleDownloadFile = async (fileUrl, filename = null, options = {}) => {

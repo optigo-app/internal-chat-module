@@ -49,6 +49,32 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const searchTimeoutRef = useRef(null);
     const { auth, isSyncing } = useContext(LoginContext);
 
+    const getMemberTimeValue = useCallback((member) => {
+        const raw = member?.lastMessageTimeValue || member?.LastMessageDate || member?.LastUpdatedDate || member?.lastMessageTime || 0;
+        const t = new Date(raw).getTime();
+        return Number.isFinite(t) ? t : 0;
+    }, []);
+
+    const conversationComparator = useCallback((a, b) => {
+        const aIsSearch = Boolean(a?.isSearchResult);
+        const bIsSearch = Boolean(b?.isSearchResult);
+        if (aIsSearch !== bIsSearch) return aIsSearch ? 1 : -1;
+
+        const aPinned = Number(a?.IsPin || 0) === 1;
+        const bPinned = Number(b?.IsPin || 0) === 1;
+        if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
+        const aUnread = Number(a?.unreadCount ?? a?.UnreadCount ?? 0) > 0;
+        const bUnread = Number(b?.unreadCount ?? b?.UnreadCount ?? 0) > 0;
+        if (aUnread !== bUnread) return aUnread ? -1 : 1;
+
+        const aTime = getMemberTimeValue(a);
+        const bTime = getMemberTimeValue(b);
+        if (aTime !== bTime) return bTime - aTime;
+
+        return Number(b?.ConversationId ?? 0) - Number(a?.ConversationId ?? 0);
+    }, [getMemberTimeValue]);
+
     const handleCloseMenu = () => {
         setAnchorEl(null);
     };
@@ -89,12 +115,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 ]
                 : currentConversations;
 
-            // Sort by last message time (newest first)
-            const sortedConversations = mergedConversations.sort((a, b) => {
-                const aTime = new Date(a?.lastMessageTimeValue || a?.LastMessageDate || a?.LastUpdatedDate || a?.lastMessageTime || 0).getTime();
-                const bTime = new Date(b?.lastMessageTimeValue || b?.LastMessageDate || b?.LastUpdatedDate || b?.lastMessageTime || 0).getTime();
-                return (bTime || 0) - (aTime || 0);
-            });
+            const sortedConversations = mergedConversations.sort(conversationComparator);
 
             setChatMembers(prev => ({
                 data: reset ? sortedConversations : [...(prev.data || []), ...sortedConversations],
@@ -110,7 +131,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         } finally {
             setLoading(false);
         }
-    }, [loading, pageSize, processApiResponse, searchTerm]);
+    }, [loading, hasMore, auth?.token, auth?.userId, pageSize, processApiResponse, searchTerm, conversationComparator]);
 
     // Effect to refresh customer list when sync completes
     useEffect(() => {
@@ -244,8 +265,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     LastMessageDirection: normalizedDirection,
                 };
 
-                updatedData.splice(index, 1);
-                updatedData.unshift(updatedChat);
+                updatedData[index] = updatedChat;
             } else {
                 const unread = isStatusChange || isOutgoing ? 0 : (isOpenConversation ? 0 : 1);
                 const avatarSeed = getCustomerAvatarSeed(incoming) || resolvedName;
@@ -266,12 +286,13 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     avatar: null,
                     avatarConfig: getWhatsAppAvatarConfig(avatarSeed),
                 };
-                updatedData.unshift(newChat);
+                updatedData.push(newChat);
             }
 
+            updatedData.sort(conversationComparator);
             return { ...prev, data: updatedData };
         });
-    }, [auth?.id, auth?.userId]);
+    }, [auth?.id, auth?.userId, conversationComparator]);
 
     useEffect(() => {
         if (!auth?.token || !auth?.userId) return;
@@ -382,18 +403,28 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const archivedCount = chatMembers?.data?.filter(m => m.IsArchived === 1)?.length || 0;
 
     const getMessageStatusIcon = (member) => {
-        if (member?.UnreadCount > 0) {
-            return (
-                <CheckCheck
-                    size={16}
-                    style={{ marginRight: 5, color: "#9e9e9e" }}
-                />
-            );
+        const direction = Number(member?.LastMessageDirection ?? member?.lastMessageDirection);
+        if (direction !== 1) return null;
+
+        const raw = member?.LastMessageStatus ?? member?.lastMessageStatus ?? member?.Status;
+
+        let statusKey = null;
+        if (typeof raw === 'string') {
+            const lowered = raw.toLowerCase();
+            if (lowered === 'read') statusKey = 'read';
+            if (lowered === 'sent') statusKey = 'sent';
+        } else {
+            const parsed = typeof raw === 'number' ? raw : parseInt(raw, 10);
+            if (parsed === 3) statusKey = 'read';
+            if (parsed === 1 || parsed === 0) statusKey = 'sent';
         }
+
+        if (!statusKey) return null;
+
         return (
             <CheckCheck
                 size={16}
-                style={{ marginRight: 5, color: "#1F51FF" }}
+                style={{ marginRight: 5, color: statusKey === 'read' ? "#1F51FF" : "#9e9e9e" }}
             />
         );
     };

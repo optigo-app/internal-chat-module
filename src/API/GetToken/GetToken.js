@@ -1,11 +1,11 @@
-import { CommonAPI1, buildLoginBody } from "../InitialApi/CommonApi1";
+import { CommonAPI, buildLoginBody } from "../InitialApi/CommonApi";
 
 export const getToken = async (companyCode) => {
     try {
         const payload = { Ufcc: companyCode };
-        const body = buildLoginBody("GetToken", "", payload, "Gettoken By Company Code (ConversionDetail)");
+        const body = buildLoginBody("VerifyCompany", "", payload, "VerifyCompany By Company Code (ConversionDetail)");
 
-        const response = await CommonAPI1(body);
+        const response = await CommonAPI(body, { authType: "login" });
         if (response?.Data) {
             return response?.Data;
         } else {

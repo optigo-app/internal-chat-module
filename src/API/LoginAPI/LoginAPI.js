@@ -1,6 +1,5 @@
 import { passwordToSha1 } from "../../utils/globalFunc";
-import { CommonAPI } from "../InitialApi/CommonApi";
-import { buildLoginBody } from "../InitialApi/CommonApi1";
+import { CommonAPI, buildLoginBody } from "../InitialApi/CommonApi";
 
 export const fetchLoginApi = async (data) => {
     try {
@@ -12,7 +11,7 @@ export const fetchLoginApi = async (data) => {
 
         const body = buildLoginBody("login", data?.userId ?? "", payload, "Chat module (login)");
 
-        const response = await CommonAPI(body, "login");
+        const response = await CommonAPI(body, { authType: "login" });
 
         if (response?.Data) {
             return response?.Data;
