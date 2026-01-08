@@ -4,7 +4,7 @@ import { sendDocumentMessage, sendImageMessage, sendTextMessage, sendVideoMessag
 import { normalizeServerMessages as normalizeServerMessagesHelper, groupMessagesByDateHelper } from './conversationUtils';
 
 import { addMessageReactionHandler, addInternalMessageHandler, emitInternalMessageSend, addInternalStatusHandler, emitInternalMessageRead } from '../../socket';
-import { readMessage } from '../../API/ReadMessage/ReadMessage';
+import { readMessageApi } from '../../API/SendMessage/ReadMessageApi';
 import { uploadMediaAPi } from '../../API/FileUpload/uploadHelpers';
 import { toast } from 'react-hot-toast';
 import { LoginContext } from '../../context/LoginData';
@@ -251,7 +251,6 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             if (!data || typeof data !== "object") return;
             setMessId(data?.MessageId);
 
-            // Store message data for later use
             if (data?.MessageId) {
                 setStoreMessData(prev => ({
                     ...prev,
@@ -276,64 +275,92 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                     );
                 };
 
+                const resolveNextStatus = () => {
+                    const raw = data?.MessageStatus ?? data?.status ?? data?.Status;
+
+                    if (typeof raw === 'string') {
+                        const lowered = raw.toLowerCase();
+                        if (lowered === 'read') return 3;
+                        if (lowered === 'sent') return 1;
+                        if (lowered === 'delivered') return 2;
+                        if (lowered === 'failed') return 4;
+                    }
+
+                    const parsed = typeof raw === 'number' ? raw : parseInt(raw, 10);
+                    if (Number.isNaN(parsed)) return 0;
+
+                    // If backend sends MessageStatus (1=sent, 2=read), map it to internal Status (1=sent, 3=read)
+                    if (data?.MessageStatus !== undefined && data?.MessageStatus !== null) {
+                        if (parsed === 2) return 3;
+                        if (parsed === 1 || parsed === 0) return 1;
+                    }
+
+                    return parsed;
+                };
+
+                const isValidTransition = (current, next) => {
+                    if (current === next) return true;
+
+                    const validTransitions = {
+                        0: [1, 2, 3, 4],
+                        1: [2, 3, 4],
+                        2: [3, 4],
+                        3: [],
+                        4: []
+                    };
+
+                    if (!(current in validTransitions)) return true;
+                    return validTransitions[current].includes(next);
+                };
+
                 const conversationId = data?.ConversationId;
                 const shouldMarkAllInConversation = Boolean(conversationId) && !data?.MessageId;
 
                 return {
                     ...prevMessages,
                     data: prevData.map((msg) => {
-                        if (msg?.Direction !== 1) {
-                            return msg;
-                        }
+                        if (msg?.Direction !== 1) return msg;
 
                         if (shouldMarkAllInConversation) {
                             if (Number(msg?.ConversationId) !== Number(conversationId)) return msg;
-                            const currentStatus = typeof msg?.Status === 'number' ? msg.Status : parseInt(msg?.Status, 10);
+                            const currentStatus = parseInt(msg?.Status, 10);
                             if (currentStatus === 3) return msg;
                             return { ...msg, Status: 3 };
                         }
 
-                        if (!messageExists(msg)) {
+                        if (!messageExists(msg)) return msg;
+
+                        const newStatus = resolveNextStatus();
+                        const currentStatus = parseInt(msg?.Status, 10);
+                        const safeCurrent = Number.isNaN(currentStatus) ? 0 : currentStatus;
+
+                        if (!isValidTransition(safeCurrent, newStatus)) {
                             return msg;
-                        }
-
-                        const rawStatus = data?.status ?? data?.Status;
-                        const parsed = typeof rawStatus === 'number'
-                            ? rawStatus
-                            : parseInt(rawStatus, 10);
-
-                        const isRead = parsed === 3 || String(rawStatus || '').toLowerCase() === 'read';
-                        const nextStatus = isRead ? 3 : 1;
-
-                        const currentStatus = typeof msg?.Status === 'number' ? msg.Status : parseInt(msg?.Status, 10);
-                        if (currentStatus === 3) {
-                            return msg;
-                        }
-
-                        if (nextStatus === 1) {
-                            return {
-                                ...msg,
-                                Status: 1,
-                                SenderInfo: msg.SenderInfo || data.SenderInfo,
-                                DateTime: data.DateTime || msg.DateTime
-                            };
                         }
 
                         return {
                             ...msg,
-                            Status: 3,
+                            Status: newStatus,
                             SenderInfo: msg.SenderInfo || data.SenderInfo,
+                            ...(data.MessageId && { messageId: data.MessageId }),
+                            ...(data.timestamp && { timestamp: data.timestamp }),
                             DateTime: data.DateTime || msg.DateTime
                         };
                     })
                 };
             });
+
+            // Note: handleReadMessage is intentionally NOT called here.
+            // This handler only updates local message status based on incoming socket events.
+            // Read status should only be triggered when the user opens/views a conversation,
+            // which is handled in the useEffect that monitors selectedCustomer changes.
         };
 
         const handleInternalMessage = (data) => {
             if (!data || typeof data !== 'object') return;
             if (Number(data?.Sender) === auth?.id || Number(data?.SenderId) === auth?.id) return;
-            if (selectedCustomerRef.current?.ConversationId == data?.ConversationId) {
+            if (selectedCustomerRef.current?.ConversationId &&
+                Number(selectedCustomerRef.current.ConversationId) === Number(data?.ConversationId)) {
                 setMessId(data?.MessageId);
                 addUniqueMessage(data);
                 handleReadMessage(data?.ConversationId);
@@ -355,7 +382,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
     const handleReadMessage = async (custConverId) => {
         if (!custConverId) return;
-        const response = await readMessage(custConverId, auth?.userId);
+
+        const response = await readMessageApi(auth, { ConversationId: custConverId });
 
         const currentConvId = selectedCustomerRef.current?.ConversationId;
         const receiverId = selectedCustomerRef.current?.ReceiverId || selectedCustomer?.ReceiverId;
@@ -365,8 +393,10 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                 ReceiverId: receiverId,
                 ConversationId: custConverId,
                 Status: 3,
+                MessageStatus: 2,
             });
         }
+
         if (response?.rd) {
             return response?.rd;
         } else {
@@ -536,7 +566,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     }, [loadingOlder, hasMore, selectedCustomer?.ConversationId, currentPage, pageSize, auth?.userId]);
 
     useEffect(() => {
-        if (!selectedCustomer || !selectedCustomer?.ConversationId) {
+        if (!selectedCustomer?.ConversationId) {
             setMessages({ data: [], total: 0 });
             setCurrentPage(1);
             setHasMore(true);
@@ -551,7 +581,10 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             loadConversation(1, true);
             setCurrentPage(1);
         }
-    }, [selectedCustomer]);
+
+        // Mark messages as read when user opens/views this conversation
+        handleReadMessage(selectedCustomer?.ConversationId);
+    }, [selectedCustomer?.ConversationId]);
 
     useEffect(() => {
         if (selectedCustomer && onConversationRead) {
@@ -712,6 +745,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                     SenderId: auth?.id,
                     Direction: 2,
                     Status: 1,
+                    MessageStatus: 1,
                     MessageType: type,
                     Message: caption,
                     Time: time,
@@ -884,6 +918,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                         SenderId: auth?.id,
                         Direction: 2,
                         Status: 1,
+                        MessageStatus: 1,
                         MessageType: "text",
                         Message: caption,
                         Time: time,
@@ -972,10 +1007,13 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         setReplyToMessage(null);
     };
 
-    const handleForward = (message, event) => {
+    const handleForward = (message, event, attachmentId = null) => {
         if (event) {
             event.stopPropagation();
-            setForwardMessage(message);
+            setForwardMessage({
+                ...(message || {}),
+                ReplyToAttachmentId: attachmentId || null,
+            });
             setForwardAnchorEl(event.currentTarget);
         }
     };
@@ -1009,6 +1047,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             MessageId: forwardMessage?.MessageId ?? messId ?? null,
             ConversationIds: conversationIds.join(",") ?? null,
             UserIds: userIds.join(",") ?? null,
+            ReplyToAttachmentId: forwardMessage?.ReplyToAttachmentId || null,
         };
         try {
             const response = await forwardMessageApi(auth, params);
@@ -1073,8 +1112,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
         const parsed = typeof raw === 'number' ? raw : parseInt(raw, 10);
 
-        // In some payloads MessageStatus=0 means sent
-        if (parsed === 3) return 'read';
+        // Support legacy Status codes (1=sent, 3=read) and new MessageStatus codes (1=sent, 2=read)
+        if (parsed === 2 || parsed === 3) return 'read';
         if (parsed === 1 || parsed === 0) return 'sent';
         return null;
     };

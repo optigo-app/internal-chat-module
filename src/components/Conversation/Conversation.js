@@ -552,6 +552,10 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                         handleReply(mediaViewerMessage, attachmentId);
                         setMediaViewerOpen(false);
                     }}
+                    onForward={(event, attachmentId) => {
+                        handleForward(mediaViewerMessage, event, attachmentId);
+                        setMediaViewerOpen(false);
+                    }}
                 />
             )}
             <div className="conversation-layout">

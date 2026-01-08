@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dialog, IconButton, Tooltip, Avatar, Skeleton } from '@mui/material';
-import { X, Download, ChevronLeft, ChevronRight, FileText, FileType, FileSpreadsheet, FileArchive, FileCode, File, ZoomIn, ZoomOut, Reply, Star, Pin, Smile, Forward, Trash2, ExternalLink } from 'lucide-react';
+import { X, Download, ChevronLeft, ChevronRight, FileText, FileType, FileSpreadsheet, FileArchive, FileCode, File, ZoomIn, ZoomOut, Reply, Smile, Forward, Trash2, ExternalLink } from 'lucide-react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Keyboard, Mousewheel, Navigation } from 'swiper/modules';
 import 'swiper/css';
@@ -9,13 +9,14 @@ import './MediaViewer.scss';
 import { handleDownloadFile, getCustomerDisplayName, getWhatsAppAvatarConfig, getCustomerAvatarSeed, hasCustomerName, getFileExt, getDocumentMeta } from '../../utils/globalFunc';
 import PersonIcon from '@mui/icons-material/Person';
 
-const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, onReply }) => {
+const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, onReply, onForward }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [loading, setLoading] = useState(() => {
     const initialState = {};
     mediaItems.forEach((_, idx) => {
       initialState[idx] = true;
     });
+
     return initialState;
   });
   const swiperRef = useRef(null);
@@ -141,17 +142,11 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
             <Tooltip title="Reply" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
               <IconButton className="toolbar-btn" onClick={() => onReply(currentMedia?.attachmentId)}><Reply size={18} /></IconButton>
             </Tooltip>
-            <Tooltip title="Star" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
-              <IconButton className="toolbar-btn"><Star size={18} /></IconButton>
-            </Tooltip>
-            <Tooltip title="Pin" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
-              <IconButton className="toolbar-btn"><Pin size={18} /></IconButton>
-            </Tooltip>
             <Tooltip title="React" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
               <IconButton className="toolbar-btn"><Smile size={18} /></IconButton>
             </Tooltip>
             <Tooltip title="Forward" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
-              <IconButton className="toolbar-btn"><Forward size={18} /></IconButton>
+              <IconButton className="toolbar-btn" onClick={(e) => onForward?.(e, currentMedia?.attachmentId)}><Forward size={18} /></IconButton>
             </Tooltip>
             <Tooltip title="Download" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
               <IconButton className="toolbar-btn" onClick={() => handleDownloadFile(currentMedia?.src, currentMedia?.name)}><Download size={18} /></IconButton>

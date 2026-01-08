@@ -39,7 +39,6 @@ const MessageArea = ({
     handleRemoveReaction,
     isSwitchingConversation
 }) => {
-    console.log('groupMessagesByDate', groupMessagesByDate)
     const [hoveredMessageId, setHoveredMessageId] = useState(null);
     const [reactionMenuAnchorEl, setReactionMenuAnchorEl] = useState(null);
     const [reactionMenuMessageId, setReactionMenuMessageId] = useState(null);

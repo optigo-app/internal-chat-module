@@ -161,10 +161,11 @@ export const normalizeServerMessages = (messagesArray, auth) => {
             || msg.ReplyToMessage
             || null;
 
-        // Map backend MessageStatus (0 = sent, other = read) to internal Status codes
+        // Map backend MessageStatus to internal Status codes
         let normalizedStatus = msg.Status;
         if (typeof msg.MessageStatus === 'number') {
-            normalizedStatus = msg.MessageStatus === 0 ? 1 : 3; // 1: sent, 3: read
+            // New mapping: 1 = sent, 2 = read
+            normalizedStatus = msg.MessageStatus === 1 ? 1 : 3; // 1: sent, 3: read
         }
 
         const resolvedMessageType = forceTextReply

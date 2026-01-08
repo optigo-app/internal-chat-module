@@ -230,7 +230,8 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
 
             const nextUnreadOnStatus = (currentCount) => {
                 if (!isStatusChange) return currentCount;
-                if (Number(incoming?.Status) === 1) return 0;
+                const raw = incoming?.MessageStatus ?? incoming?.Status;
+                if (Number(raw) === 1) return 0;
                 return currentCount;
             };
 
@@ -261,7 +262,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     UnreadCount: unreadFinal,
                     LastMessage: incoming?.Message ?? currentChat.LastMessage,
                     LastMessageType: mapMessageTypeToCode(normalizedType),
-                    LastMessageStatus: incoming?.Status ?? incoming?.status ?? currentChat.LastMessageStatus,
+                    LastMessageStatus: incoming?.MessageStatus ?? incoming?.Status ?? incoming?.status ?? currentChat.LastMessageStatus,
                     LastMessageDirection: normalizedDirection,
                 };
 
@@ -280,7 +281,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     UnreadCount: unread,
                     LastMessage: incoming?.Message ?? '',
                     LastMessageType: mapMessageTypeToCode(normalizedType),
-                    LastMessageStatus: incoming?.Status ?? incoming?.status,
+                    LastMessageStatus: incoming?.MessageStatus ?? incoming?.Status ?? incoming?.status,
                     LastMessageDirection: normalizedDirection,
                     ReceiverId: incoming?.ReceiverId,
                     avatar: null,
