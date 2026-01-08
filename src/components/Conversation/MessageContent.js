@@ -1262,4 +1262,4 @@ const MessageContent = ({
     );
 };
 
-export default MessageContent;
+export default React.memo(MessageContent);

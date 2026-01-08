@@ -106,12 +106,12 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         return getMediaKey(msg, index);
     }, [getMediaKey]);
 
-    const handleMenuClick = (event, message) => {
+    const handleMenuClick = useCallback((event, message) => {
         event.stopPropagation();
         // message-specific menu is handled via messageContextMenu in handleContextMenu
-    };
+    }, []);
 
-    const handleMessageEmojiClick = async (emojiObject, message) => {
+    const handleMessageEmojiClick = useCallback(async (emojiObject, message) => {
         console.log("TCL: handleMessageEmojiClick -> message", message, selectedCustomer)
         try {
             // if (!selectedCustomer?.CustomerId && selectedCustomer?.CustomerId !== 0) return;
@@ -244,9 +244,9 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 }
             }
         }
-    };
+    }, [auth, selectedCustomer]);
 
-    const handleRemoveReactionAction = async (reaction, message) => {
+    const handleRemoveReactionAction = useCallback(async (reaction, message) => {
         try {
             const messageIdToUse = message?.MessageId ?? message?.Id;
             if (!messageIdToUse || !auth) return;
@@ -284,7 +284,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
             console.error("Error removing reaction:", error);
             toast.error("Failed to remove reaction");
         }
-    };
+    }, [auth]);
 
     const captureMessageScrollState = useCallback(() => {
         const el = containerRef.current;
@@ -327,7 +327,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         prevMediaFilesLenRef.current = mediaFilesLength;
     }, [mediaFilesLength]);
 
-    const openFilePicker = (e, acceptType) => {
+    const openFilePicker = useCallback((e, acceptType) => {
         e.preventDefault();
         e.stopPropagation();
         if (fileInputRef?.current) {
@@ -342,7 +342,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
             };
             fileInputRef.current.click();
         }
-    };
+    }, [handleFileChange, captureMessageScrollState]);
 
     const scrollToBottom = useCallback((behavior = 'auto') => {
         if (containerRef.current) {
@@ -461,19 +461,19 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         };
     }, [handleScroll, selectedCustomer?.ConversationId]);
 
-    const handleCloseContextMenu = () => {
+    const handleCloseContextMenu = useCallback(() => {
         setContextMenu(null);
-    };
+    }, []);
 
-    const handleMenuAction = (action) => {
+    const handleMenuAction = useCallback((action) => {
         if (action === "Close") {
             onCustomerSelect(null);
         }
-    };
+    }, [onCustomerSelect]);
 
-    const toggleEmojiPicker = () => {
+    const toggleEmojiPicker = useCallback(() => {
         setShowPicker(!showPicker);
-    };
+    }, [showPicker]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -494,20 +494,20 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
 
     const [messageContextMenu, setMessageContextMenu] = useState(null);
 
-    const handleContextMenu = (event, message) => {
+    const handleContextMenu = useCallback((event, message) => {
         event.preventDefault();
         setMessageContextMenu(
             messageContextMenu === null
                 ? { mouseX: event.clientX - 2, mouseY: event.clientY - 4, message }
                 : null
         );
-    };
+    }, [messageContextMenu]);
 
     const getMessageStatusIconCallback = useCallback((msg) => {
         return getMessageStatusIcon(msg);
     }, [getMessageStatusIcon]);
 
-    const handleKeyPress = (e) => {
+    const handleKeyPress = useCallback((e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             if (inputValue.trim() || (mediaFiles && mediaFiles.length > 0)) {
@@ -515,7 +515,15 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 setInputValue("");
             }
         }
-    };
+    }, [inputValue, mediaFiles, handleSendMessage, scrollToBottom, setInputValue]);
+
+    const handleSendMessageCallback = useCallback((messageOverride) => {
+        handleSendMessage(containerRef, scrollToBottom, messageOverride);
+    }, [handleSendMessage, scrollToBottom]);
+
+    const handleFileChangeCallback = useCallback((e) => {
+        handleFileChange(e, toast);
+    }, [handleFileChange]);
 
     if (!selectedCustomer) {
         return (
@@ -637,11 +645,11 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                         imageParams={imageParams}
                         videoParams={videoParams}
                         docsParams={docsParams}
-                        handleFileChange={(e) => handleFileChange(e, toast)}
+                        handleFileChange={handleFileChangeCallback}
                         inputValue={inputValue}
                         setInputValue={setInputValue}
                         handleKeyPress={handleKeyPress}
-                        handleSendMessage={(messageOverride) => handleSendMessage(containerRef, scrollToBottom, messageOverride)}
+                        handleSendMessage={handleSendMessageCallback}
                         mediaFiles={mediaFiles}
                     />
                 </div>

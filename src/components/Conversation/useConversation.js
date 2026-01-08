@@ -359,11 +359,15 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         const handleInternalMessage = (data) => {
             if (!data || typeof data !== 'object') return;
             if (Number(data?.Sender) === auth?.id || Number(data?.SenderId) === auth?.id) return;
-            if (selectedCustomerRef.current?.ConversationId &&
-                Number(selectedCustomerRef.current.ConversationId) === Number(data?.ConversationId)) {
+
+            const incomingConvId = data?.ConversationId;
+            const activeConvId = selectedCustomerRef.current?.ConversationId;
+
+            // Strict check: Only path for the current active conversation
+            if (activeConvId && incomingConvId && Number(activeConvId) === Number(incomingConvId)) {
                 setMessId(data?.MessageId);
                 addUniqueMessage(data);
-                handleReadMessage(data?.ConversationId);
+                handleReadMessage(incomingConvId);
             }
         };
 
@@ -383,16 +387,21 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     const handleReadMessage = async (custConverId) => {
         if (!custConverId) return;
 
+        // Note: We call the API for the conversation, but socket emit is strictly guarded
         const response = await readMessageApi(auth, { ConversationId: custConverId });
 
         const currentConvId = selectedCustomerRef.current?.ConversationId;
-        const receiverId = selectedCustomerRef.current?.ReceiverId || selectedCustomer?.ReceiverId;
+        const receiverId = selectedCustomerRef.current?.ReceiverId || selectedCustomer?.ReceiverId || selectedCustomer?.CustomerId || selectedCustomer?.UserId;
+
+        // Strict guard: only emit read status if this conversation is STILL the active one
+        // and its ID matches the one we just read.
         if (receiverId && currentConvId && Number(currentConvId) === Number(custConverId)) {
+            console.log("📤 Emitting internal:msg_read for", custConverId, "to", receiverId);
             emitInternalMessageRead({
                 ufcc: auth?.ufcc,
                 ReceiverId: receiverId,
                 ConversationId: custConverId,
-                Status: 3,
+                Status: 2, // 2 = Read as per user feedback (1=Send, 2=Read)
                 MessageStatus: 2,
             });
         }
