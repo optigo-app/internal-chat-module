@@ -34,7 +34,8 @@ const MessageArea = ({
     markLoaded,
     handleRemoveReaction,
     isSwitchingConversation,
-    replyToMessage
+    replyToMessage,
+    handleForward
 }) => {
     const [hoveredMessageId, setHoveredMessageId] = useState(null);
     const [reactionMenuAnchorEl, setReactionMenuAnchorEl] = useState(null);
@@ -196,6 +197,7 @@ const MessageArea = ({
                                                 getMessageStatusIcon={getMessageStatusIcon}
                                                 handleRemoveReaction={handleRemoveReaction}
                                                 messageById={messageById}
+                                                handleForward={handleForward}
                                             />
                                         ))}
                                     </div>

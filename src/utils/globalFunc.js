@@ -195,12 +195,12 @@ export const getDocumentMeta = (name = '') => {
     if (ext === 'doc' || ext === 'docx') return { label: 'DOCS', tone: 'doc', iconName: 'FileType', iconUrl: '/doc.png' };
     if (ext === 'xls' || ext === 'xlsx' || ext === 'csv') return { label: 'EXCEL', tone: 'sheet', iconName: 'FileSpreadsheet', iconUrl: '/xls.png' };
     if (ext === 'ppt' || ext === 'pptx') return { label: 'PPT', tone: 'ppt', iconName: 'FileType', iconUrl: '/ppt.png' };
-    if (ext === 'zip' || ext === 'rar' || ext === '7z') return { label: 'ZIP', tone: 'archive', iconName: 'FileArchive', iconUrl: '/docs.png' };
-    if (ext === 'psd') return { label: 'PSD', tone: 'psd', iconName: 'FileType', iconUrl: '/docs.png' };
+    if (ext === 'zip' || ext === 'rar' || ext === '7z') return { label: 'ZIP', tone: 'archive', iconName: 'FileArchive', iconUrl: '/doc.png' };
+    if (ext === 'psd') return { label: 'PSD', tone: 'psd', iconName: 'FileType', iconUrl: '/doc.png' };
     if (ext === 'txt') return { label: 'TEXT', tone: 'default', iconName: 'FileText', iconUrl: '/txt.png' };
     if (ext === 'json' || ext === 'xml' || ext === 'html' || ext === 'js' || ext === 'ts' || ext === 'css') {
-        return { label: 'CODE', tone: 'code', iconName: 'FileCode', iconUrl: '/docs.png' };
+        return { label: 'CODE', tone: 'code', iconName: 'FileCode', iconUrl: '/doc.png' };
     }
 
-    return { label: ext.toUpperCase() || 'FILE', tone: 'default', iconName: 'File', iconUrl: '/docs.png' };
+    return { label: ext.toUpperCase() || 'FILE', tone: 'default', iconName: 'File', iconUrl: '/doc.png' };
 };

@@ -30,7 +30,8 @@ const MessageItem = ({
     handleMediaClick,
     getMessageStatusIcon,
     handleRemoveReaction,
-    messageById
+    messageById,
+    handleForward
 }) => {
     const hoverHideTimeoutRef = useRef(null);
     const messageDomId = msg.Id ?? msg.fileName;
@@ -137,6 +138,7 @@ const MessageItem = ({
                 getMessageStatusIcon={getMessageStatusIcon}
                 handleRemoveReaction={handleRemoveReaction}
                 getMessageById={(id) => messageById.get(id)}
+                handleForward={handleForward}
             />
         </div>
     );

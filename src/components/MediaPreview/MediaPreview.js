@@ -269,7 +269,7 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                 ) : ((currentMedia?.name || currentMedia?.file?.name || '').toLowerCase()).endsWith('.xls') || ((currentMedia?.name || currentMedia?.file?.name || '').toLowerCase()).endsWith('.xlsx') || ((currentMedia?.name || currentMedia?.file?.name || '').toLowerCase()).endsWith('.csv') ? (
                                     <div className="no-preview-container">
                                         <div className="file-icon">
-                                            <img src="./excel.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
+                                            <img src="./xls.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
                                         </div>
                                         <div className="file-name">{currentMedia?.name || currentMedia?.file?.name}</div>
                                         <div className="file-meta">
@@ -313,9 +313,9 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                             } else if (name.endsWith('.pdf')) {
                                 thumbSrc = "./pdf.png";
                             } else if (name.endsWith('.doc') || name.endsWith('.docx')) {
-                                thumbSrc = "./word.png";
+                                thumbSrc = "./doc.png";
                             } else if (name.endsWith('.xls') || name.endsWith('.xlsx') || name.endsWith('.csv')) {
-                                thumbSrc = "./excel.png";
+                                thumbSrc = "./xls.png";
                             } else if (name.endsWith('.txt')) {
                                 thumbSrc = "./txt.png";
                             }

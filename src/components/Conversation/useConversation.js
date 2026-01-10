@@ -12,6 +12,7 @@ import { formatDateHeader } from '../../utils/DateFnc';
 
 import { forwardMessageApi } from '../../API/SendMessage/forwardMessageApi';
 import { replyToMessageApi } from '../../API/SendMessage/replyToMessageApi';
+import imageNotFound from '../../assets/image-not-found.jpg';
 
 export const useConversation = (selectedCustomer, onConversationRead, onViewConversationRead) => {
     const [inputValue, setInputValue] = useState("");
@@ -77,7 +78,11 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         if (msg.previewUrl) return msg.previewUrl;
 
         const id = msg.MediaUrl || msg.mediaId || msg.mediaURL || null;
-        if (!id) return '';
+        if (!id) {
+            // If it's an image or video but no URL is found, return the fallback
+            if (['image', 'video'].includes(msg.MessageType)) return imageNotFound;
+            return '';
+        }
 
         return mediaCache[id] || '';
     }, [mediaCache]);
@@ -109,7 +114,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             Direction: normalizedDirection,
         };
 
-        const incomingId = normalizedWithDirection.MessageId || normalizedWithDirection.Id;
+        const incomingId = normalizedWithDirection.Id || normalizedWithDirection.MessageId;
         if (!incomingId) return;
 
         if (processedMessageIds.current.has(incomingId)) return;
@@ -242,6 +247,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     };
 
     useEffect(() => {
+        debugger;
         if (!auth?.token || !auth?.userId) {
             return;
         }
@@ -950,7 +956,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                 }
                 setMessages((prev) => ({
                     data: normalizeMessages(prev).map((m) =>
-                        m.Id === tempId ? { ...m, Id: sentId, Status: 1 } : m
+                        m.Id === tempId ? { ...m, Id: sentId, MessageId: sentId, Status: 1 } : m
                     ),
                     total: prev?.total || 0,
                 }));
@@ -1032,37 +1038,103 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         setForwardMessage(null);
     };
 
-    const handleSendForward = useCallback(async (selectedContacts = []) => {
-        if (!selectedContacts.length || !forwardMessage) {
+    const handleSendForward = useCallback(async (selectedContactsArr = []) => {
+        if (!selectedContactsArr.length || !forwardMessage) {
             toast.error("Please select at least one contact to forward message.");
             return;
         }
 
-        let userIds = [];
-        let conversationIds = [];
-        for (const contact of selectedContacts) {
-            if (contact?.Type === "user" && contact.UserId) {
-                userIds.push(contact.UserId);
-            }
-            else if (contact?.Type === "conversation" && contact.ConversationId) {
-                conversationIds.push(contact.ConversationId);
+        // Separate and order recipients to match API expectations (Conversations then Users)
+        let conversationIdsArr = [];
+        let userIdsArr = [];
+        let orderedRecipients = [];
+
+        for (const contact of selectedContactsArr) {
+            if (contact?.Type === "conversation" && contact.ConversationId) {
+                conversationIdsArr.push(contact.ConversationId);
+                orderedRecipients.push(contact);
             }
         }
-        if (!userIds.length && !conversationIds.length) {
+        for (const contact of selectedContactsArr) {
+            if (contact?.Type === "user" && (contact.UserId || contact.id)) {
+                const uid = contact.UserId || contact.id;
+                userIdsArr.push(uid);
+                orderedRecipients.push(contact);
+            }
+        }
+
+        if (!userIdsArr.length && !conversationIdsArr.length) {
             toast.error("No valid recipients found.");
             return;
         }
+
         const params = {
             MessageId: forwardMessage?.MessageId ?? messId ?? null,
-            ConversationIds: conversationIds.join(",") ?? null,
-            UserIds: userIds.join(",") ?? null,
+            ConversationIds: conversationIdsArr.join(",") || null,
+            UserIds: userIdsArr.join(",") || null,
             ReplyToAttachmentId: forwardMessage?.ReplyToAttachmentId || null,
         };
+
         try {
             const response = await forwardMessageApi(auth, params);
-            if (response?.success) {
+            if (response?.success || response?.Status === "200") {
                 toast.success("Message forwarded successfully");
+
+                const rd = response?.Data?.rd?.[0] || response?.rd?.[0];
+                const forwardedMessagesStr = rd?.ForwardedMessages;
+
+                if (forwardedMessagesStr) {
+                    try {
+                        const forwardedMessages = JSON.parse(forwardedMessagesStr);
+                        if (Array.isArray(forwardedMessages)) {
+                            forwardedMessages.forEach((fwdMsg, index) => {
+                                const contact = orderedRecipients[index];
+                                const receiverId = contact?.UserId || contact?.ReceiverId || contact?.id;
+                                const fwdData = forwardedMessages[index];
+
+                                if (receiverId && fwdData) {
+                                    const convId = fwdData.ConversationId;
+                                    const realMessageId = fwdData.MessageId;
+
+                                    const isMedia = forwardMessage?.Type === "image" || forwardMessage?.Type === "video" || forwardMessage?.Type === "document" ||
+                                        forwardMessage?.MessageType === "image" || forwardMessage?.MessageType === "video" || forwardMessage?.MessageType === "document";
+
+                                    emitInternalMessageSend({
+                                        Id: realMessageId, // Use the REAL MessageId from API
+                                        ReceiverId: receiverId,
+                                        ufcc: auth?.ufcc,
+                                        SenderId: auth?.id,
+                                        Sender: auth?.id,
+                                        ConversationId: convId,
+                                        ConversationName: auth?.username || auth?.userName || auth?.userId,
+                                        Message: forwardMessage?.Message || (isMedia ? "" : "Forwarded Message"),
+                                        MessageId: realMessageId, // Use the REAL MessageId from API
+                                        Status: 1, // Sent
+                                        MessageStatus: 1,
+                                        Direction: 2, // Incoming for the receiver (or 1 for sender? usually Sender sees Direction 1. The socket event name implies internal *send* notification, so this looks right for updating the sender's UI)
+                                        Direction: 2,
+                                        DateTime: new Date().toISOString(),
+                                        MessageType: forwardMessage?.Type || forwardMessage?.MessageType || "text",
+                                        Type: forwardMessage?.Type || forwardMessage?.MessageType || "text",
+                                        IsForwarded: true,
+                                        ForwardedFrom: auth?.id, // Ensure Forwarded indicator shows locally
+                                        mediaItems: forwardMessage?.mediaItems || [],
+                                        previewUrl: forwardMessage?.previewUrl || null,
+                                        fileName: forwardMessage?.fileName || null,
+                                        fileType: forwardMessage?.fileType || null,
+                                        Time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                        Date: new Date().toLocaleDateString(),
+                                    });
+                                }
+                            });
+                        }
+                    } catch (parseError) {
+                        console.error("Error parsing ForwardedMessages:", parseError);
+                    }
+                }
+
                 setForwardMessage(null);
+                setForwardAnchorEl(null);
             } else {
                 const errorMessage = response?.error || "Failed to forward message";
                 toast.error(errorMessage);

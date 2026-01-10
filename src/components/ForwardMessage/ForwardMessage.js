@@ -64,10 +64,10 @@ const ForwardMessage = ({ message, onSend, onClose, anchorEl, open }) => {
             const mappedContacts = safeItems.map((item) => ({
                 Type: item.Type,
                 ConversationId: item.ConversationId,
-                UserId: item.UserId,
+                UserId: item.ReceiverId,
                 DisplayName: item.DisplayName,
                 ProfileImageUrl: item.ProfileImageUrl,
-                id: item.UserId || item.ConversationId,
+                id: item.ReceiverId || item.ConversationId,
             }));
 
             setChatMembers((prev) => {

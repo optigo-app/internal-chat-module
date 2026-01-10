@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Box, CircularProgress, IconButton, Skeleton, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import { ChevronDown, Download, FileText, CheckCheck, Image as ImageIcon, Video as VideoIcon, Play, FileType, FileSpreadsheet, FileArchive, FileCode } from 'lucide-react';
+import { ChevronDown, Download, FileText, CheckCheck, Image as ImageIcon, Video as VideoIcon, Play, FileType, FileSpreadsheet, FileArchive, FileCode, Forward } from 'lucide-react';
 import { Emoji } from 'emoji-picker-react';
 import { FormatDateIST } from '../../utils/DateFnc';
 import DynamicTemplate from '../DynamicTemplate/DynamicTemplate';
 import QuickReactionMenu from './QuickReactionMenu';
 import ReactionDetailsMenu from './ReactionMenu';
 import { handleDownloadFile, getDocumentMeta } from '../../utils/globalFunc';
+import imageNotFound from '../../assets/image-not-found.jpg';
 
 const imageDimsCache = new Map();
 
@@ -49,12 +50,14 @@ const MessageContent = ({
     handleMediaClick,
     getMessageStatusIcon,
     getMessageById,
+    handleForward
 }) => {
 
     const theme = useTheme();
 
     const [imageDims, setImageDims] = useState(null);
     const [anchorEl, setAnchorEl] = React.useState(null);
+    const [videoLoadError, setVideoLoadError] = useState(false);
 
     const parsedReactions = React.useMemo(() => {
         try {
@@ -75,9 +78,6 @@ const MessageContent = ({
         const safePercent = Math.max(0, Math.min(100, Number(percent) || 0));
         const thickness = size <= 40 ? 4.5 : 4;
         const labelFontSize = size <= 40 ? 10 : 12;
-
-
-
         return (
             <Box
                 className="progress-overlay"
@@ -187,41 +187,91 @@ const MessageContent = ({
                             marginRight: '0px !important',
                             transform: `translate(${isOutgoing ? '-110%' : '110%'}, -50%) !important`,
                             display: 'flex',
+                            // Reverse order for outgoing so Forward button stays closest to the bubble
+                            flexDirection: isOutgoing ? 'row-reverse' : 'row',
                             alignItems: 'center',
-                            gap: '2px',
-                            padding: '2px',
-                            borderRadius: '999px',
-                            backgroundColor: alpha(theme.palette.background.paper, 0.92) + ' !important',
-                            border: `1px solid ${theme.palette.borderColor?.extraLight || theme.palette.divider}`,
-                            boxShadow: `0 6px 14px ${alpha('#000', 0.12)}`,
-                            opacity: (shouldShowActions ? 1 : 0) + ' !important',
-                            pointerEvents: (shouldShowActions ? 'auto' : 'none') + ' !important',
-                            transition: 'opacity 160ms ease, transform 160ms ease',
+                            gap: '6px', // Increased gap for separated bubbles
                             zIndex: '6 !important',
-                            whiteSpace: 'nowrap',
+                            pointerEvents: 'none !important', // Let clicks pass through the container gap
+                            opacity: '1 !important', // Override CSS opacity: 0
+                            boxShadow: 'none'
                         },
                     }}
                 >
-                    <QuickReactionMenu
-                        open={isReactionMenuOpenForCurrent}
-                        anchorEl={reactionMenuAnchorEl}
-                        onOpen={(e) => {
-                            e.stopPropagation();
-                            setHoveredMessageId(currentHoverId);
-                            setReactionMenuAnchorEl(e.currentTarget);
-                            setReactionMenuMessageId(currentHoverId);
+                    {/* Forward Action: Always Visible */}
+                    {['image', 'video', 'document'].includes(msg?.MessageType) && (
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '2px',
+                                borderRadius: '999px',
+                                backgroundColor: alpha(theme.palette.background.paper, 0.92),
+                                border: `1px solid ${theme.palette.borderColor?.extraLight || theme.palette.divider}`,
+                                boxShadow: `0 6px 14px ${alpha('#000', 0.12)}`,
+                                pointerEvents: 'auto',
+                            }}
+                        >
+                            <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleForward(msg, e);
+                                }}
+                                sx={{
+                                    width: 28,
+                                    height: 28,
+                                    color: theme.palette.text.secondary,
+                                    transition: 'all 0.2s ease',
+                                    '&:hover': {
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                                        color: theme.palette.primary.main,
+                                    },
+                                }}
+                            >
+                                <Forward size={16} />
+                            </IconButton>
+                        </Box>
+                    )}
+
+                    {/* Reaction Menu: Visible on Hover */}
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '2px',
+                            borderRadius: '999px',
+                            backgroundColor: alpha(theme.palette.background.paper, 0.92),
+                            border: `1px solid ${theme.palette.borderColor?.extraLight || theme.palette.divider}`,
+                            boxShadow: `0 6px 14px ${alpha('#000', 0.12)}`,
+                            opacity: shouldShowActions ? 1 : 0,
+                            pointerEvents: shouldShowActions ? 'auto' : 'none',
+                            transition: 'opacity 160ms ease, transform 160ms ease',
+                            transform: shouldShowActions ? 'scale(1)' : 'scale(0.8)', // Subtle pop animation
                         }}
-                        onClose={(e) => {
-                            e?.stopPropagation?.();
-                            closeReactionMenu();
-                        }}
-                        onSelectEmoji={(emoji) => {
-                            if (typeof handleMessageEmojiClick === 'function') {
-                                handleMessageEmojiClick(emoji, msg);
-                            }
-                            closeReactionMenu();
-                        }}
-                    />
+                    >
+                        <QuickReactionMenu
+                            open={isReactionMenuOpenForCurrent}
+                            anchorEl={reactionMenuAnchorEl}
+                            onOpen={(e) => {
+                                e.stopPropagation();
+                                setHoveredMessageId(currentHoverId);
+                                setReactionMenuAnchorEl(e.currentTarget);
+                                setReactionMenuMessageId(currentHoverId);
+                            }}
+                            onClose={(e) => {
+                                e?.stopPropagation?.();
+                                closeReactionMenu();
+                            }}
+                            onSelectEmoji={(emoji) => {
+                                if (typeof handleMessageEmojiClick === 'function') {
+                                    handleMessageEmojiClick(emoji, msg);
+                                }
+                                closeReactionMenu();
+                            }}
+                        />
+                    </Box>
+
                 </Box>
 
                 <IconButton
@@ -250,6 +300,33 @@ const MessageContent = ({
                 >
                     <ChevronDown size={24} />
                 </IconButton>
+                {/* Forwarded Indicator */}
+                {(!!msg?.ForwardedFrom && msg?.ForwardedFrom !== "0") && (
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            mb: 0.5,
+                            opacity: 0.7,
+                            '&&': {
+                                color: theme.palette.text.secondary,
+                            }
+                        }}
+                    >
+                        <Forward size={14} />
+                        <Typography
+                            variant="caption"
+                            sx={{
+                                fontSize: '11.5px',
+                                fontStyle: 'italic',
+                                fontWeight: 500,
+                            }}
+                        >
+                            Forwarded
+                        </Typography>
+                    </Box>
+                )}
                 {/* Reply Preview (Quoted message) */}
                 {msg.ContextType === 2 && (
                     <div className="">
@@ -453,7 +530,7 @@ const MessageContent = ({
                         {msg?.MessageType === "text" && (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
                                 <Typography variant="body2" className="message-text" style={{ flex: 1, marginRight: 0 }}>
-                                    {msg?.MessageType === 'template' ? "" : msg.Message}
+                                    {msg.Message}
                                 </Typography>
                                 {/* Message status inline for reply messages */}
                                 <Box
@@ -519,21 +596,11 @@ const MessageContent = ({
                             pr: 1,
                         }}
                     >
-                        {msg?.MessageType === 'template' ? "" : msg.Message}
+                        {msg.Message}
                     </Typography>
                 )}
 
-                {msg?.MessageType === 'template' && (() => {
-                    const templateData = parseTemplateData(msg);
-                    return (
-                        <DynamicTemplate
-                            templateName={templateData.templateName}
-                            params={templateData.params}
-                            language={templateData.language}
-                            components={templateData.components}
-                        />
-                    );
-                })()}
+
 
                 {/* Image */}
                 {msg?.MessageType === "image" && ((_, index) => {
@@ -543,177 +610,189 @@ const MessageContent = ({
                     const mediaItems = Array.isArray(msg?.mediaItems) ? msg.mediaItems : [];
                     const hasGrid = mediaItems.length > 1;
                     const gridRows = mediaItems.length <= 2 ? '1fr' : '1fr 1fr';
-                    const gridHeight = mediaItems.length <= 2 ? 160 : 220;
+                    const gridHeight = mediaItems.length <= 2 ? 160 : 250;
 
                     const cachedDims = src ? imageDimsCache.get(src) : null;
                     const dimsForCalc = imageDims || cachedDims;
 
-                    const mediaWidth = 220;
+                    const mediaWidth = 250;
                     const computedHeight = dimsForCalc?.w && dimsForCalc?.h
-                        ? Math.max(140, Math.min(220, Math.round(mediaWidth * (dimsForCalc.h / dimsForCalc.w))))
-                        : 220;
+                        ? Math.max('100%', Math.min(250, Math.round(mediaWidth * (dimsForCalc.h / dimsForCalc.w))))
+                        : '100%';
 
                     return (
-                        <div
-                            className="message-image"
-                            style={{
-                                position: 'relative',
-                                width: mediaWidth,
-                                height: hasGrid ? gridHeight : computedHeight,
-                                borderRadius: 12,
-                                overflow: 'hidden',
-                            }}
-                        >
-                            {hasGrid ? (
-                                <div
-                                    style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: '1fr 1fr',
-                                        gridTemplateRows: gridRows,
-                                        gap: 2,
-                                        width: '100%',
-                                        height: '100%',
-                                        cursor: 'pointer',
-                                        backgroundColor: 'rgba(0,0,0,0.04)',
-                                    }}
-                                >
-                                    {mediaItems.slice(0, 4).map((item, tileIndex) => {
-                                        const tileKey = `${mediaKey}-${tileIndex}`;
-                                        const tileSrc = item?.url;
-                                        const overflowCount = mediaItems.length - 4;
-                                        const showOverflow = tileIndex === 3 && overflowCount > 0;
+                        <div style={{ position: 'relative' }}>
+                            <div
+                                className="message-image"
+                                style={{
+                                    position: 'relative',
+                                    width: mediaWidth,
+                                    height: hasGrid ? gridHeight : computedHeight,
+                                    borderRadius: 12,
+                                    overflow: 'hidden',
+                                }}
+                            >
+                                {hasGrid ? (
+                                    <div
+                                        style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: '1fr 1fr',
+                                            gridTemplateRows: gridRows,
+                                            gap: 2,
+                                            width: '100%',
+                                            height: '100%',
+                                            cursor: 'pointer',
+                                            backgroundColor: 'rgba(0,0,0,0.04)',
+                                        }}
+                                    >
+                                        {mediaItems.slice(0, 4).map((item, tileIndex) => {
+                                            const tileKey = `${mediaKey}-${tileIndex}`;
+                                            const tileSrc = item?.url;
+                                            const overflowCount = mediaItems.length - 4;
+                                            const showOverflow = tileIndex === 3 && overflowCount > 0;
 
-                                        return (
-                                            <div
-                                                key={tileKey}
-                                                style={{
-                                                    position: 'relative',
+                                            return (
+                                                <div
+                                                    key={tileKey}
+                                                    style={{
+                                                        position: 'relative',
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        overflow: 'hidden',
+                                                        borderRadius: 8,
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        e.preventDefault();
+                                                        handleMediaClick(msg, tileIndex);
+                                                    }}
+                                                >
+                                                    {!loadedMedia[tileKey] && (
+                                                        <Skeleton
+                                                            variant="rounded"
+                                                            className="media-skeleton"
+                                                            sx={{
+                                                                borderRadius: 0,
+                                                                position: 'absolute',
+                                                                inset: 0,
+                                                                width: '100%',
+                                                                height: '100%',
+                                                            }}
+                                                        />
+                                                    )}
+
+                                                    {tileSrc && (
+                                                        <img
+                                                            src={tileSrc}
+                                                            alt="sent-img"
+                                                            onLoad={() => markLoaded(tileKey)}
+                                                            onError={(e) => {
+                                                                if (e.target.src !== imageNotFound) {
+                                                                    e.target.src = imageNotFound;
+                                                                }
+                                                                markLoaded(tileKey);
+                                                            }}
+                                                            style={{
+                                                                display: 'block',
+                                                                width: '100%',
+                                                                height: '100%',
+                                                                objectFit: 'cover',
+                                                                opacity: loadedMedia[tileKey] ? 1 : 0,
+                                                            }}
+                                                        />
+                                                    )}
+
+                                                    {showOverflow && (
+                                                        <div
+                                                            style={{
+                                                                position: 'absolute',
+                                                                inset: 0,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                backgroundColor: 'rgba(0,0,0,0.45)',
+                                                                color: '#fff',
+                                                                fontWeight: 600,
+                                                                fontSize: 22,
+                                                            }}
+                                                        >
+                                                            +{overflowCount}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <>
+                                        {!loadedMedia[mediaKey] && (
+                                            <Skeleton
+                                                variant="rounded"
+                                                className="media-skeleton"
+                                                sx={{
+                                                    borderRadius: 0,
+                                                    position: 'absolute',
+                                                    inset: 0,
                                                     width: '100%',
                                                     height: '100%',
-                                                    overflow: 'hidden',
-                                                    borderRadius: 8,
-                                                }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    e.preventDefault();
-                                                    handleMediaClick(msg, tileIndex);
-                                                }}
-                                            >
-                                                {!loadedMedia[tileKey] && (
-                                                    <Skeleton
-                                                        variant="rounded"
-                                                        className="media-skeleton"
-                                                        sx={{
-                                                            borderRadius: 0,
-                                                            position: 'absolute',
-                                                            inset: 0,
-                                                            width: '100%',
-                                                            height: '100%',
-                                                        }}
-                                                    />
-                                                )}
-
-                                                {tileSrc && (
-                                                    <img
-                                                        src={tileSrc}
-                                                        alt="sent-img"
-                                                        onLoad={() => markLoaded(tileKey)}
-                                                        onError={() => markLoaded(tileKey)}
-                                                        style={{
-                                                            display: 'block',
-                                                            width: '100%',
-                                                            height: '100%',
-                                                            objectFit: 'cover',
-                                                            opacity: loadedMedia[tileKey] ? 1 : 0,
-                                                        }}
-                                                    />
-                                                )}
-
-                                                {showOverflow && (
-                                                    <div
-                                                        style={{
-                                                            position: 'absolute',
-                                                            inset: 0,
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            backgroundColor: 'rgba(0,0,0,0.45)',
-                                                            color: '#fff',
-                                                            fontWeight: 600,
-                                                            fontSize: 22,
-                                                        }}
-                                                    >
-                                                        +{overflowCount}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <>
-                                    {!loadedMedia[mediaKey] && (
-                                        <Skeleton
-                                            variant="rounded"
-                                            className="media-skeleton"
-                                            sx={{
-                                                borderRadius: 0,
-                                                position: 'absolute',
-                                                inset: 0,
-                                                width: '100%',
-                                                height: '100%',
-                                            }}
-                                        />
-                                    )}
-
-                                    <div onClick={(e) => {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        if (msg?.mediaItems?.length) {
-                                            handleMediaClick(msg, 0);
-                                        } else {
-                                            handleMediaClick({
-                                                mediaItems: [{
-                                                    url: src,
-                                                    mimeType: 'image/*',
-                                                    filename: 'image'
-                                                }]
-                                            }, 0);
-                                        }
-                                    }} style={{ cursor: 'pointer' }}>
-                                        {src &&
-                                            <img
-                                                src={src}
-                                                alt="sent-img"
-                                                onLoad={(e) => {
-                                                    const w = e?.currentTarget?.naturalWidth || 0;
-                                                    const h = e?.currentTarget?.naturalHeight || 0;
-                                                    if (w > 0 && h > 0) {
-                                                        const nextDims = { w, h };
-                                                        setImageDims(nextDims);
-                                                        if (src) {
-                                                            imageDimsCache.set(src, nextDims);
-                                                        }
-                                                    }
-                                                    markLoaded(mediaKey);
-                                                }}
-                                                onError={() => markLoaded(mediaKey)}
-                                                style={{
-                                                    display: 'block',
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'cover',
-                                                    opacity: loadedMedia[mediaKey] ? 1 : 0,
                                                 }}
                                             />
-                                        }
-                                    </div>
-                                </>
-                            )}
+                                        )}
 
-                            {msg.isUploading && (
-                                <UploadProgressOverlay percent={msg.percent} />
-                            )}
+                                        <div onClick={(e) => {
+                                            e.stopPropagation();
+                                            e.preventDefault();
+                                            if (msg?.mediaItems?.length) {
+                                                handleMediaClick(msg, 0);
+                                            } else {
+                                                handleMediaClick({
+                                                    mediaItems: [{
+                                                        url: src,
+                                                        mimeType: 'image/*',
+                                                        filename: 'image'
+                                                    }]
+                                                }, 0);
+                                            }
+                                        }} style={{ cursor: 'pointer' }}>
+                                            {src &&
+                                                <img
+                                                    src={src}
+                                                    alt="sent-img"
+                                                    onLoad={(e) => {
+                                                        const w = e?.currentTarget?.naturalWidth || 0;
+                                                        const h = e?.currentTarget?.naturalHeight || 0;
+                                                        if (w > 0 && h > 0) {
+                                                            const nextDims = { w, h };
+                                                            setImageDims(nextDims);
+                                                            if (src) {
+                                                                imageDimsCache.set(src, nextDims);
+                                                            }
+                                                        }
+                                                        markLoaded(mediaKey);
+                                                    }}
+                                                    onError={(e) => {
+                                                        if (e.target.src !== imageNotFound) {
+                                                            e.target.src = imageNotFound;
+                                                        }
+                                                        markLoaded(mediaKey);
+                                                    }}
+                                                    style={{
+                                                        display: 'block',
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        objectFit: 'cover',
+                                                        opacity: loadedMedia[mediaKey] ? 1 : 0,
+                                                    }}
+                                                />
+                                            }
+                                        </div>
+                                    </>
+                                )}
+
+                                {msg.isUploading && (
+                                    <UploadProgressOverlay percent={msg.percent} />
+                                )}
+                            </div>
                         </div>
                     );
                 })()}
@@ -729,235 +808,253 @@ const MessageContent = ({
                     const gridHeight = mediaItems.length <= 2 ? 160 : 220;
 
                     return (
-                        <div
-                            className="message-video"
-                            style={{
-                                position: 'relative',
-                                width: 220,
-                                height: hasGrid ? gridHeight : 'auto',
-                                borderRadius: 12,
-                                overflow: 'hidden',
-                            }}
-                        >
-                            {hasGrid ? (
-                                <div
-                                    style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: '1fr 1fr',
-                                        gridTemplateRows: gridRows,
-                                        gap: 2,
-                                        width: '100%',
-                                        height: '100%',
-                                        cursor: 'pointer',
-                                        backgroundColor: 'rgba(0,0,0,0.04)',
-                                    }}
-                                >
-                                    {mediaItems.slice(0, 4).map((item, tileIndex) => {
-                                        const tileKey = `${mediaKey}-${tileIndex}`;
-                                        const tileSrc = item?.url;
-                                        const overflowCount = mediaItems.length - 4;
-                                        const showOverflow = tileIndex === 3 && overflowCount > 0;
+                        <div style={{ position: 'relative' }}>
+                            <div
+                                className="message-video"
+                                style={{
+                                    position: 'relative',
+                                    width: 220,
+                                    height: hasGrid ? gridHeight : 'auto',
+                                    borderRadius: 12,
+                                    overflow: 'hidden',
+                                }}
+                            >
+                                {hasGrid ? (
+                                    <div
+                                        style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: '1fr 1fr',
+                                            gridTemplateRows: gridRows,
+                                            gap: 2,
+                                            width: '100%',
+                                            height: '100%',
+                                            cursor: 'pointer',
+                                            backgroundColor: 'rgba(0,0,0,0.04)',
+                                        }}
+                                    >
+                                        {mediaItems.slice(0, 4).map((item, tileIndex) => {
+                                            const tileKey = `${mediaKey}-${tileIndex}`;
+                                            const tileSrc = item?.url;
+                                            const overflowCount = mediaItems.length - 4;
+                                            const showOverflow = tileIndex === 3 && overflowCount > 0;
 
-                                        return (
-                                            <div
-                                                key={tileKey}
-                                                style={{
-                                                    position: 'relative',
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    overflow: 'hidden',
-                                                    borderRadius: 8,
-                                                }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    e.preventDefault();
-                                                    handleMediaClick(msg, tileIndex);
-                                                }}
-                                            >
-                                                {!loadedMedia[tileKey] && (
-                                                    <Skeleton
-                                                        variant="rounded"
-                                                        className="media-skeleton"
-                                                        sx={{
-                                                            borderRadius: 0,
-                                                            position: 'absolute',
-                                                            inset: 0,
-                                                            width: '100%',
-                                                            height: '100%',
-                                                        }}
-                                                    />
-                                                )}
-
-                                                {tileSrc && (
-                                                    <video
-                                                        src={tileSrc}
-                                                        muted
-                                                        playsInline
-                                                        preload="metadata"
-                                                        onLoadedData={() => markLoaded(tileKey)}
-                                                        onError={() => markLoaded(tileKey)}
-                                                        style={{
-                                                            display: 'block',
-                                                            width: '100%',
-                                                            height: '100%',
-                                                            objectFit: 'cover',
-                                                            opacity: loadedMedia[tileKey] ? 1 : 0,
-                                                            pointerEvents: 'none',
-                                                        }}
-                                                    />
-                                                )}
-
-                                                {tileSrc && !showOverflow && (
-                                                    <div
-                                                        style={{
-                                                            position: 'absolute',
-                                                            inset: 0,
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            backgroundColor: 'rgba(0,0,0,0.45)',
-                                                            color: '#fff',
-                                                            borderRadius: '4px',
-                                                        }}
-                                                    >
-                                                        <IconButton
-                                                            size="small"
-                                                            sx={{
-                                                                backgroundColor: 'rgba(255,255,255,0.9)',
-                                                                color: '#000',
-                                                                '&:hover': {
-                                                                    backgroundColor: 'rgba(255,255,255,1)',
-                                                                },
-                                                            }}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                e.preventDefault();
-                                                                handleMediaClick(msg, tileIndex);
-                                                            }}
-                                                        >
-                                                            <Play size={16} />
-                                                        </IconButton>
-                                                    </div>
-                                                )}
-
-                                                {showOverflow && (
-                                                    <div
-                                                        style={{
-                                                            position: 'absolute',
-                                                            inset: 0,
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            backgroundColor: 'rgba(0,0,0,0.45)',
-                                                            color: '#fff',
-                                                            fontWeight: 600,
-                                                            fontSize: 22,
-                                                        }}
-                                                    >
-                                                        +{overflowCount}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <>
-                                    {!loadedMedia[mediaKey] && (
-                                        <Skeleton
-                                            variant="rounded"
-                                            className="media-skeleton"
-                                            sx={{
-                                                borderRadius: 0,
-                                                position: 'absolute',
-                                                inset: 0,
-                                                width: '100%',
-                                                height: '100%',
-                                            }}
-                                        />
-                                    )}
-
-                                    <div onClick={(e) => {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        if (msg?.mediaItems?.length) {
-                                            handleMediaClick(msg, 0);
-                                        } else {
-                                            handleMediaClick({
-                                                mediaItems: [{
-                                                    url: src,
-                                                    mimeType: 'video/*',
-                                                    filename: 'video'
-                                                }]
-                                            }, 0);
-                                        }
-                                    }} style={{ cursor: 'pointer', position: 'relative' }}>
-                                        {src &&
-                                            <video
-                                                src={src}
-                                                muted
-                                                playsInline
-                                                preload="metadata"
-                                                onLoadedData={() => markLoaded(mediaKey)}
-                                                onError={() => markLoaded(mediaKey)}
-                                                style={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'cover',
-                                                    opacity: loadedMedia[mediaKey] ? 1 : 0,
-                                                    pointerEvents: 'none',
-                                                }}
-                                            />
-                                        }
-                                        {src && (
-                                            <div
-                                                style={{
-                                                    position: 'absolute',
-                                                    inset: 0,
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    backgroundColor: 'rgba(0,0,0,0.45)',
-                                                    color: '#fff',
-                                                    borderRadius: '4px',
-                                                }}
-                                            >
-                                                <IconButton
-                                                    size="small"
-                                                    sx={{
-                                                        backgroundColor: 'rgba(255,255,255,0.9)',
-                                                        color: '#000',
-                                                        '&:hover': {
-                                                            backgroundColor: 'rgba(255,255,255,1)',
-                                                        },
+                                            return (
+                                                <div
+                                                    key={tileKey}
+                                                    style={{
+                                                        position: 'relative',
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        overflow: 'hidden',
+                                                        borderRadius: 8,
                                                     }}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         e.preventDefault();
-                                                        if (msg?.mediaItems?.length) {
-                                                            handleMediaClick(msg, 0);
-                                                        } else {
-                                                            handleMediaClick({
-                                                                mediaItems: [{
-                                                                    url: src,
-                                                                    mimeType: 'video/*',
-                                                                    filename: 'video'
-                                                                }]
-                                                            }, 0);
-                                                        }
+                                                        handleMediaClick(msg, tileIndex);
                                                     }}
                                                 >
-                                                    <Play size={20} />
-                                                </IconButton>
-                                            </div>
-                                        )}
-                                    </div>
-                                </>
-                            )}
+                                                    {!loadedMedia[tileKey] && (
+                                                        <Skeleton
+                                                            variant="rounded"
+                                                            className="media-skeleton"
+                                                            sx={{
+                                                                borderRadius: 0,
+                                                                position: 'absolute',
+                                                                inset: 0,
+                                                                width: '100%',
+                                                                height: '100%',
+                                                            }}
+                                                        />
+                                                    )}
 
-                            {msg.isUploading && (
-                                <UploadProgressOverlay percent={msg.percent} />
-                            )}
+                                                    {tileSrc && (
+                                                        <video
+                                                            src={tileSrc}
+                                                            muted
+                                                            playsInline
+                                                            preload="metadata"
+                                                            onLoadedData={() => markLoaded(tileKey)}
+                                                            onError={() => markLoaded(tileKey)}
+                                                            style={{
+                                                                display: 'block',
+                                                                width: '100%',
+                                                                height: '100%',
+                                                                objectFit: 'cover',
+                                                                opacity: loadedMedia[tileKey] ? 1 : 0,
+                                                                pointerEvents: 'none',
+                                                            }}
+                                                        />
+                                                    )}
+
+                                                    {tileSrc && !showOverflow && (
+                                                        <div
+                                                            style={{
+                                                                position: 'absolute',
+                                                                inset: 0,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                backgroundColor: 'rgba(0,0,0,0.45)',
+                                                                color: '#fff',
+                                                                borderRadius: '4px',
+                                                            }}
+                                                        >
+                                                            <IconButton
+                                                                size="small"
+                                                                sx={{
+                                                                    backgroundColor: 'rgba(255,255,255,0.9)',
+                                                                    color: '#000',
+                                                                    '&:hover': {
+                                                                        backgroundColor: 'rgba(255,255,255,1)',
+                                                                    },
+                                                                }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    e.preventDefault();
+                                                                    handleMediaClick(msg, tileIndex);
+                                                                }}
+                                                            >
+                                                                <Play size={16} />
+                                                            </IconButton>
+                                                        </div>
+                                                    )}
+
+                                                    {showOverflow && (
+                                                        <div
+                                                            style={{
+                                                                position: 'absolute',
+                                                                inset: 0,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                backgroundColor: 'rgba(0,0,0,0.45)',
+                                                                color: '#fff',
+                                                                fontWeight: 600,
+                                                                fontSize: 22,
+                                                            }}
+                                                        >
+                                                            +{overflowCount}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <>
+                                        {(!loadedMedia[mediaKey] && src !== imageNotFound && !videoLoadError) && (
+                                            <Skeleton
+                                                variant="rounded"
+                                                className="media-skeleton"
+                                                sx={{
+                                                    borderRadius: 0,
+                                                    position: 'absolute',
+                                                    inset: 0,
+                                                    width: '100%',
+                                                    height: '100%',
+                                                }}
+                                            />
+                                        )}
+
+                                        <div onClick={(e) => {
+                                            e.stopPropagation();
+                                            e.preventDefault();
+                                            if (msg?.mediaItems?.length) {
+                                                handleMediaClick(msg, 0);
+                                            } else {
+                                                handleMediaClick({
+                                                    mediaItems: [{
+                                                        url: src,
+                                                        mimeType: 'video/*',
+                                                        filename: 'video'
+                                                    }]
+                                                }, 0);
+                                            }
+                                        }} style={{ cursor: 'pointer', position: 'relative' }}>
+                                            {(src === imageNotFound || videoLoadError) ? (
+                                                <img
+                                                    src={imageNotFound}
+                                                    alt="Video not found"
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        objectFit: 'cover',
+                                                        borderRadius: 12,
+                                                    }}
+                                                />
+                                            ) : (
+                                                src && (
+                                                    <video
+                                                        src={src}
+                                                        muted
+                                                        playsInline
+                                                        preload="metadata"
+                                                        onLoadedData={() => markLoaded(mediaKey)}
+                                                        onError={() => {
+                                                            markLoaded(mediaKey);
+                                                            setVideoLoadError(true);
+                                                        }}
+                                                        style={{
+                                                            width: '100%',
+                                                            height: '100%',
+                                                            objectFit: 'cover',
+                                                            opacity: loadedMedia[mediaKey] ? 1 : 0,
+                                                            pointerEvents: 'none',
+                                                        }}
+                                                    />
+                                                )
+                                            )}
+                                            {src && (src !== imageNotFound) && !videoLoadError && (
+                                                <div
+                                                    style={{
+                                                        position: 'absolute',
+                                                        inset: 0,
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        backgroundColor: 'rgba(0,0,0,0.45)',
+                                                        color: '#fff',
+                                                        borderRadius: '4px',
+                                                    }}
+                                                >
+                                                    <IconButton
+                                                        size="small"
+                                                        sx={{
+                                                            backgroundColor: 'rgba(255,255,255,0.9)',
+                                                            color: '#000',
+                                                            '&:hover': {
+                                                                backgroundColor: 'rgba(255,255,255,1)',
+                                                            },
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            e.preventDefault();
+                                                            if (msg?.mediaItems?.length) {
+                                                                handleMediaClick(msg, 0);
+                                                            } else {
+                                                                handleMediaClick({
+                                                                    mediaItems: [{
+                                                                        url: src,
+                                                                        mimeType: 'video/*',
+                                                                        filename: 'video'
+                                                                    }]
+                                                                }, 0);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Play size={20} />
+                                                    </IconButton>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+
+                                {msg.isUploading && (
+                                    <UploadProgressOverlay percent={msg.percent} />
+                                )}
+                            </div>
                         </div>
                     );
                 })()}
@@ -970,6 +1067,7 @@ const MessageContent = ({
                         const { url: href, filename, fileName, mimeType, fileType } = itemProps;
                         const name = filename || fileName || 'Document';
                         const meta = getDocumentMeta(name);
+                        console.log("itemProps", itemProps)
 
                         // Map iconName to Lucide components
                         const IconMap = {
@@ -995,6 +1093,7 @@ const MessageContent = ({
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 1.5,
+                                    width: 350, // Fixed width for all document cards
                                     padding: '12px 16px',
                                     borderRadius: '12px',
                                     backgroundColor: alpha(theme.palette.background.paper, 0.2),
@@ -1036,7 +1135,8 @@ const MessageContent = ({
                                             style={{
                                                 width: '100%',
                                                 height: '100%',
-                                                objectFit: 'contain'
+                                                objectFit: 'contain',
+                                                filter: "grayscale(1)"
                                             }}
                                         />
                                     ) : (
@@ -1062,7 +1162,7 @@ const MessageContent = ({
                                     <Typography
                                         variant="caption"
                                         sx={{
-                                            color: alpha(theme.palette.text.secondary, 0.8),
+                                            color: alpha(theme.palette.text.primary, 0.8),
                                             fontWeight: 500,
                                             letterSpacing: '0.02em',
                                             display: 'flex',
@@ -1071,7 +1171,7 @@ const MessageContent = ({
                                         }}
                                     >
                                         <span style={{
-                                            fontSize: '0.7rem',
+                                            fontSize: '0.6rem',
                                         }}>
                                             {meta.label}
                                         </span>
@@ -1108,6 +1208,7 @@ const MessageContent = ({
                     if (mediaItems.length === 0) {
                         return (
                             <div className="message-document" style={{ position: 'relative', maxWidth: 350, width: '100%' }}>
+
                                 {renderDocumentItem({
                                     url: getMediaSrcForMessage(msg),
                                     fileName: msg.fileName,
@@ -1122,12 +1223,13 @@ const MessageContent = ({
                     }
 
                     return (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.2, width: '100%', maxWidth: 350 }}>
-                            {mediaItems.map((item, idx) => renderDocumentItem(item, idx))}
+                        <div className="message-document-group" style={{ position: 'relative', maxWidth: 350, width: '100%', display: 'flex', flexDirection: 'column', gap: 4 }}>
+
+                            {mediaItems.map((item, index) => renderDocumentItem(item, index))}
                             {msg.isUploading && (
                                 <UploadProgressOverlay percent={msg.percent} size={40} />
                             )}
-                        </Box>
+                        </div>
                     );
                 })()}
 
@@ -1237,20 +1339,22 @@ const MessageContent = ({
                 )}
 
             </Box>
-            {msg?.ReactionEmojis && (
-                <ReactionDetailsMenu
-                    anchorEl={anchorEl}
-                    onClose={() => setAnchorEl(null)}
-                    reactions={parsedReactions}
-                    auth={auth}
-                    onRemoveReaction={(reaction) => {
-                        if (typeof handleRemoveReaction === 'function') {
-                            handleRemoveReaction(reaction, msg);
-                        }
-                        setAnchorEl(null);
-                    }}
-                />
-            )}
+            {
+                msg?.ReactionEmojis && (
+                    <ReactionDetailsMenu
+                        anchorEl={anchorEl}
+                        onClose={() => setAnchorEl(null)}
+                        reactions={parsedReactions}
+                        auth={auth}
+                        onRemoveReaction={(reaction) => {
+                            if (typeof handleRemoveReaction === 'function') {
+                                handleRemoveReaction(reaction, msg);
+                            }
+                            setAnchorEl(null);
+                        }}
+                    />
+                )
+            }
             {/* {msg?.Direction == 1 && (
                 <Box className="message-username-sendinfo" sx={{
                     marginTop: msg?.Direction === 1 && msg?.ReactionEmojis && msg?.ReactionEmojis !== "" && msg.ReactionEmojis !== "[]" ? "20px" : "0px"
@@ -1261,5 +1365,7 @@ const MessageContent = ({
         </div>
     );
 };
+
+
 
 export default React.memo(MessageContent);

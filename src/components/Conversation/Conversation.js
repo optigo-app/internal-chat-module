@@ -363,9 +363,25 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
             setShowScrollToBottom(false);
             setTimeout(() => {
                 isAutoScrollingRef.current = false;
-            }, 150);
+            }, 100);
         }
     }, []);
+
+    // Scroll to bottom when media items load, but only if we were already near the bottom
+    useEffect(() => {
+        if (!containerRef.current || loading || isSwitchingConversation) return;
+        const container = containerRef.current;
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        const isNearBottom = scrollHeight - clientHeight - scrollTop < 300; // Increased threshold for media loads
+
+        if (isNearBottom) {
+            // Need a slight delay to ensure DOM dimensions are updated after image/video render
+            const timer = setTimeout(() => {
+                scrollToBottom('auto');
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [loadedMedia, loading, isSwitchingConversation, scrollToBottom]);
 
     useLayoutEffect(() => {
         const currentConvId = selectedCustomer?.ConversationId;
@@ -378,18 +394,29 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
             const messageList = Array.isArray(messages?.data) ? messages.data : [];
 
             if (containerRef.current) {
-                containerRef.current.scrollTo({
-                    top: containerRef.current.scrollHeight,
-                    behavior: 'auto'
-                });
+                const scroll = () => {
+                    if (containerRef.current) {
+                        containerRef.current.scrollTop = containerRef.current.scrollHeight;
+                    }
+                };
+
+                scroll();
+                // A few micro-tasks later to ensure all components have rendered
+                const t1 = setTimeout(scroll, 0);
+                const t2 = setTimeout(scroll, 50);
+
                 if (messageList.length > 0) {
                     const lastMessage = messageList[messageList.length - 1];
                     lastMessageIdRef.current = lastMessage?.Id || lastMessage?.MessageId || lastMessage?.id;
                 }
                 const timer = setTimeout(() => {
                     setIsSwitchingConversation(false);
-                }, 100);
-                return () => clearTimeout(timer);
+                }, 150);
+                return () => {
+                    clearTimeout(t1);
+                    clearTimeout(t2);
+                    clearTimeout(timer);
+                };
             }
         }
     }, [selectedCustomer?.ConversationId, loading, messages, isSwitchingConversation]);

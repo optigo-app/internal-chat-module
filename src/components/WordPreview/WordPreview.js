@@ -55,22 +55,30 @@ const WordPreview = ({ fileObject }) => {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        minHeight: 0,
       }}
     >
       <Box
         sx={{
           flex: 1,
-          overflow: 'auto',
-          p: 3,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          p: 2,
           backgroundColor: 'white',
+          minHeight: 0,
           '& .wordPreviewContent': {
-            minWidth: '250mm', // A4 width
-            maxWidth: '250mm', // A4 width
-            minHeight: '250mm', // A4 height
+            width: '100%',
             margin: '0 auto',
-            padding: '15mm', // Standard page margins
+            padding: 2,
             backgroundColor: 'white',
             boxShadow: '0 0 10px rgba(0,0,0,0.1)',
+            borderRadius: 8,
+            overflow: 'hidden',
+
+            '& img': {
+              maxWidth: '100%',
+              height: 'auto',
+            },
 
             '& p, & h1, & h2, & h3, & h4, & h5, & h6, & li, & ul, & ol, & table': {
               margin: '0.5em 0',
@@ -82,12 +90,14 @@ const WordPreview = ({ fileObject }) => {
             '& table': {
               borderCollapse: 'collapse',
               width: '100%',
+              tableLayout: 'fixed',
               '&, & th, & td': {
                 border: '1px solid #ddd',
               },
               '& th, & td': {
                 padding: '8px',
                 textAlign: 'left',
+                wordBreak: 'break-word',
               },
               '& th': {
                 backgroundColor: '#f2f2f2',

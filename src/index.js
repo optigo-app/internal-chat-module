@@ -9,9 +9,11 @@ import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme';
 import { LoginData } from './context/LoginData';
 
+import { HelmetProvider } from 'react-helmet-async';
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-  <>
+  <HelmetProvider>
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
@@ -20,7 +22,7 @@ root.render(
         </LoginData>
       </BrowserRouter>
     </ThemeProvider>
-  </>
+  </HelmetProvider>
 );
 
 reportWebVitals();

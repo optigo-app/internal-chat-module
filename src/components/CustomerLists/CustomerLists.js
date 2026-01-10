@@ -29,6 +29,7 @@ import WhatsAppMenu from '../ReusableComponent/WhatsAppMenu';
 import { getMessagePreview, processApiResponse, getCustomerListMenuItems } from './CustomerListFunc';
 import { updateConversationApi } from '../../API/SendMessage/updateConversationApi';
 import { addInternalMessageHandler, addInternalStatusHandler } from '../../socket';
+import { Helmet } from 'react-helmet-async';
 
 const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, selectedStatus = 'All', selectedTag = 'All', isConversationRead = false, viewConversationRead = false, onConversationList = () => { } }) => {
     const location = useLocation();
@@ -177,6 +178,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             default: return 1;
         }
     };
+
 
     const handleSocketUpdate = useCallback((incoming, isStatusChange = false) => {
         setChatMembers((prev) => {
@@ -495,8 +497,11 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     }, [isConversationRead, viewConversationRead, selectedCustomer?.ConversationId, tempConversationId]);
 
     return (
-        <div className="customer_lists_mainDiv">
-            <div className="customer_lists_header">
+        <Box className="customer_lists_mainDiv" ref={containerRef}>
+            <Helmet>
+                <title>{`Internal Chat (${chatMembers.total ?? 0})`}</title>
+            </Helmet>
+            <Box className="customer_lists_header">
                 {location?.pathname === "/archieve" ? (
                     <div className="header-archive">
                         <IconButton
@@ -519,10 +524,10 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     variant="outlined"
                     onClick={() => navigate('/archieve')}
                 />
-            </div>
+            </Box>
 
             {/* Search Input */}
-            <div className="customer_lists_search">
+            <Box className="customer_lists_search">
                 <TextField
                     fullWidth
                     placeholder="Search conversations"
@@ -550,7 +555,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                         ),
                     }}
                 />
-            </div>
+            </Box>
 
             {/* Filters */}
             <Box
@@ -609,7 +614,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 </Box>
             </Box>
 
-            <div className="customer_lists_main" >
+            <Box className="customer_lists_main" >
                 <ul ref={containerRef}>
                     {loading && (!chatMembers?.data || chatMembers?.data.length === 0) ? (
                         <li
@@ -885,8 +890,8 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     onAction={handleMenuAction}
                     context={selectMember}
                 />
-            </div>
-        </div >
+            </Box>
+        </Box >
     );
 };
 
