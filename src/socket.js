@@ -217,6 +217,16 @@ export const addInternalTypingHandler = (handler) => {
 export const emitInternalMessageSend = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:msg_send', { ...payload, receiveEvent: "internal:msg_receive" });
+
+    // Manually trigger local handlers for optimized update (as server might not echo back to sender)
+    internalMessageHandlers.forEach(handler => {
+        try {
+            handler(payload);
+        } catch (error) {
+            console.error('Error dispatching local send event:', error);
+        }
+    });
+
     return true;
 };
 

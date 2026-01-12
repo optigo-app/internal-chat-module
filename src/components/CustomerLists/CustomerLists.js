@@ -65,9 +65,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         const bPinned = Number(b?.IsPin || 0) === 1;
         if (aPinned !== bPinned) return aPinned ? -1 : 1;
 
-        const aUnread = Number(a?.unreadCount ?? a?.UnreadCount ?? 0) > 0;
-        const bUnread = Number(b?.unreadCount ?? b?.UnreadCount ?? 0) > 0;
-        if (aUnread !== bUnread) return aUnread ? -1 : 1;
+        // Removed unread priority check to allow sorting strictly by time
 
         const aTime = getMemberTimeValue(a);
         const bTime = getMemberTimeValue(b);
@@ -134,15 +132,12 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         }
     }, [loading, hasMore, auth?.token, auth?.userId, pageSize, processApiResponse, searchTerm, conversationComparator]);
 
-    // Effect to refresh customer list when sync completes
     useEffect(() => {
         if (isSyncing === false) {
-            // Refresh the customer list when sync completes
             loadMembers(1, true);
         }
     }, [isSyncing]);
 
-    // Create a stable reference for socket callbacks
     const loadMembersRef = useRef(loadMembers);
     useEffect(() => {
         loadMembersRef.current = loadMembers;
@@ -236,7 +231,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 if (Number(raw) === 1) return 0;
                 return currentCount;
             };
-
             if (index !== -1) {
                 const currentChat = updatedData[index];
                 const currentUnread = currentChat.unreadCount ?? currentChat.UnreadCount ?? 0;
@@ -259,7 +253,16 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     lastMessage: messagePreviewNode,
                     lastMessageText: messagePreviewText,
                     lastMessageTime: formattedTime,
-                    lastMessageTimeValue: incoming?.DateTime || currentChat.lastMessageTimeValue,
+                    lastMessageTimeValue: isStatusChange
+                        ? currentChat.lastMessageTimeValue
+                        : (() => {
+                            // Server list uses "Local Time as LastUpdatedDate" (e.g., 10:40 Z) but socket sends UTC (05:10 Z).
+                            // We need to generate a timestamp that matches the list's "Local" magnitude to ensure it sorts to top.
+                            const now = new Date();
+                            const offset = now.getTimezoneOffset() * 60000;
+                            const localISO = new Date(now.getTime() - offset).toISOString();
+                            return localISO;
+                        })(),
                     unreadCount: unreadFinal,
                     UnreadCount: unreadFinal,
                     LastMessage: incoming?.Message ?? currentChat.LastMessage,
