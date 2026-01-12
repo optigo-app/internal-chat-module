@@ -324,9 +324,8 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
         }
-
         searchTimeoutRef.current = setTimeout(() => {
-            loadMembers(1, true, value); // ✅ Pass the latest search value explicitly
+            loadMembers(1, true, value);
         }, 500);
     }, [loadMembers]);
 

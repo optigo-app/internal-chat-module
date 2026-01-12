@@ -13,6 +13,18 @@ $hover-bg: $bg-light;
 $danger-color: $error-main;
 $white: #ffffff;
 
+// Fade-in animation for smooth empty-state transitions
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 // Mixins
 @mixin flex-center {
     display: flex;
@@ -222,6 +234,15 @@ $white: #ffffff;
         font-weight: 500 !important;
         color: $text-primary;
         margin-bottom: 4px !important;
+    }
+
+    .customer-email {
+        font-size: 14px !important;
+        color: $text-secondary;
+        margin-bottom: 8px !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .customer-phone {

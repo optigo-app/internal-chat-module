@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useRef, useState } from "react";
 import "./LoginPage1.scss";
 import {
     TextField,
@@ -34,12 +34,18 @@ const LoginPage1 = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [credentials, setCredentials] = useState({ companycode: "", userId: "", password: "" });
     const [errors, setErrors] = useState({});
+    const [formError, setFormError] = useState("");
     const { setAuth, token, setToken } = useContext(LoginContext);
+
+    const companyCodeRef = useRef(null);
+    const userIdRef = useRef(null);
+    const passwordRef = useRef(null);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setCredentials({ ...credentials, [name]: value });
         setErrors(prev => ({ ...prev, [name]: "" }));
+        if (formError) setFormError("");
     };
 
     // Add this function inside your component
@@ -54,7 +60,7 @@ const LoginPage1 = () => {
                         yc: "",
                     });
                     sessionStorage.setItem("token", JSON.stringify(token));
-                    return;
+                    return false;
                 }
                 else if (token?.rd?.[0]?.stat === 1) {
                     setIsBtnShow(true)
@@ -67,34 +73,54 @@ const LoginPage1 = () => {
                     });
 
                     sessionStorage.setItem("token", JSON.stringify(tokenData));
+                    return true;
                 }
             } catch (error) {
                 console.error("Error in handleCompanyCodeBlur:", error);
                 setErrors(prev => ({ ...prev, companycode: "Error validating company code" }));
+                return false;
             } finally {
                 setIsBtnShow(false);
             }
         }
+
+        return false;
     };
 
     // Simple validation function
     const validateCredentials = () => {
         const newErrors = {};
-        if (!credentials.companycode) newErrors.companycode = "Project code is required";
-        if (!credentials.userId) newErrors.userId = "User ID is required";
-        if (!credentials.password) newErrors.password = "Password is required";
+        if (!credentials.companycode?.trim()) newErrors.companycode = "Project code is required";
+        if (!credentials.userId?.trim()) newErrors.userId = "User ID is required";
+        if (!credentials.password?.trim()) newErrors.password = "Password is required";
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        e?.preventDefault?.();
         setIsLoading(true);
+        setFormError("");
 
         if (!validateCredentials()) {
             setIsLoading(false);
             return;
+        }
+
+        if (errors.companycode === "Invalid company code") {
+            companyCodeRef.current?.focus?.();
+            setIsLoading(false);
+            return;
+        }
+
+        if (credentials.companycode?.trim() && (!token?.sv || !token?.yc)) {
+            const ok = await handleCompanyCodeBlur();
+            if (!ok) {
+                companyCodeRef.current?.focus?.();
+                setIsLoading(false);
+                return;
+            }
         }
 
         try {
@@ -103,6 +129,7 @@ const LoginPage1 = () => {
 
             const userInfo = loginData?.rd?.[0];
             if (userInfo?.stat !== 1) {
+                setFormError("Invalid credentials");
                 toast.error("Invalid credentials");
                 return setIsLoading(false);
             }
@@ -137,6 +164,7 @@ const LoginPage1 = () => {
                 sessionStorage.setItem("userData", JSON.stringify(updatedUserData));
                 sessionStorage.setItem("isLoggedIn", true);
                 setAuth(updatedUserData);
+                setFormError("");
                 toast.success("Login successful! Welcome back!", { icon: "🎉" });
                 navigate("/");
                 setIsLoading(false);
@@ -145,12 +173,14 @@ const LoginPage1 = () => {
             // ❌ Handle connection failure
             socket.on("connect_error", (err) => {
                 console.error("❌ Socket connect error:", err.message);
+                setFormError("Socket connection failed");
                 toast.error("Socket connection failed");
                 setIsLoading(false);
             });
 
         } catch (err) {
             console.error("Login error:", err);
+            setFormError("Login failed. Please try again.");
             toast.error("Login failed. Please try again.");
             setIsLoading(false);
         }
@@ -169,9 +199,15 @@ const LoginPage1 = () => {
                     <div className="login-form-section">
                         <div className="login-form-content">
                             <Typography variant="h5" className="login-title">CHAT LOGIN</Typography>
-                            <Typography variant="body2" className="login-subtitle">
+                            <Typography variant="body2" className="login-subtitle" sx={{ mb: formError ? 1 : 2 }}>
                                 Welcome back! Let’s get you connected.
                             </Typography>
+
+                            {formError ? (
+                                <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+                                    {formError}
+                                </Typography>
+                            ) : null}
 
                             {/* Project Code */}
                             <div className="form-group">
@@ -193,8 +229,24 @@ const LoginPage1 = () => {
                                         value={credentials.companycode}
                                         onChange={handleChange}
                                         onBlur={handleCompanyCodeBlur}
+                                        onKeyDown={async (e) => {
+                                            if (e.key !== "Enter") return;
+                                            e.preventDefault();
+
+                                            const companyCode = credentials.companycode.trim();
+                                            if (!companyCode) {
+                                                setErrors(prev => ({ ...prev, companycode: "Project code is required" }));
+                                                return;
+                                            }
+
+                                            const ok = await handleCompanyCodeBlur();
+                                            if (ok) {
+                                                userIdRef.current?.focus?.();
+                                            }
+                                        }}
                                         error={!!errors.companycode}
                                         helperText={errors.companycode}
+                                        inputRef={companyCodeRef}
                                         {...commonTextFieldProps}
                                     />
 
@@ -236,8 +288,27 @@ const LoginPage1 = () => {
                                     placeholder="Enter username"
                                     value={credentials.userId}
                                     onChange={handleChange}
+                                    onKeyDown={(e) => {
+                                        if (e.key !== "Enter") return;
+                                        e.preventDefault();
+
+                                        const userId = credentials.userId.trim();
+                                        if (!userId) {
+                                            setErrors(prev => ({ ...prev, userId: "User ID is required" }));
+                                            return;
+                                        }
+
+                                        const password = credentials.password.trim();
+                                        if (password) {
+                                            handleSubmit();
+                                            return;
+                                        }
+
+                                        passwordRef.current?.focus?.();
+                                    }}
                                     error={!!errors.userId}
                                     helperText={errors.userId}
+                                    inputRef={userIdRef}
                                     {...commonTextFieldProps}
                                 />
                             </div>
@@ -256,19 +327,13 @@ const LoginPage1 = () => {
                                     onChange={handleChange}
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter") {
-                                            const isDisabled =
-                                                !token ||
-                                                credentials.companycode.trim() === "" ||
-                                                errors.companycode === "Invalid company code" ||
-                                                (credentials.companycode.trim() !== "" && !token?.sv && !token?.yc);
-
-                                            if (!isDisabled) {
-                                                handleSubmit(e);
-                                            }
+                                            e.preventDefault();
+                                            handleSubmit();
                                         }
                                     }}
                                     error={!!errors.password}
                                     helperText={errors.password}
+                                    inputRef={passwordRef}
                                     {...commonTextFieldProps}
                                     InputProps={{
                                         endAdornment: (
@@ -299,12 +364,7 @@ const LoginPage1 = () => {
                                     variant="contained"
                                     className="buttonClassname login-button"
                                     onClick={handleSubmit}
-                                    disabled={
-                                        !token ||
-                                        credentials.companycode.trim() === "" ||
-                                        errors.companycode === "Invalid company code" ||
-                                        (credentials.companycode.trim() !== "" && !token?.sv && !token?.yc)
-                                    }
+                                    disabled={isLoading}
                                 >
                                     {isLoading ? 'Logging...' : 'Login Now'}
                                 </Button>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Button, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Skeleton, Typography } from '@mui/material';
 import useLazyLoading from './useLazyLoading';
 import { Download, FileText } from 'lucide-react';
@@ -16,6 +16,17 @@ const DocumentsSection = ({
 
     // Lazy loading hook
     const lastDocumentElementRef = useLazyLoading(onLoadMore, hasMore && paginationFlag, isLoading);
+
+    // Smooth empty-state transition
+    const [showEmptyState, setShowEmptyState] = useState(false);
+    useEffect(() => {
+        if (!isLoading && documents.length === 0) {
+            const timer = setTimeout(() => setShowEmptyState(true), 180);
+            return () => clearTimeout(timer);
+        } else {
+            setShowEmptyState(false);
+        }
+    }, [isLoading, documents.length]);
 
     // Show nothing if loading and no items
     if (isLoading && documents.length === 0) {
@@ -49,8 +60,44 @@ const DocumentsSection = ({
 
     // Show "No items" message if no items after loading
     if (documents.length === 0) {
+        if (!showEmptyState) {
+            // Keep showing skeleton briefly to avoid blink
+            return (
+                <Box>
+                    <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 500, mb: 1 }}>
+                        Documents
+                    </Typography>
+                    <List disablePadding>
+                        {Array.from({ length: 6 }).map((_, idx) => (
+                            <ListItem
+                                key={`doc-skel-${idx}`}
+                                disableGutters
+                                secondaryAction={(
+                                    <Skeleton variant="rounded" width={28} height={28} sx={{ borderRadius: 2 }} />
+                                )}
+                            >
+                                <ListItemIcon sx={{ minWidth: 40 }}>
+                                    <Skeleton variant="rounded" width={32} height={32} sx={{ borderRadius: 2 }} />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary={<Skeleton variant="text" width="70%" />}
+                                    secondary={<Skeleton variant="text" width="45%" />}
+                                />
+                            </ListItem>
+                        ))}
+                    </List>
+                </Box>
+            );
+        }
         return (
-            <Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
+            <Box
+                sx={{
+                    py: 4,
+                    textAlign: 'center',
+                    color: 'text.secondary',
+                    animation: 'fadeIn 280ms ease-out',
+                }}
+            >
                 <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1.5, opacity: 0.5 }}>
                     <FileText size={44} />
                 </Box>

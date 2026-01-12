@@ -77,6 +77,17 @@
                     line-height: 1.2;
                 }
 
+                .customer-email {
+                    color: #6b7280;
+                    margin: 0;
+                    line-height: 1.2;
+                    font-size: 12px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    max-width: 320px;
+                }
+
                 .customer-status {
                     color: #6b7280;
                     margin: 0;

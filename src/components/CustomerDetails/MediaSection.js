@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Button, ImageList, ImageListItem, Skeleton, Typography } from '@mui/material';
 import useLazyLoading from './useLazyLoading';
 import { Image, Play } from 'lucide-react';
@@ -15,6 +15,17 @@ const MediaSection = ({
 
     // Combine images and videos
     const combinedMedia = [...(mediaItems.images || []), ...(mediaItems.videos || [])];
+
+    // Smooth empty-state transition
+    const [showEmptyState, setShowEmptyState] = useState(false);
+    useEffect(() => {
+        if (!isLoading && combinedMedia.length === 0) {
+            const timer = setTimeout(() => setShowEmptyState(true), 180);
+            return () => clearTimeout(timer);
+        } else {
+            setShowEmptyState(false);
+        }
+    }, [isLoading, combinedMedia.length]);
 
     // Lazy loading hook
     const lastMediaElementRef = useLazyLoading(onLoadMore, hasMore && paginationFlag, isLoading);
@@ -44,8 +55,37 @@ const MediaSection = ({
 
     // Show "No items" message if no items after loading
     if (combinedMedia.length === 0) {
+        if (!showEmptyState) {
+            // Keep showing skeleton briefly to avoid blink
+            return (
+                <Box>
+                    <Typography
+                        variant="subtitle2"
+                        sx={{ color: 'text.secondary', fontWeight: 500, mb: 1 }}
+                    >
+                        Media
+                    </Typography>
+                    <ImageList cols={3} gap={6} sx={{ m: 0 }}>
+                        {Array.from({ length: 9 }).map((_, idx) => (
+                            <ImageListItem key={`media-skel-${idx}`} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                                <Box sx={{ position: 'relative', width: '100%', aspectRatio: '1 / 1' }}>
+                                    <Skeleton variant="rounded" width="100%" height="100%" sx={{ position: 'absolute', inset: 0 }} />
+                                </Box>
+                            </ImageListItem>
+                        ))}
+                    </ImageList>
+                </Box>
+            );
+        }
         return (
-            <Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
+            <Box
+                sx={{
+                    py: 4,
+                    textAlign: 'center',
+                    color: 'text.secondary',
+                    animation: 'fadeIn 280ms ease-out',
+                }}
+            >
                 <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1.5, opacity: 0.5 }}>
                     <Image size={44} />
                 </Box>

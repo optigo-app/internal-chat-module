@@ -324,6 +324,7 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'drawer' }) => {
     const displayName = getCustomerDisplayName(customer);
     const avatarSeed = getCustomerAvatarSeed(customer);
     const cfg = customer?.avatarConfig || getWhatsAppAvatarConfig(avatarSeed, 80);
+    const displayEmail = String(customer?.DisplayEmail ?? '').trim();
 
     return (
         <>
@@ -370,6 +371,9 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'drawer' }) => {
                             </div>
 
                             <Typography className="customer-name">{displayName}</Typography>
+                            {displayEmail ? (
+                                <Typography className="customer-email">{displayEmail}</Typography>
+                            ) : null}
                         </div>
 
                         {/* Media Tabs */}

@@ -574,6 +574,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         );
     }
 
+    const displayEmail = String(selectedCustomer?.DisplayEmail ?? '').trim();
+
     return (
         <Box className="conversation-container">
             {/* Media Viewer */}
@@ -617,6 +619,11 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                 <Typography variant="subtitle1" className="customer-name">
                                     {getCustomerDisplayName(selectedCustomer)}
                                 </Typography>
+                                {displayEmail ? (
+                                    <Typography variant="body2" className="customer-email">
+                                        {displayEmail}
+                                    </Typography>
+                                ) : null}
                             </div>
                         </div>
                     </div>
