@@ -176,6 +176,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
 
 
     const handleSocketUpdate = useCallback((incoming, isStatusChange = false) => {
+        debugger;
         setChatMembers((prev) => {
             if (!prev?.data) return prev;
 
@@ -199,9 +200,15 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 (member) => Number(member.ConversationId) === Number(conversationId)
             );
 
-            const normalizedType = normalizeMessageType(incoming?.MessageType ?? incoming?.LastMessageType);
+            const existingChat = index !== -1 ? updatedData[index] : null;
+            const normalizedType = normalizeMessageType(
+                incoming?.MessageType ??
+                incoming?.LastMessageType ??
+                existingChat?.LastMessageType
+            );
             const previewMsg = {
                 ...incoming,
+                Message: incoming?.Message ?? existingChat?.LastMessage ?? '',
                 MessageType: normalizedType,
             };
             const messagePreview = getMessagePreview(previewMsg);

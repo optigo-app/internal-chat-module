@@ -22,6 +22,10 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
   const swiperRef = useRef(null);
   const [zoomLevel, setZoomLevel] = useState(1);
 
+  const resetZoom = useCallback(() => {
+    setZoomLevel(1);
+  }, []);
+
   const pauseVideosInElement = useCallback((rootEl) => {
     if (!rootEl || typeof rootEl.querySelectorAll !== 'function') return;
     const videos = rootEl.querySelectorAll('video');
@@ -35,30 +39,58 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
     });
   }, []);
 
-  useEffect(() => {
-    const handleResizeError = (e) => {
-      if (e.message === 'ResizeObserver loop completed with undelivered notifications.') {
-        e.stopImmediatePropagation();
-      }
-    };
+  const markLoaded = (key) => {
+    setLoading(prev => ({ ...prev, [key]: false }));
+  };
 
-    window.addEventListener('error', handleResizeError);
-    return () => window.removeEventListener('error', handleResizeError);
+  const enableLoop = mediaItems.length > 1;
+
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel((prev) => Math.min(prev + 0.2, 3));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel((prev) => Math.max(prev - 0.2, 0.5));
   }, []);
 
   useEffect(() => {
-    setCurrentIndex(initialIndex);
+    const onKeyDown = (e) => {
+      const target = e.target;
+      const tagName = target?.tagName?.toLowerCase?.();
+      const isTypingTarget = Boolean(
+        target?.isContentEditable ||
+        tagName === 'input' ||
+        tagName === 'textarea' ||
+        tagName === 'select'
+      );
 
-    if (swiperRef.current) {
-      if (typeof swiperRef.current.slideToLoop === 'function') {
-        swiperRef.current.slideToLoop(initialIndex, 0);
-      } else if (typeof swiperRef.current.slideTo === 'function') {
-        swiperRef.current.slideTo(initialIndex, 0);
+      if (isTypingTarget) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const key = e.key;
+      const code = e.code;
+
+      if (key === '+' || key === '=' || code === 'NumpadAdd') {
+        e.preventDefault();
+        handleZoomIn();
+        return;
       }
-    }
-  }, [initialIndex]);
 
-  const currentMedia = mediaItems[currentIndex];
+      if (key === '-' || code === 'NumpadSubtract') {
+        e.preventDefault();
+        handleZoomOut();
+        return;
+      }
+
+      if (key === '0' || code === 'Digit0' || code === 'Numpad0') {
+        e.preventDefault();
+        resetZoom();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleZoomIn, handleZoomOut, resetZoom]);
 
   const handlePrev = () => {
     if (swiperRef.current && typeof swiperRef.current.slidePrev === 'function') {
@@ -78,14 +110,7 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
     setCurrentIndex((prev) => (prev < mediaItems.length - 1 ? prev + 1 : 0));
   };
 
-  const markLoaded = (key) => {
-    setLoading(prev => ({ ...prev, [key]: false }));
-  };
-
-  const enableLoop = mediaItems.length > 1;
-
-  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.2, 3));
-  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.2, 0.5));
+  const currentMedia = mediaItems[currentIndex];
 
   return (
     <Dialog

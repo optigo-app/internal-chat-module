@@ -7,7 +7,7 @@ import { FormatDateIST } from '../../utils/DateFnc';
 import DynamicTemplate from '../DynamicTemplate/DynamicTemplate';
 import QuickReactionMenu from './QuickReactionMenu';
 import ReactionDetailsMenu from './ReactionMenu';
-import { handleDownloadFile, getDocumentMeta } from '../../utils/globalFunc';
+import { handleDownloadFile, getDocumentMeta, renderTextWithLinks } from '../../utils/globalFunc';
 import imageNotFound from '../../assets/image-not-found.jpg';
 
 const imageDimsCache = new Map();
@@ -54,6 +54,10 @@ const MessageContent = ({
 }) => {
 
     const theme = useTheme();
+
+    const linkifyText = (value) => renderTextWithLinks(value, {
+        linkStyle: { color: theme.palette.primary.main },
+    });
 
     const [imageDims, setImageDims] = useState(null);
     const [anchorEl, setAnchorEl] = React.useState(null);
@@ -530,7 +534,7 @@ const MessageContent = ({
                         {msg?.MessageType === "text" && (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
                                 <Typography variant="body2" className="message-text" style={{ flex: 1, marginRight: 0 }}>
-                                    {msg.Message}
+                                    {linkifyText(msg.Message)}
                                 </Typography>
                                 {/* Message status inline for reply messages */}
                                 <Box
@@ -596,7 +600,7 @@ const MessageContent = ({
                             pr: 1,
                         }}
                     >
-                        {msg.Message}
+                        {linkifyText(msg.Message)}
                     </Typography>
                 )}
 

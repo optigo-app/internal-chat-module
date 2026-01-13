@@ -9,10 +9,10 @@ import { uploadMediaAPi } from '../../API/FileUpload/uploadHelpers';
 import { toast } from 'react-hot-toast';
 import { LoginContext } from '../../context/LoginData';
 import { formatDateHeader } from '../../utils/DateFnc';
-
 import { forwardMessageApi } from '../../API/SendMessage/forwardMessageApi';
 import { replyToMessageApi } from '../../API/SendMessage/replyToMessageApi';
 import imageNotFound from '../../assets/image-not-found.jpg';
+import { generateMediaFolderName, validateMediaFiles } from '../../utils/globalFunc';
 
 export const useConversation = (selectedCustomer, onConversationRead, onViewConversationRead) => {
     const [inputValue, setInputValue] = useState("");
@@ -628,7 +628,23 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
 
-        const newMediaFiles = files.map(file => ({
+        const validation = validateMediaFiles(files);
+        const { acceptedFiles, skippedSize, skippedCount } = validation;
+
+        if (skippedCount > 0) {
+            toast.error(`Only 30 files are allowed. ${skippedCount} file(s) were removed.`, { id: 'too-many-files' });
+        }
+
+        if (skippedSize.length > 0) {
+            const fileList = skippedSize.length > 2
+                ? `${skippedSize.slice(0, 2).join(', ')} and ${skippedSize.length - 2} more`
+                : skippedSize.join(', ');
+            toast.error(`Files too large (>100MB): ${fileList}. They were removed.`, { id: 'file-too-large' });
+        }
+
+        if (acceptedFiles.length === 0) return;
+
+        const newMediaFiles = acceptedFiles.map(file => ({
             file,
             preview: URL.createObjectURL(file),
             type: file.type.startsWith('image/') ? 'image' :
@@ -704,8 +720,12 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         const getName = u => u?.fileName ?? u?.filename ?? u?.FileName ?? u?.name ?? u?.originalName ?? u?.originalname ?? null;
 
         try {
+            const convIdForFolder = selectedCustomer?.ConversationId || tempConversationId || null;
+            const folderCategory = type === 'image' ? 'images' : type === 'video' ? 'videos' : 'docs';
+            const folderName = generateMediaFolderName(convIdForFolder, folderCategory);
+
             const resp = await uploadMediaAPi({
-                folderName: "ChatMedia",
+                folderName,
                 files: safeFiles,
                 onProgress: (percent) => {
                     setMessages((prev) => ({

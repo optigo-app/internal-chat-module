@@ -1,3 +1,4 @@
+import React from 'react';
 import { SHA1 } from "crypto-js";
 import Hex from "crypto-js/enc-hex";
 
@@ -21,6 +22,88 @@ const getInitials = (name) => {
     const parts = cleaned.split(/\s+/).filter(Boolean);
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
+};
+
+export const renderTextWithLinks = (rawText, options = {}) => {
+    const { linkStyle = {} } = options;
+
+    const text = rawText == null ? '' : String(rawText);
+    if (!text) return '';
+
+    const urlRegex = /(?:https?:\/\/|www\.)[^\s]+/gi;
+    const lines = text.split('\n');
+
+    return lines.map((line, lineIndex) => {
+        const nodes = [];
+        let lastIndex = 0;
+        let matchIndex = 0;
+
+        for (const match of line.matchAll(urlRegex)) {
+            const matchedUrl = match[0];
+            const start = match.index ?? 0;
+            const end = start + matchedUrl.length;
+
+            if (start > lastIndex) {
+                nodes.push(
+                    <React.Fragment key={`t-${lineIndex}-${matchIndex}`}>{line.slice(lastIndex, start)}</React.Fragment>
+                );
+            }
+
+            const trimmed = matchedUrl.match(/^(.*?)([\]\[\)\}>,.!?:;]+)?$/);
+            const urlPart = trimmed?.[1] ?? matchedUrl;
+            const trailing = trimmed?.[2] ?? '';
+            const href = urlPart.toLowerCase().startsWith('http') ? urlPart : `https://${urlPart}`;
+
+            nodes.push(
+                <React.Fragment key={`u-${lineIndex}-${matchIndex}`}>
+                    <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                            textDecoration: 'underline',
+                            wordBreak: 'break-word',
+                            ...linkStyle,
+                        }}
+                    >
+                        {urlPart}
+                    </a>
+                    {trailing}
+                </React.Fragment>
+            );
+
+            lastIndex = end;
+            matchIndex += 1;
+        }
+
+        if (lastIndex < line.length) {
+            nodes.push(<React.Fragment key={`e-${lineIndex}`}>{line.slice(lastIndex)}</React.Fragment>);
+        }
+
+        return (
+            <React.Fragment key={`line-${lineIndex}`}>
+                {nodes}
+                {lineIndex < lines.length - 1 ? <br /> : null}
+            </React.Fragment>
+        );
+    });
+};
+
+export const generateMediaFolderName = (conversationId, category = 'docs') => {
+    const sanitizeSegment = (value) => {
+        const raw = String(value ?? '').trim();
+        if (!raw) return '';
+        return raw
+            .replace(/\\/g, '/')
+            .split('/')
+            .filter(Boolean)
+            .join('_')
+            .replace(/[^a-zA-Z0-9_-]/g, '_');
+    };
+
+    const conv = sanitizeSegment(conversationId || 'unknown');
+    const cat = sanitizeSegment(category || 'docs') || 'docs';
+    return `tecochat/conv_${conv}/${cat}`;
 };
 
 export const getSoftAvatarColors = (seed) => {
@@ -203,4 +286,38 @@ export const getDocumentMeta = (name = '') => {
     }
 
     return { label: ext.toUpperCase() || 'FILE', tone: 'default', iconName: 'File', iconUrl: '/doc.png' };
+};
+
+
+export const validateMediaFiles = (files) => {
+    const MAX_FILES = 30;
+    const MAX_SIZE_MB = 100;
+    const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+
+    const rawFiles = Array.from(files);
+    const acceptedFiles = [];
+    const skippedSize = [];
+    let skippedCount = 0;
+
+    for (const file of rawFiles) {
+        if (acceptedFiles.length >= MAX_FILES) {
+            skippedCount++;
+            continue;
+        }
+
+        if (file.size > MAX_SIZE_BYTES) {
+            skippedSize.push(file.name);
+            continue;
+        }
+
+        acceptedFiles.push(file);
+    }
+
+    return {
+        acceptedFiles,
+        skippedSize,
+        skippedCount,
+        totalFiles: rawFiles.length,
+        isLimitReached: rawFiles.length > MAX_FILES
+    };
 };

@@ -8,7 +8,7 @@ export const uploadMediaAPi = async ({
   try {
     if (!Array.isArray(files) || files.length === 0) return [];
 
-    const uniqueNo = files?.[0]?.name?.split(".")?.[0] || `${Date.now()}`;
+    const uniqueNo = `${files?.[0]?.name?.split(".")?.[0]}_${Date.now()}` || `${Date.now()}`;
 
     const res = await filesUploadApi({
       attachments: files.map((file) => ({ file })),
