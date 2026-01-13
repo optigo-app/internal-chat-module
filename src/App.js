@@ -1,6 +1,6 @@
 import './App.css';
 import { useEffect, useState, useContext } from 'react';
-import { useNavigate, Routes, Route, useLocation, matchPath } from 'react-router-dom';
+import { useNavigate, Routes, Route, useLocation, matchPath, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 import toast, { Toaster } from 'react-hot-toast';
 import LoginPage1 from './components/LoginPage/LoginPage1';
@@ -21,6 +21,17 @@ import loader from './assets/lotties/loader.json';
 import ChatHeader from './TestPage/ChatHeader';
 
 const PagenotFound = () => <div>404 - Page Not Found</div>;
+
+function RedirectIfAuthenticated({ children }) {
+  const isLoggedIn = sessionStorage.getItem('isLoggedIn');
+  const userData = sessionStorage.getItem('userData');
+
+  if (isLoggedIn && userData) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
 
 function Layout({ children, onStatusSelect, selectedStatus, onTagSelect, selectedTag }) {
   const location = useLocation();
@@ -230,7 +241,7 @@ function App() {
 
   return (
     <>
-      <Toaster position="top-right" toastOptions={toastConfig} />
+      <Toaster {...toastConfig} />
       {isSyncing && (
         <Box
           sx={{
@@ -261,7 +272,7 @@ function App() {
       )}
       <div className="app_mainDiv">
         <Routes>
-          <Route path="/login" element={<LoginPage1 />} />
+          <Route path="/login" element={<RedirectIfAuthenticated><LoginPage1 /></RedirectIfAuthenticated>} />
           <Route path="/session-check" element={<LoginExists />} />
           <Route path="/test" element={<ChatHeader chatId="123" />} />
           <Route

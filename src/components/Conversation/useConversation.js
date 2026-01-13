@@ -13,6 +13,7 @@ import { forwardMessageApi } from '../../API/SendMessage/forwardMessageApi';
 import { replyToMessageApi } from '../../API/SendMessage/replyToMessageApi';
 import imageNotFound from '../../assets/image-not-found.jpg';
 import { generateMediaFolderName, validateMediaFiles } from '../../utils/globalFunc';
+import { showToast } from '../../utils/toastHelper';
 
 export const useConversation = (selectedCustomer, onConversationRead, onViewConversationRead) => {
     const [inputValue, setInputValue] = useState("");
@@ -21,9 +22,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     const [tempConversationId, setTempConversationId] = useState(null);
     const [mediaFiles, setMediaFiles] = useState([]);
     const [assigneeList, setAssigneeList] = useState([]);
-    const [escalatedLists, setEscalatedLists] = useState([]);
     const [selectedAssignees, setSelectedAssignees] = useState([]);
-    const [selectedEscalated, setSelectedEscalate] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 100;
     const [loading, setLoading] = useState(false);
@@ -629,17 +628,21 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         if (files.length === 0) return;
 
         const validation = validateMediaFiles(files);
-        const { acceptedFiles, skippedSize, skippedCount } = validation;
+        const { acceptedFiles, skippedSize, skippedTotal, skippedCount } = validation;
 
         if (skippedCount > 0) {
-            toast.error(`Only 30 files are allowed. ${skippedCount} file(s) were removed.`, { id: 'too-many-files' });
+            showToast(`Only 30 files are allowed. ${skippedCount} file(s) were removed.`, 'error', { id: 'too-many-files' });
         }
 
         if (skippedSize.length > 0) {
             const fileList = skippedSize.length > 2
                 ? `${skippedSize.slice(0, 2).join(', ')} and ${skippedSize.length - 2} more`
                 : skippedSize.join(', ');
-            toast.error(`Files too large (>100MB): ${fileList}. They were removed.`, { id: 'file-too-large' });
+            showToast(`Files too large (>100MB): ${fileList}. They were removed.`, 'error', { id: 'file-too-large' });
+        }
+
+        if (skippedTotal.length > 0) {
+            showToast(`Total selection exceeds 100MB. Remaining files were removed.`, 'error', { id: 'total-too-large' });
         }
 
         if (acceptedFiles.length === 0) return;
@@ -1231,12 +1234,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         setShowMedia,
         assigneeList,
         setAssigneeList,
-        escalatedLists,
-        setEscalatedLists,
         selectedAssignees,
         setSelectedAssignees,
-        selectedEscalated,
-        setSelectedEscalate,
         loading,
         setLoading,
         loadingOlder,

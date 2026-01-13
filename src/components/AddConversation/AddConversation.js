@@ -142,7 +142,6 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
             ?.filter((member) => {
                 const isFavorite = member.IsStar === 1;
                 switch (tabValue) {
-                    case 1: return member.ticketStatus === 'escalated';
                     case 2: return isFavorite && tabValue === 2;
                     default: return true;
                 }
@@ -213,7 +212,7 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
                         padding: '6px',
                     }}
                 >
-                    {[{ label: 'All', value: 0 }, { label: 'Escalated', value: 1 }, { label: 'Favorite', value: 2 }].map((item) => {
+                    {[{ label: 'All', value: 0 }, { label: 'Favorite', value: 2 }].map((item) => {
                         const isActive = tabValue === item.value;
 
                         return (

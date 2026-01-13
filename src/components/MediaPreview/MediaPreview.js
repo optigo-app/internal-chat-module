@@ -2,9 +2,19 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { X, Paperclip, Trash2 } from 'lucide-react';
 import './MediaPreview.scss';
 import WordPreview from '../WordPreview/WordPreview';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation, FreeMode, Thumbs } from 'swiper/modules';
+
+// Swiper styles
+import 'swiper/css';
+import 'swiper/css/navigation';
+import 'swiper/css/thumbs';
+import 'swiper/css/free-mode';
 
 const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, handleClosePreview }) => {
     const fileInputRef = useRef(null);
+    const mainSwiperRef = useRef(null);
+    const [thumbsSwiper, setThumbsSwiper] = useState(null);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [mediaItems, setMediaItems] = useState([]);
     const [textPreview, setTextPreview] = useState('');
@@ -120,6 +130,14 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
         return { sizeText, extText };
     }, [currentMedia]);
 
+    const totalSizeMB = useMemo(() => {
+        const totalBytes = mediaItems.reduce((acc, item) => {
+            const bytes = typeof item.file?.size === 'number' ? item.file.size : 0;
+            return acc + bytes;
+        }, 0);
+        return (totalBytes / (1024 * 1024)).toFixed(1);
+    }, [mediaItems]);
+
     useEffect(() => {
         let cancelled = false;
         setTextPreview('');
@@ -163,18 +181,30 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
             }
 
             if (e.key === 'ArrowLeft') {
-                setCurrentIndex((prev) => Math.max(0, prev - 1));
+                const nextIndex = Math.max(0, currentIndex - 1);
+
+                if (mainSwiperRef.current && typeof mainSwiperRef.current.slideTo === 'function') {
+                    mainSwiperRef.current.slideTo(nextIndex);
+                } else {
+                    setCurrentIndex(nextIndex);
+                }
                 return;
             }
 
             if (e.key === 'ArrowRight') {
-                setCurrentIndex((prev) => Math.min(mediaItems.length - 1, prev + 1));
+                const nextIndex = Math.min(mediaItems.length - 1, currentIndex + 1);
+
+                if (mainSwiperRef.current && typeof mainSwiperRef.current.slideTo === 'function') {
+                    mainSwiperRef.current.slideTo(nextIndex);
+                } else {
+                    setCurrentIndex(nextIndex);
+                }
             }
         };
 
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [handleClose, mediaItems.length]);
+    }, [currentIndex, handleClose, mediaItems.length]);
 
 
     const removeMedia = (id) => {
@@ -214,7 +244,7 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                         </div>
                         {currentMedia?.file ? (
                             <div className="media-subtitle">
-                                {currentFileMeta.sizeText}{currentFileMeta.extText ? ` · ${currentFileMeta.extText}` : ''}{mediaItems.length ? ` · ${currentIndex + 1} of ${mediaItems.length}` : ''}
+                                {currentFileMeta.sizeText}{currentFileMeta.extText ? ` · ${currentFileMeta.extText}` : ''}{mediaItems.length ? ` · ${currentIndex + 1} of ${mediaItems.length}` : ''} · Total: {totalSizeMB} MB
                             </div>
                         ) : null}
                     </div>
@@ -233,112 +263,146 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
 
                 {/* Main Media Display */}
                 <div className="media-display-area">
-                    <div className="media-container">
-                        {currentMedia?.type === 'image' && (
-                            <div className="media-stage">
-                                <img
-                                    src={currentMediaUrl}
-                                    alt={currentMedia?.name || 'media'}
-                                    className="media-itemscl media-item--image"
-                                />
-                            </div>
-                        )}
+                    <Swiper
+                        spaceBetween={10}
+                        navigation={mediaItems.length > 1}
+                        thumbs={{ swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null }}
+                        modules={[Navigation, Thumbs]}
+                        className="main-media-swiper"
+                        onSwiper={(swiper) => {
+                            mainSwiperRef.current = swiper;
+                        }}
+                        onSlideChange={(swiper) => setCurrentIndex(swiper.activeIndex)}
+                    >
+                        {mediaItems.map((item, index) => {
+                            const url = item.url || item.preview || item.file?.preview || '';
+                            return (
+                                <SwiperSlide key={item.id}>
+                                    <div className="media-container">
+                                        {item.type === 'image' && (
+                                            <div className="media-stage">
+                                                <img
+                                                    src={url}
+                                                    alt={item.name || 'media'}
+                                                    className="media-itemscl media-item--image"
+                                                />
+                                            </div>
+                                        )}
 
-                        {currentMedia?.type === 'video' && (
-                            <div className="media-stage">
-                                <video src={currentMediaUrl} className="media-itemscl media-item--video" controls />
-                            </div>
-                        )}
-                        {currentMedia?.type === 'file' && (
-                            <>
-                                {((currentMedia?.name || currentMedia?.file?.name || '').toLowerCase()).endsWith('.pdf') ? (
-                                    <div className="no-preview-container">
-                                        <div className="file-icon">
-                                            <img src="./pdf.png" alt="Pdf" style={{ height: "100px", width: "100%" }} />
-                                        </div>
-                                        <div className="file-name">{currentMedia?.name || currentMedia?.file?.name}</div>
-                                        <div className="file-meta">
-                                            {currentFileMeta.sizeText} · {currentFileMeta.extText}
-                                        </div>
-                                        <div className="no-preview-text">No preview available</div>
-                                    </div>
-                                ) : ((currentMedia?.name || currentMedia?.file?.name || '').toLowerCase()).endsWith('.doc') || ((currentMedia?.name || currentMedia?.file?.name || '').toLowerCase()).endsWith('.docx') ? (
-                                    <div className="file-preview-docx">
-                                        <WordPreview fileObject={currentMedia.file} />
-                                    </div>
-                                ) : ((currentMedia?.name || currentMedia?.file?.name || '').toLowerCase()).endsWith('.xls') || ((currentMedia?.name || currentMedia?.file?.name || '').toLowerCase()).endsWith('.xlsx') || ((currentMedia?.name || currentMedia?.file?.name || '').toLowerCase()).endsWith('.csv') ? (
-                                    <div className="no-preview-container">
-                                        <div className="file-icon">
-                                            <img src="./xls.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
-                                        </div>
-                                        <div className="file-name">{currentMedia?.name || currentMedia?.file?.name}</div>
-                                        <div className="file-meta">
-                                            {currentFileMeta.sizeText} · {currentFileMeta.extText}
-                                        </div>
-                                        <div className="no-preview-text">No preview available</div>
-                                    </div>
-                                ) : ((currentMedia?.name || currentMedia?.file?.name || '').toLowerCase()).endsWith('.txt') ? (
-                                    <div className="file-preview-text">
-                                        {textPreviewError ? (
-                                            <div className="no-preview-text">{textPreviewError}</div>
-                                        ) : (
-                                            <pre className="text-preview-pre">{textPreview}</pre>
+                                        {item.type === 'video' && (
+                                            <div className="media-stage">
+                                                <video src={url} className="media-itemscl media-item--video" controls />
+                                            </div>
+                                        )}
+
+                                        {item.type === 'file' && (
+                                            <>
+                                                {((item.name || item.file?.name || '').toLowerCase()).endsWith('.pdf') ? (
+                                                    <div className="no-preview-container">
+                                                        <div className="file-icon">
+                                                            <img src="./pdf.png" alt="Pdf" style={{ height: "100px", width: "100%" }} />
+                                                        </div>
+                                                        <div className="file-name">{item.name || item.file?.name}</div>
+                                                        <div className="file-meta">
+                                                            {currentFileMeta.sizeText} · {currentFileMeta.extText}
+                                                        </div>
+                                                        <div className="no-preview-text">No preview available</div>
+                                                    </div>
+                                                ) : ((item.name || item.file?.name || '').toLowerCase()).endsWith('.doc') || ((item.name || item.file?.name || '').toLowerCase()).endsWith('.docx') ? (
+                                                    <div className="file-preview-docx">
+                                                        <WordPreview fileObject={item.file} />
+                                                    </div>
+                                                ) : ((item.name || item.file?.name || '').toLowerCase()).endsWith('.xls') || ((item.name || item.file?.name || '').toLowerCase()).endsWith('.xlsx') || ((item.name || item.file?.name || '').toLowerCase()).endsWith('.csv') ? (
+                                                    <div className="no-preview-container">
+                                                        <div className="file-icon">
+                                                            <img src="./xls.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
+                                                        </div>
+                                                        <div className="file-name">{item.name || item.file?.name}</div>
+                                                        <div className="file-meta">
+                                                            {currentFileMeta.sizeText} · {currentFileMeta.extText}
+                                                        </div>
+                                                        <div className="no-preview-text">No preview available</div>
+                                                    </div>
+                                                ) : ((item.name || item.file?.name || '').toLowerCase()).endsWith('.txt') ? (
+                                                    <div className="file-preview-text">
+                                                        {textPreviewError ? (
+                                                            <div className="no-preview-text">{textPreviewError}</div>
+                                                        ) : (
+                                                            <pre className="text-preview-pre">{textPreview}</pre>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="file-placeholder">
+                                                        <span>Preview not available for {item.name || item.file?.name}</span>
+                                                    </div>
+                                                )}
+                                            </>
                                         )}
                                     </div>
-                                ) : (
-                                    <div className="file-placeholder">
-                                        <span>Preview not available for {currentMedia?.name || currentMedia?.file?.name}</span>
-                                    </div>
-                                )}
-                            </>
-                        )}
-
-                    </div>
+                                </SwiperSlide>
+                            );
+                        })}
+                    </Swiper>
                 </div>
 
                 {/* Thumbnails */}
                 {mediaItems.length > 0 && (
                     <div className="thumbnails-container">
-                        {mediaItems.map((item, index) => {
-                            const mime = getMime(item.file); // e.g. "application/pdf"
-                            const name = (item.name || getAnyName(item.file) || '').toLowerCase();
-                            let thumbSrc = "./txt.png";
-                            const ext = getExtLower(item.name || getAnyName(item.file));
-                            const isPhotoThumb = mime.startsWith('image') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'tif', 'tiff', 'ico'].includes(ext);
-
-                            if (mime.startsWith('image') || isPhotoThumb) {
-                                thumbSrc = item.url || item.file.preview;
-                            } else if (mime.startsWith('video')) {
-                                thumbSrc = "./video.png";
-                            } else if (name.endsWith('.pdf')) {
-                                thumbSrc = "./pdf.png";
-                            } else if (name.endsWith('.doc') || name.endsWith('.docx')) {
-                                thumbSrc = "./doc.png";
-                            } else if (name.endsWith('.xls') || name.endsWith('.xlsx') || name.endsWith('.csv')) {
-                                thumbSrc = "./xls.png";
-                            } else if (name.endsWith('.txt')) {
-                                thumbSrc = "./txt.png";
-                            }
-
-                            return (
-                                <div
-                                    key={item.id}
-                                    className={`thumbnail ${index === currentIndex ? "active" : ""}`}
-                                    onClick={() => setCurrentIndex(index)}
+                        {/* Thumbnails */}
+                        {mediaItems.length > 0 && (
+                            <div className="thumbnails-container">
+                                <Swiper
+                                    onSwiper={setThumbsSwiper}
+                                    spaceBetween={8}
+                                    slidesPerView={"auto"}
+                                    freeMode={true}
+                                    watchSlidesProgress={true}
+                                    modules={[FreeMode, Navigation, Thumbs]}
+                                    className="thumbnails-swiper"
                                 >
-                                    <img src={thumbSrc} alt={item.name} className={`thumbnail-img ${isPhotoThumb ? 'is-photo' : 'is-icon'}`} />
-                                    <button
-                                        className="remove-thumbnail"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            removeMedia(item.id);
-                                        }}
-                                    >
-                                        <X size={18} color="white" />
-                                    </button>
-                                </div>
-                            );
-                        })}
+                                    {mediaItems.map((item, index) => {
+                                        const mime = getMime(item.file);
+                                        const name = (item.name || getAnyName(item.file) || '').toLowerCase();
+                                        let thumbSrc = "./txt.png";
+                                        const ext = getExtLower(item.name || getAnyName(item.file));
+                                        const isPhotoThumb = mime.startsWith('image') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'tif', 'tiff', 'ico'].includes(ext);
+
+                                        if (mime.startsWith('image') || isPhotoThumb) {
+                                            thumbSrc = item.url || item.file.preview;
+                                        } else if (mime.startsWith('video')) {
+                                            thumbSrc = "./video.png";
+                                        } else if (name.endsWith('.pdf')) {
+                                            thumbSrc = "./pdf.png";
+                                        } else if (name.endsWith('.doc') || name.endsWith('.docx')) {
+                                            thumbSrc = "./doc.png";
+                                        } else if (name.endsWith('.xls') || name.endsWith('.xlsx') || name.endsWith('.csv')) {
+                                            thumbSrc = "./xls.png";
+                                        } else if (name.endsWith('.txt')) {
+                                            thumbSrc = "./txt.png";
+                                        }
+
+                                        return (
+                                            <SwiperSlide key={item.id} style={{ width: 'auto' }}>
+                                                <div
+                                                    className={`thumbnail ${index === currentIndex ? "active" : ""}`}
+                                                >
+                                                    <img src={thumbSrc} alt={item.name} className={`thumbnail-img ${isPhotoThumb ? 'is-photo' : 'is-icon'}`} />
+                                                    <button
+                                                        className="remove-thumbnail"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            removeMedia(item.id);
+                                                        }}
+                                                    >
+                                                        <X size={18} color="white" />
+                                                    </button>
+                                                </div>
+                                            </SwiperSlide>
+                                        );
+                                    })}
+                                </Swiper>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

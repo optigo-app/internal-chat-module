@@ -166,7 +166,7 @@ const LoginPage1 = () => {
                 setAuth(updatedUserData);
                 setFormError("");
                 toast.success("Login successful! Welcome back!", { icon: "🎉" });
-                navigate("/");
+                navigate("/", { replace: true });
                 setIsLoading(false);
             });
 

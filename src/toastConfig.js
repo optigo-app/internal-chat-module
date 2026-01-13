@@ -1,26 +1,28 @@
 export const toastConfig = {
     position: "top-right",
     toastOptions: {
-        duration: 2500,
+        duration: 3500,
         style: {
-            background: '#ffffff',
-            color: '#374151',
-            borderRadius: '12px',
-            padding: '16px',
-            fontSize: '16px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            color: '#111827',
+            borderRadius: '16px',
+            padding: '12px 20px',
+            fontSize: '14px',
             fontWeight: '500',
-            border: '1px solid #e5e7eb',
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+            border: '1px solid rgba(229, 231, 235, 0.8)',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            backdropFilter: 'blur(8px)',
+            maxWidth: '400px',
         },
         success: {
             style: {
-                background: '#f0fdf4',
-                color: '#166534',
-                border: '1px solid #bbf7d0',
+                background: '#ecfdf5',
+                color: '#065f46',
+                border: '1px solid #a7f3d0',
             },
             iconTheme: {
-                primary: '#16a34a',
-                secondary: '#f0fdf4',
+                primary: '#10b981',
+                secondary: '#ecfdf5',
             },
         },
         error: {
@@ -30,16 +32,16 @@ export const toastConfig = {
                 border: '1px solid #fecaca',
             },
             iconTheme: {
-                primary: '#dc2626',
+                primary: '#ef4444',
                 secondary: '#fef2f2',
             },
         },
         loading: {
             style: {
-                background: '#f0f4ff',
-                color: '#3730a3',
-                border: '1px solid #c7d2fe',
+                background: '#f9fafb',
+                color: '#374151',
+                border: '1px solid #e5e7eb',
             },
         },
     },
-}; 
+};

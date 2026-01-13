@@ -1,3 +1,4 @@
+import CryptoJS from "crypto-js";
 import { filesUploadApi } from "./filesUploadApi";
 
 export const uploadMediaAPi = async ({
@@ -8,7 +9,7 @@ export const uploadMediaAPi = async ({
   try {
     if (!Array.isArray(files) || files.length === 0) return [];
 
-    const uniqueNo = `${files?.[0]?.name?.split(".")?.[0]}_${Date.now()}` || `${Date.now()}`;
+    const uniqueNo = CryptoJS.lib.WordArray.random(16).toString();
 
     const res = await filesUploadApi({
       attachments: files.map((file) => ({ file })),

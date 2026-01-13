@@ -370,7 +370,11 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
                 )}
                 {item.type === 'video' && (
                   <div className="thumbnail-video">
-                    <div className="thumbnail-icon">🎬</div>
+                    <img
+                      src={`${process.env.PUBLIC_URL}/video.png`}
+                      alt="Video"
+                      className="thumbnail-video-icon"
+                    />
                   </div>
                 )}
                 {item.type === 'document' && (

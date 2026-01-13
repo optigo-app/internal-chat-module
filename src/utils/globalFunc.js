@@ -288,16 +288,19 @@ export const getDocumentMeta = (name = '') => {
     return { label: ext.toUpperCase() || 'FILE', tone: 'default', iconName: 'File', iconUrl: '/doc.png' };
 };
 
-
 export const validateMediaFiles = (files) => {
     const MAX_FILES = 30;
     const MAX_SIZE_MB = 100;
+    const MAX_TOTAL_SIZE_MB = 100;
     const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+    const MAX_TOTAL_BYTES = MAX_TOTAL_SIZE_MB * 1024 * 1024;
 
     const rawFiles = Array.from(files);
     const acceptedFiles = [];
     const skippedSize = [];
+    const skippedTotal = [];
     let skippedCount = 0;
+    let currentTotal = 0;
 
     for (const file of rawFiles) {
         if (acceptedFiles.length >= MAX_FILES) {
@@ -310,14 +313,22 @@ export const validateMediaFiles = (files) => {
             continue;
         }
 
+        if (currentTotal + file.size > MAX_TOTAL_BYTES) {
+            skippedTotal.push(file.name);
+            continue;
+        }
+
         acceptedFiles.push(file);
+        currentTotal += file.size;
     }
 
     return {
         acceptedFiles,
         skippedSize,
+        skippedTotal,
         skippedCount,
         totalFiles: rawFiles.length,
-        isLimitReached: rawFiles.length > MAX_FILES
+        isLimitReached: rawFiles.length > MAX_FILES,
+        totalSize: currentTotal
     };
 };
