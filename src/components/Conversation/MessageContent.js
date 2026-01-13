@@ -353,16 +353,17 @@ const MessageContent = ({
                                 return null;
                             })();
 
+                            const isSpecificItem = !!msg.ReplyToAttachmentId;
                             const computedReplyText = (() => {
                                 if (!original) return msg?.ReplyContextMsg;
                                 if (!isGenericReply) return msg?.ReplyContextMsg;
 
                                 if (originalType === 'image') {
-                                    const suffix = mediaCount > 1 ? `${mediaCount} Photos` : 'Photo';
+                                    const suffix = (mediaCount > 1 && !isSpecificItem) ? `${mediaCount} Photos` : 'Photo';
                                     return `Media ${suffix}`;
                                 }
                                 if (originalType === 'video') {
-                                    const suffix = mediaCount > 1 ? `${mediaCount} Videos` : 'Video';
+                                    const suffix = (mediaCount > 1 && !isSpecificItem) ? `${mediaCount} Videos` : 'Video';
                                     return `Media ${suffix}`;
                                 }
                                 if (originalType === 'document') return originalFileName || 'Document';
@@ -446,8 +447,8 @@ const MessageContent = ({
                                                 .filter(Boolean)
                                             : [replyMediaUrl];
 
-                                        const thumbsToShow = allThumbs.slice(0, 2);
-                                        const overflowCount = allThumbs.length - 2;
+                                        const thumbsToShow = isSpecificItem ? [replyMediaUrl] : allThumbs.slice(0, 2);
+                                        const overflowCount = isSpecificItem ? 0 : (allThumbs.length - 2);
 
                                         return (
                                             <Box

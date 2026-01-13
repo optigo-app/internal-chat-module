@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { LoginContext } from '../../context/LoginData'
 import CryptoJS from "crypto-js";
 
-const Sidebar = ({ onStatusSelect, selectedStatus, onTagSelect, selectedTag }) => {
+const Sidebar = () => {
 
     const location = useLocation();
     const [activePath, setActivePath] = useState(location.pathname);
@@ -58,6 +58,7 @@ const Sidebar = ({ onStatusSelect, selectedStatus, onTagSelect, selectedTag }) =
     const menuItems = [
         { type: "internal", path: "/", icon: <HomeIcon {...ICON_PROPS} />, label: "Inbox" },
         { type: "internal", path: "/add-conversation", icon: <Users {...ICON_PROPS} />, label: "Add Conversation" },
+        // { type: "internal", path: "/changelog", icon: <ListTodo {...ICON_PROPS} />, label: "Changelog" },
     ];
 
     useEffect(() => {

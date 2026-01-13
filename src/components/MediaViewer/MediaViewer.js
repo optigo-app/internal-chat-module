@@ -65,21 +65,26 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
       );
 
       if (isTypingTarget) return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.altKey) return;
 
+      const isCtrlOrMeta = e.ctrlKey || e.metaKey;
       const key = e.key;
       const code = e.code;
 
       if (key === '+' || key === '=' || code === 'NumpadAdd') {
-        e.preventDefault();
-        handleZoomIn();
-        return;
+        if (isCtrlOrMeta || !isCtrlOrMeta) { // Support both with and without Ctrl/Cmd
+          e.preventDefault();
+          handleZoomIn();
+          return;
+        }
       }
 
       if (key === '-' || code === 'NumpadSubtract') {
-        e.preventDefault();
-        handleZoomOut();
-        return;
+        if (isCtrlOrMeta || !isCtrlOrMeta) {
+          e.preventDefault();
+          handleZoomOut();
+          return;
+        }
       }
 
       if (key === '0' || code === 'Digit0' || code === 'Numpad0') {
@@ -213,6 +218,7 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
             onSlideChange={(swiper) => {
               const nextIndex = typeof swiper?.realIndex === 'number' ? swiper.realIndex : swiper.activeIndex;
               setCurrentIndex(nextIndex);
+              resetZoom();
             }}
             keyboard={{ enabled: true }}
             mousewheel={true}

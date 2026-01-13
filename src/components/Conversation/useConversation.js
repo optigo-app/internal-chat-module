@@ -1010,9 +1010,10 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             message?.mediaItems?.[0]?.fileName ||
             '';
 
+        const isSpecificItem = !!attachmentId;
         const fallbackLabel = (() => {
-            if (replyType === 'image') return mediaCount > 1 ? `${mediaCount} Photos` : 'Photo';
-            if (replyType === 'video') return mediaCount > 1 ? `${mediaCount} Videos` : 'Video';
+            if (replyType === 'image') return (mediaCount > 1 && !isSpecificItem) ? `${mediaCount} Photos` : 'Photo';
+            if (replyType === 'video') return (mediaCount > 1 && !isSpecificItem) ? `${mediaCount} Videos` : 'Video';
             if (replyType === 'document') return fileName || 'Document';
             return 'Media';
         })();

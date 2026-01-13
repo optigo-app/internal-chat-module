@@ -16,6 +16,7 @@ import { toastConfig } from './toastConfig';
 import { LoginContext } from './context/LoginData';
 import { registerSocketId } from './utils/socketHelper';
 import LoginExists from './components/LoginExists/LoginExists';
+import Changelog from './components/Changelog/Changelog';
 import Lottie from 'lottie-react';
 import loader from './assets/lotties/loader.json';
 import ChatHeader from './TestPage/ChatHeader';
@@ -289,6 +290,7 @@ function App() {
                     path="/"
                     element={<Home selectedStatus={selectedStatus} selectedTag={selectedTag} isConnected={isConnected} socketStatus={socketStatus} />}
                   />
+                  <Route path="/changelog" element={<Changelog />} />
                   <Route path="/add-conversation" element={<Customers />} />
                   <Route path="/notification" element={<Customers />} />
                   <Route path="/archieve" element={<Customers />} />
