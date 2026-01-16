@@ -29,6 +29,22 @@ const Customers = ({ selectedStatus, selectedTag }) => {
         setViewConversationRead(isRead);
     };
 
+    React.useEffect(() => {
+        const handleSelectConversation = (event) => {
+            const { conversationId } = event.detail;
+            if (!conversationId) return;
+
+            // Find the customer in the list and select them
+            const customer = converList.find(c => Number(c.ConversationId) === Number(conversationId));
+            if (customer) {
+                handleCustomerSelect(customer);
+            }
+        };
+
+        window.addEventListener('SELECT_CONVERSATION', handleSelectConversation);
+        return () => window.removeEventListener('SELECT_CONVERSATION', handleSelectConversation);
+    }, [converList]);
+
     return (
         <div className="customers-container">
             <div className="customers-layout">

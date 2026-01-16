@@ -3,8 +3,8 @@
 .forwardMessageMenu {
     position: fixed;
     z-index: 1400;
-    width: 320px;
-    max-height: 420px;
+    width: 360px;
+    max-height: 560px;
     background: #ffffff;
     border-radius: 20px;
     border: 1px solid $sidebar-borderColor;
@@ -13,6 +13,14 @@
     display: flex;
     flex-direction: column;
     font-family: $font-family;
+
+    &.isCentered {
+        position: fixed;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    }
 }
 
 .fm-header {
@@ -29,6 +37,10 @@
         align-items: center;
         gap: 8px;
         min-width: 0;
+
+        .fm-closeBtn {
+            margin-left: -6px;
+        }
 
         .fm-title {
             font-size: 0.9rem;
@@ -56,13 +68,12 @@
 }
 
 .fm-search {
-    padding: 10px 12px;
-    border-bottom: 1px solid $sidebar-borderColor;
+    padding: 10px 12px 8px;
 
     .MuiOutlinedInput-root {
-        border-radius: 20px;
+        border-radius: 999px;
         font-size: 0.875rem;
-        background: #ffffff;
+        background: rgba(0, 0, 0, 0.03);
 
         fieldset {
             border-color: $sidebar-borderColor;
@@ -77,6 +88,13 @@
             box-shadow: 0 0 0 3px rgba($primary-main, 0.12);
         }
     }
+}
+
+.fm-sectionTitle {
+    padding: 8px 14px 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: $secondaryColor;
 }
 
 .fm-selected {
@@ -202,9 +220,9 @@
 }
 
 .fm-contactItem {
-    height: 44px;
+    height: 64px;
     box-sizing: border-box;
-    padding: 6px 12px;
+    padding: 8px 10px;
     transition: background-color $transition-duration ease;
 
     &:hover {
@@ -212,25 +230,76 @@
     }
 
     &.isSelected {
-        background: rgba($primary-main, 0.10);
-        border-left: 3px solid $primary-main;
+        background: transparent;
+        border-left: none;
     }
 
     .MuiCheckbox-root {
         padding: 6px;
     }
+
+    .fm-rowCheckbox {
+        padding: 6px;
+        margin-left: -2px;
+        margin-right: 2px;
+    }
+
+    .MuiListItemText-root {
+        margin: 0;
+        min-width: 0;
+    }
+
+    .MuiListItemText-primary {
+        color: $titleColor;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .MuiListItemText-secondary {
+        color: $secondaryColor;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-top: 2px;
+    }
 }
 
 .fm-actions {
-    padding: 12px 16px;
+    padding: 10px 12px;
     border-top: 1px solid $sidebar-borderColor;
     display: flex;
+    align-items: center;
     gap: 10px;
-    justify-content: flex-end;
+    justify-content: space-between;
     background: #ffffff;
     position: sticky;
     bottom: 0;
-    z-index: 1;
+    z-index: 2;
+}
+
+.fm-selectedFooterText {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: $secondaryColor;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fm-sendFab {
+    width: 44px !important;
+    height: 44px !important;
+    background: $primary-main !important;
+    color: #ffffff !important;
+    border-radius: 999px !important;
+    box-shadow: 0 12px 26px rgba(17, 24, 39, 0.18) !important;
+
+    &:hover {
+        background: $button-color-hover !important;
+    }
 }
 
 .fm-sendBtn.Mui-disabled {

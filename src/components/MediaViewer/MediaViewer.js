@@ -21,9 +21,13 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
   });
   const swiperRef = useRef(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const draggingRef = useRef(false);
+  const startPosRef = useRef({ x: 0, y: 0 });
 
   const resetZoom = useCallback(() => {
     setZoomLevel(1);
+    setOffset({ x: 0, y: 0 });
   }, []);
 
   const pauseVideosInElement = useCallback((rootEl) => {
@@ -50,8 +54,32 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
   }, []);
 
   const handleZoomOut = useCallback(() => {
-    setZoomLevel((prev) => Math.max(prev - 0.2, 0.5));
+    setZoomLevel((prev) => {
+      const next = Math.max(prev - 0.2, 0.5);
+      if (next <= 1) setOffset({ x: 0, y: 0 });
+      return next;
+    });
   }, []);
+
+  const handlePointerDown = (e) => {
+    if (zoomLevel > 1) {
+      draggingRef.current = true;
+      startPosRef.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+  };
+
+  const handlePointerMove = (e) => {
+    if (draggingRef.current && zoomLevel > 1) {
+      const newX = e.clientX - startPosRef.current.x;
+      const newY = e.clientY - startPosRef.current.y;
+      setOffset({ x: newX, y: newY });
+    }
+  };
+
+  const handlePointerUp = () => {
+    draggingRef.current = false;
+  };
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -253,10 +281,15 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
                           className={`media-content ${slideLoading ? 'loading' : 'loaded'}`}
                           onLoad={() => markLoaded(index)}
                           onError={() => markLoaded(index)}
+                          onPointerDown={handlePointerDown}
+                          onPointerMove={handlePointerMove}
+                          onPointerUp={handlePointerUp}
                           style={{
                             display: slideLoading ? 'none' : 'block',
-                            transform: `scale(${zoomLevel})`,
-                            transition: 'transform 0.2s ease-in-out'
+                            transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoomLevel})`,
+                            transition: draggingRef.current ? 'none' : 'transform 0.2s ease-in-out',
+                            cursor: zoomLevel > 1 ? (draggingRef.current ? 'grabbing' : 'grab') : 'default',
+                            touchAction: 'none'
                           }}
                         />
                       </>
@@ -286,8 +319,15 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
                           onLoadedData={() => markLoaded(index)}
                           onCanPlay={() => markLoaded(index)}
                           onError={() => markLoaded(index)}
+                          onPointerDown={handlePointerDown}
+                          onPointerMove={handlePointerMove}
+                          onPointerUp={handlePointerUp}
                           style={{
-                            display: slideLoading ? 'none' : 'block'
+                            display: slideLoading ? 'none' : 'block',
+                            transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoomLevel})`,
+                            transition: draggingRef.current ? 'none' : 'transform 0.2s ease-in-out',
+                            cursor: zoomLevel > 1 ? (draggingRef.current ? 'grabbing' : 'grab') : 'default',
+                            touchAction: 'none'
                           }}
                         />
                       </>

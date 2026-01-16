@@ -32,6 +32,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const lastMessageIdRef = useRef(null);
     const lastConversationIdRef = useRef(null);
     const [showPicker, setShowPicker] = useState(false);
+    const [isForwardFromViewer, setIsForwardFromViewer] = useState(false);
     const emojiPickerRef = useRef(null);
     const [showScrollToBottom, setShowScrollToBottom] = useState(false);
     const { auth } = useContext(LoginContext);
@@ -590,6 +591,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                         setMediaViewerOpen(false);
                     }}
                     onForward={(event, attachmentId) => {
+                        setIsForwardFromViewer(true);
                         handleForward(mediaViewerMessage, event, attachmentId);
                         setMediaViewerOpen(false);
                     }}
@@ -733,7 +735,11 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 message={forwardMessage}
                 open={!!forwardAnchorEl && !!forwardMessage}
                 anchorEl={forwardAnchorEl}
-                onClose={handleCloseForward}
+                isCentered={isForwardFromViewer}
+                onClose={() => {
+                    setIsForwardFromViewer(false);
+                    handleCloseForward();
+                }}
                 onSend={handleSendForward}
             />
 

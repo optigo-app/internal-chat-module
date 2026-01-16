@@ -30,7 +30,6 @@ const LoginPage1 = () => {
     const isMobile = useMediaQuery("(max-width:600px)");
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
-    const [isBtnShow, setIsBtnShow] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [credentials, setCredentials] = useState({ companycode: "", userId: "", password: "" });
     const [errors, setErrors] = useState({});
@@ -56,19 +55,16 @@ const LoginPage1 = () => {
                 if (token?.rd?.[0]?.stat === 0) {
                     setErrors(newErrors => ({ ...newErrors, companycode: "Invalid company code" }));
                     setToken({
-                        sv: "", // Convert to string if needed
+                        sv: "",
                         yc: "",
                     });
                     sessionStorage.setItem("token", JSON.stringify(token));
                     return false;
                 }
                 else if (token?.rd?.[0]?.stat === 1) {
-                    setIsBtnShow(true)
-
-                    // Fix: Set the token with the correct structure
                     const tokenData = token.rd[0];
                     setToken({
-                        sv: tokenData.sv.toString(), // Convert to string if needed
+                        sv: tokenData.sv.toString(),
                         yc: tokenData.yc || "",
                     });
 
@@ -79,8 +75,6 @@ const LoginPage1 = () => {
                 console.error("Error in handleCompanyCodeBlur:", error);
                 setErrors(prev => ({ ...prev, companycode: "Error validating company code" }));
                 return false;
-            } finally {
-                setIsBtnShow(false);
             }
         }
 

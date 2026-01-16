@@ -3,7 +3,7 @@ import { toast } from 'react-hot-toast';
 /**
  * Modern Centralized Toast Utility
  * @param {string} message - The message to display
- * @param {('success'|'error'|'warning'|'info'|'loading')} type - Type of toast
+ * @param {('success'|'error'|'warning'|'info'|'loading'|'notification')} type - Type of toast
  * @param {object} options - Optional react-hot-toast options (e.g. id, duration)
  */
 export const showToast = (message, type = 'info', options = {}) => {

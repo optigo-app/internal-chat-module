@@ -11,10 +11,13 @@ import Sidebar from './components/Siderbar/Sidebar';
 import CustomerDetails from './components/CustomerDetails/CustomerDetails';
 import { TagsProvider } from './contexts/TagsContexts';
 import { ArchieveProvider } from './contexts/ArchieveContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import { disconnectSocket, initializeSocket, isSocketConnected } from './socket';
 import { toastConfig } from './toastConfig';
 import { LoginContext } from './context/LoginData';
 import { registerSocketId } from './utils/socketHelper';
+import { notify } from './utils/notificationTemplates';
+import { unlockAudio } from './utils/sound';
 import LoginExists from './components/LoginExists/LoginExists';
 import Changelog from './components/Changelog/Changelog';
 import Lottie from 'lottie-react';
@@ -162,9 +165,7 @@ function App() {
           navigate('/login');
 
           // Show a message to the user
-          toast.error('Your session has been logged out from another device', {
-            duration: 3000,
-          });
+          notify({}, 'SESSION_LOGOUT');
         };
 
         /** ❌ On error */
@@ -239,9 +240,13 @@ function App() {
     return () => clearTimeout(timeout);
   }, [navigate]);
 
+  useEffect(() => {
+    window.addEventListener('click', unlockAudio, { once: true });
+    return () => window.removeEventListener('click', unlockAudio);
+  }, []);
 
   return (
-    <>
+    <NotificationProvider>
       <Toaster {...toastConfig} />
       {isSyncing && (
         <Box
@@ -301,7 +306,7 @@ function App() {
           />
         </Routes>
       </div>
-    </>
+    </NotificationProvider>
   );
 }
 

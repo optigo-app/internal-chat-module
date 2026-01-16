@@ -966,6 +966,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                         ...(!selectedCustomer?.ReceiverId
                             ? { ConversationName: auth?.username || auth?.userId }
                             : {}),
+                        RecieverName: auth?.username || auth?.userId,
                         ...(replySnapshot && replyToMessageId
                             ? {
                                 ContextType: 2,

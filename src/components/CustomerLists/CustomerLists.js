@@ -30,6 +30,7 @@ import { getMessagePreview, processApiResponse, getCustomerListMenuItems } from 
 import { updateConversationApi } from '../../API/SendMessage/updateConversationApi';
 import { addInternalMessageHandler, addInternalStatusHandler } from '../../socket';
 import { Helmet } from 'react-helmet-async';
+import { notify } from '../../utils/notificationTemplates';
 
 const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, selectedStatus = 'All', selectedTag = 'All', isConversationRead = false, viewConversationRead = false, onConversationList = () => { } }) => {
     const location = useLocation();
@@ -190,10 +191,12 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     incoming?.UserName ??
                     incoming?.name ??
                     incoming?.DisplayEmail ??
+                    incoming?.RecieverName ??
                     ''
                 ).trim();
                 return candidate || getCustomerDisplayName(incoming);
             })();
+
 
             const updatedData = [...prev.data];
             const index = updatedData.findIndex(
@@ -224,6 +227,23 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             const isOpenConversation =
                 Number(selectedConversationIdRef.current) === Number(conversationId) &&
                 Boolean(isConversationReadingRef.current);
+
+            // Trigger notification if it's a new incoming message and conversation is not active/focused
+            const isWindowFocused = document.hasFocus();
+            const shouldNotify = !isOutgoing && !isStatusChange && (!isOpenConversation || !isWindowFocused);
+
+            if (shouldNotify) {
+                notify(
+                    {
+                        senderName: resolvedName,
+                        message: messagePreviewText,
+                        conversationId: conversationId,
+                        tag: `msg-${conversationId}`, // Deduplication tag
+                        ...incoming
+                    },
+                    "NEW_MESSAGE"
+                );
+            }
 
             const nextUnreadCount = (currentCount) => {
                 if (isStatusChange) return currentCount;
