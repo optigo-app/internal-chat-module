@@ -1,0 +1,55 @@
+.drag-drop-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(115, 103, 240, 0.08); // Very light project primary
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0;
+    transform: translateY(100%);
+    visibility: hidden;
+    border: 2px dashed #7367f0; // Project Primary
+    margin: 16px;
+    border-radius: 16px;
+    backdrop-filter: blur(8px);
+
+    &.visible {
+        opacity: 1;
+        transform: translateY(0);
+        visibility: visible;
+    }
+
+    .overlay-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+
+        .upload-icon {
+            width: 50px;
+            height: 50px;
+            margin-bottom: 24px;
+            color: #7367f0; // Project Primary
+            filter: drop-shadow(0 4px 12px rgba(115, 103, 240, 0.3));
+        }
+
+        .overlay-text {
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #444050; // $titleColor from global.scss
+        }
+
+        .overlay-subtext {
+            color: #6D6B77; // $text2ndColor from global.scss
+            font-size: 1.1rem;
+            max-width: 300px;
+            line-height: 1.5;
+        }
+    }
+}

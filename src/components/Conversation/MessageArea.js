@@ -3,6 +3,7 @@ import { Box, CircularProgress, Typography } from '@mui/material';
 import MediaPreview from '../MediaPreview/MediaPreview';
 import MessageItem from './MessageItem';
 import ScrollToBottomButton from './ScrollToBottomButton';
+import DragDropOverlay from '../DragDropOverlay/DragDropOverlay';
 
 const MessageArea = ({
     auth,
@@ -35,11 +36,15 @@ const MessageArea = ({
     handleRemoveReaction,
     isSwitchingConversation,
     replyToMessage,
-    handleForward
+    handleForward,
+    processFiles,
+    captureMessageScrollState
 }) => {
     const [hoveredMessageId, setHoveredMessageId] = useState(null);
     const [reactionMenuAnchorEl, setReactionMenuAnchorEl] = useState(null);
     const [reactionMenuMessageId, setReactionMenuMessageId] = useState(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const dragCounter = useRef(0);
     const messagesEndRef = useRef(null);
 
     const isMediaPreviewOpen = (mediaFiles?.length || 0) > 0;
@@ -74,9 +79,59 @@ const MessageArea = ({
         return getMessageStatusIconProp ? getMessageStatusIconProp(msg) : null;
     }, [getMessageStatusIconProp]);
 
+    const handleDragEnter = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragCounter.current++;
+        if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+            setIsDragging(true);
+        }
+    }, []);
+
+    const handleDragLeave = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragCounter.current--;
+        if (dragCounter.current === 0) {
+            setIsDragging(false);
+        }
+    }, []);
+
+    const handleDragOver = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    }, []);
+
+    const handleDrop = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        dragCounter.current = 0;
+
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const files = Array.from(e.dataTransfer.files);
+            if (captureMessageScrollState) captureMessageScrollState();
+            if (processFiles) processFiles(files);
+            e.dataTransfer.clearData();
+        }
+    }, [processFiles, captureMessageScrollState]);
+
+    const handlePaste = useCallback((e) => {
+        if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+            const files = Array.from(e.clipboardData.files);
+            if (captureMessageScrollState) captureMessageScrollState();
+            if (processFiles) processFiles(files);
+        }
+    }, [processFiles, captureMessageScrollState]);
+
     return (
         <div
             className="messages-area"
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onPaste={handlePaste}
             style={{
                 position: "relative",
                 ...(showMedia && {
@@ -103,6 +158,7 @@ const MessageArea = ({
                 });
             }}
         >
+            <DragDropOverlay isDragging={isDragging} />
             {loading ? (
                 <Box
                     sx={{

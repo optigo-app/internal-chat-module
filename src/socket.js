@@ -1,18 +1,15 @@
 import { io } from 'socket.io-client';
 
-// Socket server configuration
-const SOCKET_URLS = {
-    production: 'http://newnextjs.web',
-    development: 'http://newnextjs.web',
-};
+const isLocal = ["localhost", "nzen", 'tecochat.web', 'web'].includes(window.location.hostname);
+
+// Base URLs
+const API_SOCKETBASE_URL = isLocal
+    ? "http://newnextjs.web"
+    : "https://apilx.optigoapps.com";
 
 // Pick correct URL
 const getSocketURL = () => {
-    const url = process.env.NODE_ENV == 'production'
-        ? SOCKET_URLS.production
-        : SOCKET_URLS.development;
-    // console.log("🔗 getSocketURL ->", url);
-    return url;
+    return API_SOCKETBASE_URL;
 };
 
 // Socket state

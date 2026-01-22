@@ -309,8 +309,15 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                                         <div className="no-preview-text">No preview available</div>
                                                     </div>
                                                 ) : ((item.name || item.file?.name || '').toLowerCase()).endsWith('.doc') || ((item.name || item.file?.name || '').toLowerCase()).endsWith('.docx') ? (
-                                                    <div className="file-preview-docx">
-                                                        <WordPreview fileObject={item.file} />
+                                                    <div className="no-preview-container">
+                                                        <div className="file-icon">
+                                                            <img src="./doc.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
+                                                        </div>
+                                                        <div className="file-name">{item.name || item.file?.name}</div>
+                                                        <div className="file-meta">
+                                                            {currentFileMeta.sizeText} · {currentFileMeta.extText}
+                                                        </div>
+                                                        <div className="no-preview-text">No preview available</div>
                                                     </div>
                                                 ) : ((item.name || item.file?.name || '').toLowerCase()).endsWith('.xls') || ((item.name || item.file?.name || '').toLowerCase()).endsWith('.xlsx') || ((item.name || item.file?.name || '').toLowerCase()).endsWith('.csv') ? (
                                                     <div className="no-preview-container">
@@ -324,12 +331,15 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                                         <div className="no-preview-text">No preview available</div>
                                                     </div>
                                                 ) : ((item.name || item.file?.name || '').toLowerCase()).endsWith('.txt') ? (
-                                                    <div className="file-preview-text">
-                                                        {textPreviewError ? (
-                                                            <div className="no-preview-text">{textPreviewError}</div>
-                                                        ) : (
-                                                            <pre className="text-preview-pre">{textPreview}</pre>
-                                                        )}
+                                                    <div className="no-preview-container">
+                                                        <div className="file-icon">
+                                                            <img src="./txt.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
+                                                        </div>
+                                                        <div className="file-name">{item.name || item.file?.name}</div>
+                                                        <div className="file-meta">
+                                                            {currentFileMeta.sizeText} · {currentFileMeta.extText}
+                                                        </div>
+                                                        <div className="no-preview-text">No preview available</div>
                                                     </div>
                                                 ) : (
                                                     <div className="file-placeholder">

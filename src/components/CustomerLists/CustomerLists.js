@@ -31,6 +31,7 @@ import { updateConversationApi } from '../../API/SendMessage/updateConversationA
 import { addInternalMessageHandler, addInternalStatusHandler } from '../../socket';
 import { Helmet } from 'react-helmet-async';
 import { notify } from '../../utils/notificationTemplates';
+import NotificationPermissionBar from '../_ui/NotificationPermissionBar';
 
 const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, selectedStatus = 'All', selectedTag = 'All', isConversationRead = false, viewConversationRead = false, onConversationList = () => { } }) => {
     const location = useLocation();
@@ -262,9 +263,12 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 const currentChat = updatedData[index];
                 const currentUnread = currentChat.unreadCount ?? currentChat.UnreadCount ?? 0;
 
-                const isSameMessage =
-                    currentChat.lastMessageText === messagePreviewText &&
-                    currentChat.lastMessageTime === formattedTime;
+                const incomingId = incoming?.MessageId ?? incoming?.Id;
+                const isSameMessage = incomingId
+                    ? (String(incomingId) === String(currentChat.LastMessageId))
+                    : (currentChat.lastMessageText === messagePreviewText &&
+                        currentChat.lastMessageTime === formattedTime);
+
                 if (isSameMessage && !isStatusChange) {
                     return prev;
                 }
@@ -296,6 +300,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     LastMessageType: mapMessageTypeToCode(normalizedType),
                     LastMessageStatus: incoming?.MessageStatus ?? incoming?.Status ?? incoming?.status ?? currentChat.LastMessageStatus,
                     LastMessageDirection: normalizedDirection,
+                    LastMessageId: incomingId || currentChat.LastMessageId,
                 };
 
                 updatedData[index] = updatedChat;
@@ -315,6 +320,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     LastMessageType: mapMessageTypeToCode(normalizedType),
                     LastMessageStatus: incoming?.MessageStatus ?? incoming?.Status ?? incoming?.status,
                     LastMessageDirection: normalizedDirection,
+                    LastMessageId: incoming?.MessageId ?? incoming?.Id,
                     ReceiverId: incoming?.ReceiverId,
                     avatar: null,
                     avatarConfig: getWhatsAppAvatarConfig(avatarSeed),
@@ -553,6 +559,8 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     onClick={() => navigate('/archieve')}
                 />
             </Box>
+
+            <NotificationPermissionBar />
 
             {/* Search Input */}
             <Box className="customer_lists_search">

@@ -38,7 +38,7 @@ export const LoginData = ({ children }) => {
                     username: parsed?.username || "",
                     ukey: parsed?.ukey || "",
                     token: parsed?.token || "",
-                    id: parsed?.id,
+                    id: parsed?.id || "",
                     ufcc: parsed?.ufcc || parsed?.companycode || ""
                 };
             }

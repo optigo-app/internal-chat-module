@@ -623,9 +623,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         setShowMedia((prev) => !prev);
     };
 
-    const handleFileChange = async (e) => {
-        const files = Array.from(e.target.files);
-        if (files.length === 0) return;
+    const processFiles = useCallback(async (files) => {
+        if (!files || files.length === 0) return;
 
         const validation = validateMediaFiles(files);
         const { acceptedFiles, skippedSize, skippedTotal, skippedCount } = validation;
@@ -668,6 +667,11 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         });
 
         setUploadProgress(prev => ({ ...prev, ...progressUpdates }));
+    }, []);
+
+    const handleFileChange = async (e) => {
+        const files = Array.from(e.target.files);
+        await processFiles(files);
     };
 
     const handleMediaClick = (message, index) => {
@@ -1277,6 +1281,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         markLoaded,
         handleAttachClick,
         handleFileChange,
+        processFiles,
         handleMediaClick,
         handleClosePreview,
         handleSendMessage,

@@ -1,41 +1,46 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { showToast } from "../utils/toastHelper";
+import LOGO_ICON from "../assets/logoB.png";
 
 const NotificationContext = createContext();
 
-const LOGO_ICON = "/src/assets/logo.png";
-
 export const NotificationProvider = ({ children }) => {
     const [enabledOpen, setEnabledOpen] = useState(false);
+    const [showGuide, setShowGuide] = useState(false);
+    const [permissionStatus, setPermissionStatus] = useState(
+        typeof window !== "undefined" ? Notification.permission : "default"
+    );
 
     useEffect(() => {
         if (typeof window === "undefined" || !("Notification" in window)) return;
 
         if (Notification.permission === "granted") {
             setEnabledOpen(true);
-        } else if (Notification.permission === "default") {
-            // WhatsApp Web behavior: Prompt for native permission shortly after load
-            // This ensures the native browser prompt is shown directly without custom UI masking it
-            const t = setTimeout(() => {
-                Notification.requestPermission().then(status => {
-                    if (status === "granted") setEnabledOpen(true);
-                });
-            }, 2000);
-            return () => clearTimeout(t);
         }
+        setPermissionStatus(Notification.permission);
     }, []);
 
     const requestPermission = async () => {
         if (typeof window === "undefined" || !("Notification" in window)) return;
 
+        if (Notification.permission === 'default') {
+            setShowGuide(true);
+        } else {
+            // If already blocked or granted, don't show guide, just try to request (browser will handle)
+            executeNativeRequest();
+        }
+    };
+
+    const executeNativeRequest = async () => {
         try {
             const status = await Notification.requestPermission();
+            setPermissionStatus(status);
+            setShowGuide(false);
 
             if (status === "granted") {
                 setEnabledOpen(true);
                 showToast("Notifications enabled!", "success");
 
-                // Test notification
                 new Notification("Notifications enabled!", {
                     body: "You'll receive real-time updates.",
                     icon: LOGO_ICON
@@ -45,6 +50,7 @@ export const NotificationProvider = ({ children }) => {
             }
         } catch (error) {
             console.error("Error requesting notification permission:", error);
+            setShowGuide(false);
         }
     };
 
@@ -52,8 +58,12 @@ export const NotificationProvider = ({ children }) => {
         <NotificationContext.Provider
             value={{
                 enabledOpen,
+                permissionStatus,
+                showGuide,
                 setEnabledOpen,
+                setShowGuide,
                 requestPermission,
+                executeNativeRequest,
             }}
         >
             {children}

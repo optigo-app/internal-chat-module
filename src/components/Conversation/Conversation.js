@@ -89,6 +89,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         handleSendForward,
         scrollToMessage,
         getMessageStatusIcon,
+        processFiles,
     } = useConversation(selectedCustomer, onConversationRead, onViewConversationRead);
 
     useEffect(() => {
@@ -666,6 +667,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                         handleRemoveReaction={handleRemoveReactionAction}
                         replyToMessage={replyToMessage}
                         isSwitchingConversation={isSwitchingConversation}
+                        processFiles={processFiles}
+                        captureMessageScrollState={captureMessageScrollState}
                     />
 
                     <ChatBox

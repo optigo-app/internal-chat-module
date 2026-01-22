@@ -23,6 +23,7 @@ import Changelog from './components/Changelog/Changelog';
 import Lottie from 'lottie-react';
 import loader from './assets/lotties/loader.json';
 import ChatHeader from './TestPage/ChatHeader';
+import NotificationPermissionModal from './components/_ui/NotificationPermissionModal';
 
 const PagenotFound = () => <div>404 - Page Not Found</div>;
 
@@ -78,6 +79,7 @@ function App() {
   const [selectedTag, setSelectedTag] = useState('All');
   const [isConnected, setIsConnected] = useState(false);
   const [socketStatus, setSocketStatus] = useState('disconnected');
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -136,7 +138,22 @@ function App() {
         /** 🔗 On successful connection (also fires after reconnect) */
         const onConnect = async () => {
           if (!isMounted) return;
-          console.log('✅ Socket connected:', socket.id);
+          console.log(
+            '%cSocket Connected',
+            `
+  color: #685dd8;
+  font-size: 100px;
+  font-weight: bold;
+  `
+          );
+
+          console.log(
+            '%cSocket ID:%c %c' + socket.id,
+            'color:#685dd8;font-weight:bold;font-size:18px;',
+            'color:#0f172a;font-size:18px;',
+            'background:#808080;color:#fff;padding:4px 8px;border-radius:8px;font-size:18px;'
+          );
+
           await emitStoreSocketData();
           setIsConnected(true);
           setSocketStatus('connected');
@@ -220,7 +237,7 @@ function App() {
   }, [auth?.token, auth?.id, auth?.userId, auth?.ufcc, navigate]);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
+    const checkSession = () => {
       const isLoggedIn = sessionStorage.getItem('isLoggedIn');
       const userData = JSON.parse(sessionStorage.getItem('userData') || '{}');
       const hasExistingSocket = sessionStorage.getItem('hasSocketId');
@@ -229,15 +246,19 @@ function App() {
         if (hasExistingSocket) {
           navigate('/session-check');
         } else if (userData?.id) {
+          // If we have user data but notLoggedIn (maybe a stale session or partial load), 
+          // we might want to try to recover or just go to login.
+          // For now, let's stick to the existing logic but without the timeout.
           navigate('/');
         } else {
           disconnectSocket(true);
           navigate('/login');
         }
       }
-    }, 500);
+      setIsCheckingSession(false);
+    };
 
-    return () => clearTimeout(timeout);
+    checkSession();
   }, [navigate]);
 
   useEffect(() => {
@@ -248,6 +269,7 @@ function App() {
   return (
     <NotificationProvider>
       <Toaster {...toastConfig} />
+      <NotificationPermissionModal />
       {isSyncing && (
         <Box
           sx={{
@@ -284,24 +306,45 @@ function App() {
           <Route
             path="*"
             element={
-              <Layout
-                onStatusSelect={setSelectedStatus}
-                selectedStatus={selectedStatus}
-                onTagSelect={setSelectedTag}
-                selectedTag={selectedTag}
-              >
-                <Routes>
-                  <Route
-                    path="/"
-                    element={<Home selectedStatus={selectedStatus} selectedTag={selectedTag} isConnected={isConnected} socketStatus={socketStatus} />}
-                  />
-                  <Route path="/changelog" element={<Changelog />} />
-                  <Route path="/add-conversation" element={<Customers />} />
-                  <Route path="/notification" element={<Customers />} />
-                  <Route path="/archieve" element={<Customers />} />
-                  <Route path="*" element={<PagenotFound />} />
-                </Routes>
-              </Layout>
+              isCheckingSession ? (
+                <Box
+                  sx={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: '#fff',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 10000,
+                  }}
+                >
+                  <Box sx={{ width: 150, height: 150 }}>
+                    <Lottie animationData={loader} loop={true} />
+                  </Box>
+                </Box>
+              ) : (
+                <Layout
+                  onStatusSelect={setSelectedStatus}
+                  selectedStatus={selectedStatus}
+                  onTagSelect={setSelectedTag}
+                  selectedTag={selectedTag}
+                >
+                  <Routes>
+                    <Route
+                      path="/"
+                      element={<Home selectedStatus={selectedStatus} selectedTag={selectedTag} isConnected={isConnected} socketStatus={socketStatus} />}
+                    />
+                    <Route path="/changelog" element={<Changelog />} />
+                    <Route path="/add-conversation" element={<Customers />} />
+                    <Route path="/notification" element={<Customers />} />
+                    <Route path="/archieve" element={<Customers />} />
+                    <Route path="*" element={<PagenotFound />} />
+                  </Routes>
+                </Layout>
+              )
             }
           />
         </Routes>

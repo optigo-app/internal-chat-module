@@ -82,6 +82,7 @@ export const processApiResponse = (apiData) => {
       ...conversation,
       ConversationId: conversation.ConversationId ?? conversation.Id,
       ReceiverId: conversation.ReceiverId ?? "",
+      LastMessageId: conversation.LastMessageId ?? conversation.MessageId ?? "", // Store the ID of the last message
       lastMessage: preview.node,
       lastMessageText: preview.text,
       lastMessageTimeValue,

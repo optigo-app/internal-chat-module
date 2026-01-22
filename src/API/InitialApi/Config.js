@@ -3,11 +3,11 @@ const isLocal = ["localhost", "nzen", 'tecochat.web', 'web'].includes(window.loc
 // Base URLs
 const API_BASE_URL = isLocal
     ? "http://newnextjs.web/api"
-    : "https://nxt27.optigoapps.com/api";
+    : "https://apilx.optigoapps.com/api";
 
 const WHATSAPP_BASE_URL = isLocal
     ? "http://newnextjs.web/api"
-    : "https://nxt27.optigoapps.com/api";
+    : "https://apilx.optigoapps.com/api";
 
 const MEDIA_BASE_URL =
     "https://crmapp.mpillarapi.com/api/meta/v19.0/622385334300738/Media/";

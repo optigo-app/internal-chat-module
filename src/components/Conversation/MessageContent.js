@@ -571,13 +571,21 @@ const MessageContent = ({
                                         <Box sx={{ display: "flex", alignItems: "center", lineHeight: 1 }}>
                                             {(() => {
                                                 const statusKey = getMessageStatusIcon(msg);
-                                                if (statusKey === 'sent') {
-                                                    return <CheckCheck size={18} style={{ marginLeft: 4, color: alpha(theme.palette.text.primary, 0.6) }} />;
-                                                }
-                                                if (statusKey === 'read') {
-                                                    return <CheckCheck size={18} style={{ marginLeft: 4, color: theme.palette.primary.blue }} />;
-                                                }
-                                                return null;
+                                                const isVisible = statusKey === 'sent' || statusKey === 'read';
+                                                const color = statusKey === 'read'
+                                                    ? theme.palette.primary.blue
+                                                    : alpha(theme.palette.text.primary, 0.6);
+
+                                                return (
+                                                    <CheckCheck
+                                                        size={18}
+                                                        style={{
+                                                            marginLeft: 4,
+                                                            color,
+                                                            visibility: isVisible ? 'visible' : 'hidden',
+                                                        }}
+                                                    />
+                                                );
                                             })()}
                                         </Box>
                                     )}
@@ -1072,7 +1080,6 @@ const MessageContent = ({
                         const { url: href, filename, fileName, mimeType, fileType } = itemProps;
                         const name = filename || fileName || 'Document';
                         const meta = getDocumentMeta(name);
-                        console.log("itemProps", itemProps)
 
                         // Map iconName to Lucide components
                         const IconMap = {
@@ -1141,7 +1148,6 @@ const MessageContent = ({
                                                 width: '100%',
                                                 height: '100%',
                                                 objectFit: 'contain',
-                                                filter: "grayscale(1)"
                                             }}
                                         />
                                     ) : (
@@ -1290,13 +1296,21 @@ const MessageContent = ({
                             <Box sx={{ display: "flex", alignItems: "center", lineHeight: 1 }}>
                                 {(() => {
                                     const statusKey = getMessageStatusIcon(msg);
-                                    if (statusKey === 'sent') {
-                                        return <CheckCheck size={18} style={{ marginLeft: 4, color: alpha(theme.palette.text.primary, 0.6) }} />;
-                                    }
-                                    if (statusKey === 'read') {
-                                        return <CheckCheck size={18} style={{ marginLeft: 4, color: theme.palette.primary.blue }} />;
-                                    }
-                                    return null;
+                                    const isVisible = statusKey === 'sent' || statusKey === 'read';
+                                    const color = statusKey === 'read'
+                                        ? theme.palette.primary.blue
+                                        : alpha(theme.palette.text.primary, 0.6);
+
+                                    return (
+                                        <CheckCheck
+                                            size={18}
+                                            style={{
+                                                marginLeft: 4,
+                                                color,
+                                                visibility: isVisible ? 'visible' : 'hidden',
+                                            }}
+                                        />
+                                    );
                                 })()}
                             </Box>
                         )}
