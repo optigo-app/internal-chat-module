@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, CircularProgress, IconButton, Skeleton, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import { ChevronDown, Download, FileText, CheckCheck, Image as ImageIcon, Video as VideoIcon, Play, FileType, FileSpreadsheet, FileArchive, FileCode, Forward } from 'lucide-react';
+import { ChevronDown, Download, FileText, CheckCheck, Image as ImageIcon, Video as VideoIcon, Play, FileType, FileSpreadsheet, FileArchive, FileCode, Forward, ArrowBigDownDash, ArrowBigDown } from 'lucide-react';
 import { Emoji } from 'emoji-picker-react';
 import { FormatDateIST } from '../../utils/DateFnc';
 import DynamicTemplate from '../DynamicTemplate/DynamicTemplate';
@@ -1108,23 +1108,11 @@ const MessageContent = ({
                                     width: 350, // Fixed width for all document cards
                                     padding: '12px 16px',
                                     borderRadius: '12px',
-                                    backgroundColor: alpha(theme.palette.background.paper, 0.2),
+                                    backgroundColor: msg.Direction == 1 ? alpha(theme.palette.background.default, 0.2) : theme.palette.background.default,
                                     backdropFilter: 'blur(1px)',
                                     cursor: 'pointer',
                                     color: theme.palette.text.primary,
                                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        transform: 'translateY(-1px)',
-                                        boxShadow: `0 4px 12px ${alpha('#000', 0.08)}`,
-                                        borderColor: alpha(theme.palette.primary.main, 0.3),
-                                        '& .doc-icon-box': {
-                                            transform: 'scale(1.05)',
-                                        },
-                                        '& .doc-download-btn': {
-                                            opacity: 1,
-                                            transform: 'translateX(0)',
-                                        }
-                                    }
                                 }}
                             >
                                 <Box
@@ -1198,19 +1186,18 @@ const MessageContent = ({
                                     className="doc-download-btn"
                                     onClick={(e) => e.stopPropagation()}
                                     sx={{
-                                        color: theme.palette.text.secondary,
+                                        color: theme.palette.text.primary,
                                         flex: '0 0 auto',
                                         opacity: 0.6,
                                         transform: 'translateX(4px)',
                                         transition: 'all 0.2s ease',
-                                        '&:hover': {
-                                            color: theme.palette.primary.main,
-                                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                        }
+                                        border: '1px solid',
+                                        borderColor: theme.palette.text.primary,
+                                        borderRadius: '50%',
                                     }}
                                     title="Download"
                                 >
-                                    <Download size={20} />
+                                    <ArrowBigDown size={20} />
                                 </IconButton>
                             </Box>
                         );

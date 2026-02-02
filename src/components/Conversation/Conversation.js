@@ -178,7 +178,13 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     apiEmoji = "";
                 } else {
                     const filtered = currentReactions.filter(r => r.Direction !== 1);
-                    const newReaction = { Reaction: nextEmoji, Unified: nextUnified, Direction: 1 };
+                    const newReaction = {
+                        Reaction: nextEmoji,
+                        Unified: nextUnified,
+                        Direction: 1,
+                        UserName: auth?.username || auth?.UserName || auth?.name,
+                        UserId: auth?.id || auth?.userId
+                    };
                     updatedReactions = [...filtered, newReaction];
                     reactionPayload = JSON.stringify(updatedReactions);
                     apiEmoji = nextEmoji;
