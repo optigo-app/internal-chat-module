@@ -5,6 +5,7 @@ export const fetchConversationLists = async (
     pageSize = 50,
     auth,
     search = "",
+    signal = null,
     fLabel = "Chat ( List Conversation )"
 ) => {
     try {
@@ -16,7 +17,7 @@ export const fetchConversationLists = async (
         };
 
         const body = buildCommonBody("GetConversationList", auth, payload, fLabel);
-        const response = await CommonAPI(body);
+        const response = await CommonAPI(body, { signal });
         if (response?.Data) {
             return {
                 data: response?.Data || [],

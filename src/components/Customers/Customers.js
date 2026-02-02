@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import CustomerLists from '../CustomerLists/CustomerLists';
 import './Customers.scss';
 import { useLocation } from 'react-router-dom';
@@ -8,26 +8,29 @@ import Conversation from '../Conversation/Conversation';
 const Customers = ({ selectedStatus, selectedTag }) => {
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [converList, setConvList] = useState([]);
+    const converListRef = React.useRef([]);
     const [isConversationRead, setIsConversationRead] = useState(false);
     const [viewConversationRead, setViewConversationRead] = useState(false);
     const location = useLocation();
 
-    const handleCustomerSelect = (customer) => {
+    const handleCustomerSelect = useCallback((customer) => {
         setSelectedCustomer(customer);
         setIsConversationRead(false);
-    };
+    }, []);
 
-    const handleConversationRead = (isRead) => {
+    const handleConversationRead = useCallback((isRead) => {
         setIsConversationRead(isRead);
-    };
+    }, []);
 
-    const handleConversationList = (list) => {
-        setConvList(list);
-    };
+    const handleConversationList = useCallback((list) => {
+        const safeList = Array.isArray(list) ? list : [];
+        converListRef.current = safeList;
+        setConvList(safeList);
+    }, []);
 
-    const handleViewConversationRead = (isRead) => {
+    const handleViewConversationRead = useCallback((isRead) => {
         setViewConversationRead(isRead);
-    };
+    }, []);
 
     React.useEffect(() => {
         const handleSelectConversation = (event) => {
@@ -35,7 +38,8 @@ const Customers = ({ selectedStatus, selectedTag }) => {
             if (!conversationId) return;
 
             // Find the customer in the list and select them
-            const customer = converList.find(c => Number(c.ConversationId) === Number(conversationId));
+            const list = converListRef.current || [];
+            const customer = list.find(c => Number(c.ConversationId) === Number(conversationId));
             if (customer) {
                 handleCustomerSelect(customer);
             }
@@ -43,7 +47,7 @@ const Customers = ({ selectedStatus, selectedTag }) => {
 
         window.addEventListener('SELECT_CONVERSATION', handleSelectConversation);
         return () => window.removeEventListener('SELECT_CONVERSATION', handleSelectConversation);
-    }, [converList]);
+    }, []);
 
     return (
         <div className="customers-container">

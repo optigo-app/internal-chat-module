@@ -1,11 +1,12 @@
 import { useContext, useEffect, useState } from 'react'
 import './Sidebar.scss'
-import { HomeIcon, Users, MessageCircle } from 'lucide-react'
+import { HomeIcon, Users, MessageCircle, ChevronLeft } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { LoginContext } from '../../context/LoginData'
 import CryptoJS from "crypto-js";
+import { IconButton, Tooltip } from '@mui/material'
 
-const Sidebar = () => {
+const Sidebar = ({ isCollapsed = false, onCollapsedChange = () => { } }) => {
 
     const location = useLocation();
     const [activePath, setActivePath] = useState(location.pathname);
@@ -57,25 +58,49 @@ const Sidebar = () => {
 
     const menuItems = [
         { type: "internal", path: "/", icon: <HomeIcon {...ICON_PROPS} />, label: "Inbox" },
-        { type: "internal", path: "/add-conversation", icon: <Users {...ICON_PROPS} />, label: "Add Conversation" },
-        // { type: "internal", path: "/changelog", icon: <ListTodo {...ICON_PROPS} />, label: "Changelog" },
+        // { type: "internal", path: "/add-conversation", icon: <Users {...ICON_PROPS} />, label: "Add Conversation" },
     ];
 
     useEffect(() => {
         setActivePath(location.pathname);
     }, [location.pathname]);
 
+    const handleHeaderClick = () => {
+        if (isCollapsed) {
+            onCollapsedChange(false);
+        }
+        navigate("/");
+    };
+
     return (
-        <div className="sidebar_mainDiv">
+        <div
+            className={`sidebar_mainDiv ${isCollapsed ? 'collapsed' : ''}`}
+            style={{ width: isCollapsed ? 76 : 260, minWidth: isCollapsed ? 76 : 260 }}
+        >
             <div className="sidebar-content">
                 <div className="sidebar-sections">
-                    <div className="agentic-chat-header" onClick={() => navigate("/")}>
-                        <div className="agentic-chat-header__icon">
+                    <div className="agentic-chat-header">
+                        <div className="agentic-chat-header__icon" onClick={handleHeaderClick}>
                             <div className="icon-bg">
                                 <MessageCircle className="icon" {...ICON_PROPS} />
                             </div>
-                            <h1 className="title">Internal chat</h1>
+                            {!isCollapsed && <h1 className="title">TeCoChat</h1>}
                         </div>
+
+                        {!isCollapsed && (
+                            <Tooltip title="Collapse sidebar" placement="right" arrow>
+                                <IconButton
+                                    className="sidebar-toggle"
+                                    size="small"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onCollapsedChange(!isCollapsed);
+                                    }}
+                                >
+                                    <ChevronLeft size={18} />
+                                </IconButton>
+                            </Tooltip>
+                        )}
                     </div>
                     <div className="sidebar_main">
                         <ul>
@@ -87,29 +112,36 @@ const Sidebar = () => {
                                 let content = (
                                     <>
                                         {item.icon}
-                                        <span>{item.label}</span>
+                                        {!isCollapsed && <span>{item.label}</span>}
                                     </>
                                 );
 
                                 return (
                                     <li key={item.label}>
-                                        {isExternal ? (
-                                            <a
-                                                href={`${appURLs[item.app]}?token=${encryptToken(Token, item.app)}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                            >
-                                                {content}
-                                            </a>
-                                        ) : (
-                                            <Link
-                                                to={item.path}
-                                                onClick={() => setActivePath(item.path)}
-                                                className={isActive ? "active" : ""}
-                                            >
-                                                {content}
-                                            </Link>
-                                        )}
+                                        <Tooltip
+                                            title={item.label}
+                                            placement="right"
+                                            arrow
+                                            disableHoverListener={!isCollapsed}
+                                        >
+                                            {isExternal ? (
+                                                <a
+                                                    href={`${appURLs[item.app]}?token=${encryptToken(Token, item.app)}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    {content}
+                                                </a>
+                                            ) : (
+                                                <Link
+                                                    to={item.path}
+                                                    onClick={() => setActivePath(item.path)}
+                                                    className={`sidebar_main_link ${isActive ? "active" : ""}`}
+                                                >
+                                                    {content}
+                                                </Link>
+                                            )}
+                                        </Tooltip>
                                     </li>
                                 );
                             })}
@@ -118,7 +150,7 @@ const Sidebar = () => {
                 </div>
 
                 {/* Powered by section at the bottom */}
-                <div className="powered-by">
+                <div className={isCollapsed ? "powered-by collapsed" : "powered-by"}>
                     <span>Powered by </span>
                     <div className="optigo-logo">
                         <img src="/logo1.png" alt="Optigo logo" />

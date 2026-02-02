@@ -3,7 +3,7 @@ import { CommonAPI, buildCommonBody } from "../InitialApi/CommonApi";
 export const saveSocketDataApi = async (
     SocketId,
     userData,
-    fLabel = "internal Chat (Save Socket id )"
+    fLabel = "TeCoChat (Save Socket id )"
 ) => {
     try {
         const payload = {

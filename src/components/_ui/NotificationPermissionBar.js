@@ -7,7 +7,6 @@ import { useNotificationManager } from '../../contexts/NotificationContext';
 const NotificationPermissionBar = () => {
     const { permissionStatus, requestPermission } = useNotificationManager();
     const [dismissed, setDismissed] = React.useState(false);
-    console.log(permissionStatus, "kjkjk");
 
     if (permissionStatus !== 'default' || dismissed) {
         return null;

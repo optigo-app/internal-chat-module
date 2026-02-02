@@ -1,4 +1,4 @@
-import { FileText, Image, Video, ArrowLeft, Pin, ChevronDown, Star } from 'lucide-react';
+import { FileText, Image, Video, ArrowLeft, Pin, ChevronDown, Star, MessageSquarePlus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CheckCheck } from "lucide-react";
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -32,6 +32,7 @@ import { addInternalMessageHandler, addInternalStatusHandler } from '../../socke
 import { Helmet } from 'react-helmet-async';
 import { notify } from '../../utils/notificationTemplates';
 import NotificationPermissionBar from '../_ui/NotificationPermissionBar';
+import AddConversation from '../AddConversation/AddConversation';
 
 const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, selectedStatus = 'All', selectedTag = 'All', isConversationRead = false, viewConversationRead = false, onConversationList = () => { } }) => {
     const location = useLocation();
@@ -47,9 +48,13 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const [anchorEl, setAnchorEl] = useState(null);
     const [selectMember, setSelectMember] = useState({});
     const [hoveredId, setHoveredId] = useState(null);
+    const [showNewChat, setShowNewChat] = useState(false);
     const containerRef = useRef(null);
     const pageSize = 100;
     const searchTimeoutRef = useRef(null);
+    const fetchControllerRef = useRef(null);
+    const clickTimeoutRef = useRef(null);
+    const pendingSelectConversationIdRef = useRef(null);
     const { auth, isSyncing } = useContext(LoginContext);
 
     const getMemberTimeValue = useCallback((member) => {
@@ -86,11 +91,17 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             console.log('⚠️ No auth token available, skipping conversation load');
             return;
         }
+        if (fetchControllerRef.current) {
+            fetchControllerRef.current.abort();
+        }
+        const controller = new AbortController();
+        fetchControllerRef.current = controller;
+
         setLoading(true);
 
         try {
             const searchToUse = search !== null ? search : searchTerm;
-            const response = await fetchConversationLists(page, pageSize, auth, searchToUse);
+            const response = await fetchConversationLists(page, pageSize, auth, searchToUse, controller.signal);
 
             // Process both rd and rd1 data
             const currentConversations = processApiResponse(response.data?.rd || []);
@@ -128,6 +139,9 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
 
             if (moreAvailable) setCurrentPage(page);
         } catch (error) {
+            if (error.name === 'AbortError' || error.message === 'AbortError') {
+                return;
+            }
             console.error('Error loading members:', error);
         } finally {
             setLoading(false);
@@ -146,11 +160,30 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     }, [loadMembers]);
 
     const selectedConversationIdRef = useRef(selectedCustomer?.ConversationId);
+    const selectedCustomerRef = useRef(selectedCustomer);
     const isConversationReadingRef = useRef(false);
     useEffect(() => {
         selectedConversationIdRef.current = selectedCustomer?.ConversationId;
+        selectedCustomerRef.current = selectedCustomer;
         isConversationReadingRef.current = Boolean(isConversationRead || viewConversationRead);
-    }, [selectedCustomer?.ConversationId, isConversationRead, viewConversationRead]);
+    }, [selectedCustomer, isConversationRead, viewConversationRead]);
+
+    useEffect(() => {
+        const list = Array.isArray(chatMembers?.data) ? chatMembers.data : [];
+        onConversationList(list);
+
+        const pendingId = pendingSelectConversationIdRef.current;
+        if (pendingId) {
+            pendingSelectConversationIdRef.current = null;
+            setTimeout(() => {
+                window.dispatchEvent(
+                    new CustomEvent('SELECT_CONVERSATION', {
+                        detail: { conversationId: pendingId }
+                    })
+                );
+            }, 0);
+        }
+    }, [chatMembers, onConversationList]);
 
     const normalizeMessageType = (type) => {
         if (typeof type === 'string') return type;
@@ -176,16 +209,16 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         }
     };
 
-
     const handleSocketUpdate = useCallback((incoming, isStatusChange = false) => {
-        debugger;
+        // debugger;
         setChatMembers((prev) => {
             if (!prev?.data) return prev;
 
             const conversationId = incoming?.ConversationId ?? incoming?.conversationId;
             if (conversationId == null) return prev;
 
-            const resolvedName = (() => {
+            // RESOLVED NAME (default logic)
+            let resolvedName = (() => {
                 const candidate = String(
                     incoming?.CustomerName ??
                     incoming?.ConversationName ??
@@ -197,7 +230,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 ).trim();
                 return candidate || getCustomerDisplayName(incoming);
             })();
-
 
             const updatedData = [...prev.data];
             const index = updatedData.findIndex(
@@ -306,10 +338,33 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 updatedData[index] = updatedChat;
             } else {
                 const unread = isStatusChange || isOutgoing ? 0 : (isOpenConversation ? 0 : 1);
-                const avatarSeed = getCustomerAvatarSeed(incoming) || resolvedName;
+
+                // If this is a new conversation and WE sent the message, 
+                // we want the list item to be the RECEIVER, not us.
+                // We check if the current selected customer matches this new conversation.
+                let avatarSeed = getCustomerAvatarSeed(incoming) || resolvedName;
+                let finalName = resolvedName;
+
+                const currentSelected = selectedCustomerRef.current;
+
+                if (isOutgoing && currentSelected) {
+                    // Check if matched by ConversationId or ReceiverId
+                    const receiverId = incoming?.ReceiverId;
+                    const selectedId = currentSelected.UserId || currentSelected.CustomerId || currentSelected.Id;
+
+                    const isMatch = (Number(conversationId) === Number(currentSelected.ConversationId)) ||
+                        (receiverId && selectedId && Number(receiverId) === Number(selectedId));
+
+                    if (isMatch) {
+                        finalName = currentSelected.name || getCustomerDisplayName(currentSelected) || resolvedName;
+                        avatarSeed = getCustomerAvatarSeed(currentSelected) || finalName;
+                        pendingSelectConversationIdRef.current = conversationId;
+                    }
+                }
+
                 const newChat = {
                     ConversationId: conversationId,
-                    name: resolvedName,
+                    name: finalName,
                     lastMessage: messagePreviewNode,
                     lastMessageText: messagePreviewText,
                     lastMessageTime: formattedTime,
@@ -379,9 +434,18 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             }
             loadMembers(1, true, '');
         } else {
-            debouncedSearch(value); // ✅ Uses latest input
+            debouncedSearch(value); // Uses latest input
         }
     };
+
+    const handleCustomerClick = useCallback((member) => {
+        if (clickTimeoutRef.current) {
+            clearTimeout(clickTimeoutRef.current);
+        }
+        clickTimeoutRef.current = setTimeout(() => {
+            onCustomerSelect(member);
+        }, 300);
+    }, [onCustomerSelect]);
 
     const handleScroll = useCallback(() => {
         if (!containerRef.current || loading || !hasMore) return;
@@ -391,7 +455,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             loadMembers(currentPage + 1);
         }
     }, [loading, hasMore, currentPage, loadMembers]);
-
 
     useEffect(() => {
         const container = containerRef.current;
@@ -406,10 +469,10 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         setTabValue(newValue);
     };
 
-    const filteredMembers =
-        chatMembers?.data
+    const getFilteredMembers = (isForArchiveOverlay) => {
+        return chatMembers?.data
             ?.filter((member) => {
-                if (location.pathname === '/archieve') {
+                if (isForArchiveOverlay) {
                     return member.IsArchived === 1;
                 } else {
                     return member.IsArchived !== 1;
@@ -436,6 +499,18 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 if (!selectedTag || selectedTag === 'All') return true;
                 return member.tags && member.tags.some(tag => tag.TagId === selectedTag.Id);
             });
+    };
+
+    const activeMembers = getFilteredMembers(false);
+    const archivedMembers = getFilteredMembers(true);
+    const isArchiveOpen = location.pathname === '/archieve';
+
+    // Use the appropriate list for the main rendering loop
+    // If archive is open, we'll render the overlay separately, so the "main" list underneath should technically be the active members
+    // But to avoid complex prop drilling/rendering logic duplication, we will define `displayMembers` based on context
+    // Actually, we can just render the Overlay *in addition* to the main list.
+    // So the MAIN list (filteredMembers) should ALWAYS be activeMembers.
+    const filteredMembers = activeMembers;
 
     const archivedCount = chatMembers?.data?.filter(m => m.IsArchived === 1)?.length || 0;
 
@@ -472,7 +547,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
 
     const handleMenuAction = async (action, member) => {
         setSelectMember(member);
-        onConversationList(member);
+        onConversationList(Array.isArray(chatMembers?.data) ? chatMembers.data : []);
         if (!member?.ConversationId) {
             toast.error("Missing Conversation ID. Cannot update conversation.");
             handleCloseMenu();
@@ -530,34 +605,31 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         }
     }, [isConversationRead, viewConversationRead, selectedCustomer?.ConversationId, tempConversationId]);
 
+    const totalUnread = chatMembers?.data?.reduce((acc, curr) => {
+        const count = Number(curr.unreadCount ?? curr.UnreadCount ?? 0);
+        return acc + (count > 0 ? 1 : 0);
+    }, 0) || 0;
+
     return (
-        <Box className="customer_lists_mainDiv" ref={containerRef}>
+        <Box className="customer_lists_mainDiv" ref={containerRef} sx={{ position: 'relative' }}>
             <Helmet>
-                <title>{`Internal Chat (${chatMembers.total ?? 0})`}</title>
+                <title>{totalUnread > 0 ? `(${totalUnread}) TeCoChat` : 'TeCoChat'}</title>
             </Helmet>
             <Box className="customer_lists_header">
-                {location?.pathname === "/archieve" ? (
-                    <div className="header-archive">
-                        <IconButton
-                            className="back-button"
-                            onClick={() => navigate(-1)}
-                            size="small"
-                        >
-                            <ArrowLeft />
-                        </IconButton>
-                        <Typography variant="h6" className="header_title_archieve">Archived Chats</Typography>
-                    </div>
-                ) : (
-                    <Typography variant="h6" className="header_title">Chat Members</Typography>
-                )}
+                <Typography variant="h6" className="header_title">Chat Members</Typography>
 
-                <Chip
-                    label={`${archieve} archive`}
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                    onClick={() => navigate('/archieve')}
-                />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <IconButton onClick={() => setShowNewChat(true)} size="small" sx={{ p: 0.8 }}>
+                        <MessageSquarePlus size={20} />
+                    </IconButton>
+                    <Chip
+                        label={`${archieve} archive`}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        onClick={() => navigate('/archieve')}
+                    />
+                </Box>
             </Box>
 
             <NotificationPermissionBar />
@@ -592,6 +664,175 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     }}
                 />
             </Box>
+
+            {showNewChat && (
+                <Box className="new-chat-overlay">
+                    <AddConversation
+                        onBack={() => setShowNewChat(false)}
+                        onClose={() => setShowNewChat(false)}
+                        onCustomerSelect={(customer) => {
+                            onCustomerSelect(customer);
+                            setShowNewChat(false);
+                        }}
+                        selectedStatus={selectedStatus}
+                        selectedTag={selectedTag}
+                    />
+                </Box>
+            )}
+
+            {isArchiveOpen && (
+                <Box className="new-chat-overlay">
+                    <Box className="customer_lists_mainDiv_2">
+                        <div className="customer_lists_header">
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <IconButton
+                                    onClick={() => navigate(-1)}
+                                    size="small"
+                                    sx={{ p: 0.5, mr: 1 }}
+                                >
+                                    <ArrowLeft size={20} />
+                                </IconButton>
+                                <Typography variant="h6" className="header_title">Archived Chats</Typography>
+                            </Box>
+                            <IconButton
+                                onClick={() => navigate(-1)}
+                                size="small"
+                                sx={{ p: 0.5 }}
+                            >
+                                <X size={20} />
+                            </IconButton>
+                        </div>
+
+                        {/* Search Input for Archive - Reusing Main Search Logic/UI for consistency or duplicate? 
+                            Ideally Archive has its own search but for now let's reuse logic.
+                        */}
+                        <div className="customer_lists_search">
+                            <TextField
+                                fullWidth
+                                placeholder="Search archived"
+                                variant="outlined"
+                                size="small"
+                                value={searchTerm}
+                                onChange={handleSearchChange}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Search fontSize="small" />
+                                        </InputAdornment>
+                                    ),
+                                    endAdornment: searchTerm && (
+                                        <InputAdornment
+                                            position="end"
+                                            style={{ cursor: 'pointer' }}
+                                            onClick={() => {
+                                                setSearchTerm('');
+                                                loadMembers(1, true, '');
+                                            }}
+                                        >
+                                            <Clear fontSize="small" />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </div>
+
+                        <div className="customer_lists_main">
+                            <ul>
+                                {archivedMembers?.map((member) => {
+                                    const isSelectedAndReading =
+                                        selectedCustomer?.ConversationId === member.ConversationId &&
+                                        ((isConversationRead || viewConversationRead) ||
+                                            (isConversationRead && viewConversationRead));
+                                    const isSelected = selectedCustomer?.ConversationId === member.ConversationId;
+                                    const shouldShowUnreadBadge =
+                                        member.unreadCount > 0 && !isSelectedAndReading;
+
+                                    return (
+                                        <li
+                                            key={member.ConversationId}
+                                            className={`member-item ${isSelected ? 'active' : ''}`}
+                                            onClick={() => {
+                                                handleCustomerClick(member);
+                                            }}
+                                        >
+                                            <div className={`member-item ${isSelected ? 'active' : ''} ${isSelectedAndReading ? 'reading' : ''}`}>
+                                                <div className="member-avatar">
+                                                    {!hasCustomerName(member) ? (
+                                                        <Avatar
+                                                            {...getWhatsAppAvatarConfig(getCustomerAvatarSeed(member))}
+                                                        >
+                                                            <PersonIcon fontSize="small" />
+                                                        </Avatar>
+                                                    ) : (
+                                                        <Avatar {...member.avatarConfig} />
+                                                    )}
+                                                </div>
+
+                                                <div className="member-info">
+                                                    <div className="member-header">
+                                                        <Typography
+                                                            variant="subtitle1"
+                                                            className={shouldShowUnreadBadge ? 'member-name-unread' : 'member-name'}
+                                                        >
+                                                            {member.name}
+                                                        </Typography>
+
+                                                        {(member?.lastMessageText && member?.lastMessageText !== 'No message') && (
+                                                            <Typography variant="caption" className="member-time">
+                                                                {member?.lastMessageTime}
+                                                            </Typography>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="member-message">
+                                                        <Typography
+                                                            variant="body2"
+                                                            className={shouldShowUnreadBadge ? 'last-message-unread' : 'last-message'}
+                                                            style={{ display: 'flex', alignItems: 'center' }}
+                                                        >
+                                                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                {getMessageStatusIcon(member)}
+                                                                {member.LastMessageType === 1 && (member.LastMessage || 'Text')}
+                                                                {member.LastMessageType === 2 && <><Image size={12} /><span>Image</span></>}
+                                                                {member.LastMessageType === 3 && <><Video size={14} /><span>Video</span></>}
+                                                                {member.LastMessageType === 4 && <><FileText size={12} /><span>Document</span></>}
+                                                                {!member.LastMessageType && <span>Text</span>}
+                                                            </span>
+                                                        </Typography>
+
+                                                        <div className="member-actions-bar">
+                                                            {/* Minimal actions for Archive view or full actions? Assuming full actions ok */}
+                                                            <Tooltip title="Unarchive" arrow>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    className="action-btn"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleMenuAction("UnArchive", member);
+                                                                    }}
+                                                                >
+                                                                    <Pin size={17} style={{ transform: 'rotate(180deg)' }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                                {archivedMembers?.length === 0 && (
+                                    <li style={{ textAlign: 'center', padding: '20px' }}>
+                                        <Typography variant="body2" color="textSecondary">
+                                            No archived conversations.
+                                        </Typography>
+                                    </li>
+                                )}
+                            </ul>
+                        </div>
+                    </Box>
+                </Box>
+            )}
 
             {/* Filters */}
             <Box
@@ -692,7 +933,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                             <li
                                                 key={member.ConversationId}
                                                 className={`member-item ${isSelected ? 'active' : ''} ${isSelectedAndReading ? 'reading' : ''} ${isMenuOpen ? 'menu-open' : ''}`}
-                                                onClick={() => onCustomerSelect(member)}
+                                                onClick={() => handleCustomerClick(member)}
                                                 onMouseEnter={() => setHoveredId(member.ConversationId)}
                                                 onMouseLeave={() => setHoveredId(null)}
                                             >
@@ -816,7 +1057,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
 
                                                                                     setAnchorEl(e.currentTarget);
                                                                                     setSelectMember(member);
-                                                                                    onConversationList(member);
+                                                                                    onConversationList(Array.isArray(chatMembers?.data) ? chatMembers.data : []);
                                                                                 }}
                                                                             >
                                                                                 <ChevronDown size={17} />

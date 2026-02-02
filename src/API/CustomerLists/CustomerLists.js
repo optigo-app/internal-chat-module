@@ -5,7 +5,7 @@ export const fetchCustomerLists = async (
     pageSize = 20,
     searchTerm = "",
     auth,
-    fLabel = "internal Chat ( Employee List )"
+    fLabel = "TeCoChat ( Employee List )"
 ) => {
     try {
         const payload = {

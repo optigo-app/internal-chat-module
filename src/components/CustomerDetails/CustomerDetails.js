@@ -21,9 +21,7 @@ import LinksSection from './LinksSection';
 import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig, hasCustomerName } from '../../utils/globalFunc';
 import { FileText, Image, Link } from 'lucide-react';
 
-const CustomerDetails = ({ customer, onClose, open, variant = 'drawer' }) => {
-    const { id } = useParams();
-    const navigate = useNavigate();
+const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
     const [activeTab, setActiveTab] = useState('media');
     const [mediaItems, setMediaItems] = useState({
         images: [],
@@ -38,18 +36,11 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'drawer' }) => {
         links: { page: 1, hasMore: true, isLoading: false }
     });
     const [mediaCache, setMediaCache] = useState({});
-    const [isStarred, setIsStarred] = useState(false);
-    const [isMuted, setIsMuted] = useState(false);
-    const [isBlocked, setIsBlocked] = useState(false);
-    const [readReceipts, setReadReceipts] = useState(true);
-    const [isVisible, setIsVisible] = useState(false);
-    const { PERMISSION_SET, auth } = useContext(LoginContext);
+    const { auth } = useContext(LoginContext);
     const pageSize = 6;
     
     // Flag for enabling/disabling pagination for testing
     const enablePagination = true;
-
-    const can = (perm) => PERMISSION_SET?.has(perm);
 
     const inFlightRequestsRef = useRef(new Set());
     const fetchedPagesRef = useRef(new Set());
@@ -324,7 +315,6 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'drawer' }) => {
     const displayName = getCustomerDisplayName(customer);
     const avatarSeed = getCustomerAvatarSeed(customer);
     const cfg = customer?.avatarConfig || getWhatsAppAvatarConfig(avatarSeed, 80);
-    const displayEmail = String(customer?.DisplayEmail ?? '').trim();
 
     return (
         <>
@@ -371,9 +361,6 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'drawer' }) => {
                             </div>
 
                             <Typography className="customer-name">{displayName}</Typography>
-                            {displayEmail ? (
-                                <Typography className="customer-email">{displayEmail}</Typography>
-                            ) : null}
                         </div>
 
                         {/* Media Tabs */}

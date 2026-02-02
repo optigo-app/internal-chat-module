@@ -40,10 +40,12 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const reactionRequestStateRef = useRef(new Map());
     const messagesRef = useRef(null);
     const isNarrowScreen = useMediaQuery('(max-width: 992px)');
+    const isTopPanelScreen = useMediaQuery('(max-width: 1620px)');
     const isCompactDockedPanel = useMediaQuery('(max-width: 1200px)');
     const isDetailsPanelDocked = drawerOpen === true && !isNarrowScreen;
     const dockedPanelWidth = isCompactDockedPanel ? 380 : 420;
     const scrollToBottomRightOffset = isDetailsPanelDocked ? dockedPanelWidth + 30 : 30;
+    const showFullDetails = drawerOpen === true && !isNarrowScreen && isTopPanelScreen;
 
     // Use the conversation hook
     const {
@@ -601,96 +603,111 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
             <div className="conversation-layout">
                 <div className="conversation-main">
                     {/* Header */}
-                    <div className="conversation-header">
-                        <div className="header-left">
-                            <div style={{ width: 40, height: 40, marginRight: 10, cursor: "pointer" }}>
-                                {!hasCustomerName(selectedCustomer) ? (
-                                    <Avatar
-                                        {...getWhatsAppAvatarConfig(getCustomerAvatarSeed(selectedCustomer), 40)}
-                                        onClick={() => setDrawerOpen(true)}
-                                    >
-                                        <PersonIcon fontSize="small" />
-                                    </Avatar>
-                                ) : (
-                                    <Avatar
-                                        {...(selectedCustomer?.avatarConfig || getWhatsAppAvatarConfig(getCustomerAvatarSeed(selectedCustomer), 40))}
-                                        onClick={() => setDrawerOpen(true)}
-                                    />
-                                )}
-                            </div>
-                            <div className="customer-info">
-                                <Typography variant="subtitle1" className="customer-name">
-                                    {getCustomerDisplayName(selectedCustomer)}
-                                </Typography>
-                                {displayEmail ? (
-                                    <Typography variant="body2" className="customer-email">
-                                        {displayEmail}
+                    {!showFullDetails && (
+                        <div className="conversation-header">
+                            <div className="header-left">
+                                <div style={{ width: 40, height: 40, marginRight: 10, cursor: "pointer" }}>
+                                    {!hasCustomerName(selectedCustomer) ? (
+                                        <Avatar
+                                            {...getWhatsAppAvatarConfig(getCustomerAvatarSeed(selectedCustomer), 40)}
+                                            onClick={() => setDrawerOpen(true)}
+                                        >
+                                            <PersonIcon fontSize="small" />
+                                        </Avatar>
+                                    ) : (
+                                        <Avatar
+                                            {...(selectedCustomer?.avatarConfig || getWhatsAppAvatarConfig(getCustomerAvatarSeed(selectedCustomer), 40))}
+                                            onClick={() => setDrawerOpen(true)}
+                                        />
+                                    )}
+                                </div>
+                                <div className="customer-info">
+                                    <Typography variant="subtitle1" className="customer-name">
+                                        {getCustomerDisplayName(selectedCustomer)}
                                     </Typography>
-                                ) : null}
+                                    {displayEmail ? (
+                                        <Typography variant="body2" className="customer-email">
+                                            {displayEmail}
+                                        </Typography>
+                                    ) : null}
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
                     {/* Messages Area - Using the MessageArea component */}
-                    <MessageArea
-                        auth={auth}
-                        showMedia={showMedia}
-                        setShowMedia={setShowMedia}
-                        loading={loading}
-                        mediaFiles={mediaFiles}
-                        setMediaFiles={setMediaFiles}
-                        handleClosePreview={handleClosePreview}
-                        containerRef={containerRef}
-                        showScrollToBottom={showScrollToBottom}
-                        scrollToBottomRightOffset={scrollToBottomRightOffset}
-                        setContextMenu={setContextMenu}
-                        selectedCustomer={selectedCustomer}
-                        scrollToBottom={scrollToBottom}
-                        groupMessagesByDate={groupMessagesByDate}
-                        formatDateHeader={formatDateHeader}
-                        getMessageStatusIcon={getMessageStatusIconCallback}
-                        parseTemplateData={parseTemplateData}
-                        getMediaSrcForMessage={getMediaSrcForMessage}
-                        handleMediaClick={handleMediaClick}
-                        handleMessageEmojiClick={handleMessageEmojiClick}
-                        handleMenuClick={handleMenuClick}
-                        handleContextMenu={handleContextMenu}
-                        scrollToMessage={scrollToMessage}
-                        handleReply={handleReply}
-                        handleForward={handleForward}
-                        blinkMessageId={blinkMessageId}
-                        setBlinkMessageId={setBlinkMessageId}
-                        loadedMedia={loadedMedia}
-                        setLoadedMedia={setLoadedMedia}
-                        getMediaKey={getMediaKeyCallback}
-                        markLoaded={markLoadedCallback}
-                        uploadProgress={uploadProgress}
-                        handleRemoveReaction={handleRemoveReactionAction}
-                        replyToMessage={replyToMessage}
-                        isSwitchingConversation={isSwitchingConversation}
-                        processFiles={processFiles}
-                        captureMessageScrollState={captureMessageScrollState}
-                    />
+                    {showFullDetails ? (
+                        <div className="conversation-details-full">
+                            <CustomerDetails
+                                customer={selectedCustomer}
+                                onClose={() => setDrawerOpen(false)}
+                                open={drawerOpen}
+                                variant="panel"
+                            />
+                        </div>
+                    ) : (
+                        <>
+                            <MessageArea
+                                auth={auth}
+                                showMedia={showMedia}
+                                setShowMedia={setShowMedia}
+                                loading={loading}
+                                mediaFiles={mediaFiles}
+                                setMediaFiles={setMediaFiles}
+                                handleClosePreview={handleClosePreview}
+                                containerRef={containerRef}
+                                showScrollToBottom={showScrollToBottom}
+                                scrollToBottomRightOffset={scrollToBottomRightOffset}
+                                setContextMenu={setContextMenu}
+                                selectedCustomer={selectedCustomer}
+                                scrollToBottom={scrollToBottom}
+                                groupMessagesByDate={groupMessagesByDate}
+                                formatDateHeader={formatDateHeader}
+                                getMessageStatusIcon={getMessageStatusIconCallback}
+                                parseTemplateData={parseTemplateData}
+                                getMediaSrcForMessage={getMediaSrcForMessage}
+                                handleMediaClick={handleMediaClick}
+                                handleMessageEmojiClick={handleMessageEmojiClick}
+                                handleMenuClick={handleMenuClick}
+                                handleContextMenu={handleContextMenu}
+                                scrollToMessage={scrollToMessage}
+                                handleReply={handleReply}
+                                handleForward={handleForward}
+                                blinkMessageId={blinkMessageId}
+                                setBlinkMessageId={setBlinkMessageId}
+                                loadedMedia={loadedMedia}
+                                setLoadedMedia={setLoadedMedia}
+                                getMediaKey={getMediaKeyCallback}
+                                markLoaded={markLoadedCallback}
+                                uploadProgress={uploadProgress}
+                                handleRemoveReaction={handleRemoveReactionAction}
+                                replyToMessage={replyToMessage}
+                                isSwitchingConversation={isSwitchingConversation}
+                                processFiles={processFiles}
+                                captureMessageScrollState={captureMessageScrollState}
+                            />
 
-                    <ChatBox
-                        replyToMessage={replyToMessage}
-                        handleCancelReply={handleCancelReply}
-                        handleAttachClick={handleAttachClick}
-                        toggleEmojiPicker={toggleEmojiPicker}
-                        showPicker={showPicker}
-                        emojiPickerRef={emojiPickerRef}
-                        showMedia={showMedia}
-                        fileInputRef={fileInputRef}
-                        openFilePicker={openFilePicker}
-                        imageParams={imageParams}
-                        videoParams={videoParams}
-                        docsParams={docsParams}
-                        handleFileChange={handleFileChangeCallback}
-                        inputValue={inputValue}
-                        setInputValue={setInputValue}
-                        handleKeyPress={handleKeyPress}
-                        handleSendMessage={handleSendMessageCallback}
-                        mediaFiles={mediaFiles}
-                    />
+                            <ChatBox
+                                replyToMessage={replyToMessage}
+                                handleCancelReply={handleCancelReply}
+                                handleAttachClick={handleAttachClick}
+                                toggleEmojiPicker={toggleEmojiPicker}
+                                showPicker={showPicker}
+                                emojiPickerRef={emojiPickerRef}
+                                showMedia={showMedia}
+                                fileInputRef={fileInputRef}
+                                openFilePicker={openFilePicker}
+                                imageParams={imageParams}
+                                videoParams={videoParams}
+                                docsParams={docsParams}
+                                handleFileChange={handleFileChangeCallback}
+                                inputValue={inputValue}
+                                setInputValue={setInputValue}
+                                handleKeyPress={handleKeyPress}
+                                handleSendMessage={handleSendMessageCallback}
+                                mediaFiles={mediaFiles}
+                            />
+                        </>
+                    )}
                 </div>
 
                 {drawerOpen === true && (
@@ -702,14 +719,16 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                             variant="drawer"
                         />
                     ) : (
-                        <div className="conversation-right-panel">
-                            <CustomerDetails
-                                customer={selectedCustomer}
-                                onClose={() => setDrawerOpen(false)}
-                                open={drawerOpen}
-                                variant="panel"
-                            />
-                        </div>
+                        !isTopPanelScreen ? (
+                            <div className="conversation-right-panel">
+                                <CustomerDetails
+                                    customer={selectedCustomer}
+                                    onClose={() => setDrawerOpen(false)}
+                                    open={drawerOpen}
+                                    variant="panel"
+                                />
+                            </div>
+                        ) : null
                     )
                 )}
             </div>

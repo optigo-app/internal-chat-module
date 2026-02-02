@@ -389,11 +389,11 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         };
     }, [auth?.token, auth?.userId]);
 
-    const handleReadMessage = async (custConverId) => {
+    const handleReadMessage = async (custConverId, signal = null) => {
         if (!custConverId) return;
 
         // Note: We call the API for the conversation, but socket emit is strictly guarded
-        const response = await readMessageApi(auth, { ConversationId: custConverId });
+        const response = await readMessageApi(auth, { ConversationId: custConverId, signal });
 
         const currentConvId = selectedCustomerRef.current?.ConversationId;
         const receiverId = selectedCustomerRef.current?.ReceiverId || selectedCustomer?.ReceiverId || selectedCustomer?.CustomerId || selectedCustomer?.UserId;
@@ -597,7 +597,10 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         }
 
         // Mark messages as read when user opens/views this conversation
-        handleReadMessage(selectedCustomer?.ConversationId);
+        // We use the same abort controller created by loadConversation if possible, 
+        // or just ensure handleReadMessage is also abortable.
+        // loadConversation update abortControllerRef.current, so we can use it.
+        handleReadMessage(selectedCustomer?.ConversationId, abortControllerRef.current?.signal);
     }, [selectedCustomer?.ConversationId]);
 
     useEffect(() => {

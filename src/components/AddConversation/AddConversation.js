@@ -5,17 +5,19 @@ import {
     TextField,
     InputAdornment,
     Box,
-    Button
+    Button,
+    IconButton
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { Search, Clear, Person as PersonIcon, ChatBubbleOutline } from '@mui/icons-material';
+import { Search, Clear, Person as PersonIcon, ChatBubbleOutline, ArrowBack, } from '@mui/icons-material';
+import { X } from 'lucide-react';
 import './AddConversation.scss';
 import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig, hasCustomerName } from '../../utils/globalFunc';
 import { fetchCustomerLists } from '../../API/CustomerLists/CustomerLists';
 import { useLocation } from 'react-router-dom';
 import { LoginContext } from '../../context/LoginData';
 
-const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null, selectedTag, selectedStatus = 'All' }) => {
+const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null, selectedTag, selectedStatus = 'All', onClose, onBack }) => {
 
     const [searchTerm, setSearchTerm] = useState('');
     const [tabValue, setTabValue] = useState(0);
@@ -160,8 +162,19 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
     return (
         <div className="customer_lists_mainDiv_2">
             <div className="customer_lists_header">
-                <Typography variant="h6" className="header_title">Chat Members</Typography>
-
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    {onBack && (
+                        <IconButton onClick={onBack} size="small" sx={{ mr: 1, p: 0.5 }}>
+                            <ArrowBack size={20} />
+                        </IconButton>
+                    )}
+                    <Typography variant="h6" className="header_title">New Chat</Typography>
+                </Box>
+                {onClose && (
+                    <IconButton onClick={onClose} size="small" sx={{ p: 0.5 }}>
+                        <X size={20} />
+                    </IconButton>
+                )}
             </div>
 
             {/* Search Input */}

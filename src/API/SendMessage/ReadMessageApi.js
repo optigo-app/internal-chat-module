@@ -5,6 +5,7 @@ export const readMessageApi = async (
     {
         ConversationId,
         fLabel = "Read Message",
+        signal = null,
     }
 ) => {
     try {
@@ -18,7 +19,7 @@ export const readMessageApi = async (
         };
 
         const body = buildCommonBody("ReadMessage", auth, payload, fLabel);
-        const response = await CommonAPI(body);
+        const response = await CommonAPI(body, { signal });
         return response;
     } catch (error) {
         console.error("readMessageApi Error:", error);

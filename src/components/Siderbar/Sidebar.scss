@@ -2,9 +2,10 @@
 
 .sidebar_mainDiv {
     min-width: 260px;
+    width: 260px;
     height: calc(100vh - 3.2rem);
     background: $sidebar-Bgcolor;
-    padding: $sidebar-padding;
+    padding: 0px 16px 16px 16px;
     border-right: 1px solid $sidebar-borderColor;
     position: fixed;
     top: 3.2rem;
@@ -13,6 +14,81 @@
     display: flex;
     flex-direction: column;
     overflow-x: hidden;
+
+    &.collapsed {
+        min-width: 76px;
+        width: 76px;
+        padding: 0 10px 10px 10px;
+
+        .agentic-chat-header {
+            justify-content: center;
+
+            &__icon {
+                gap: 0;
+            }
+        }
+
+        .sidebar_main {
+            ul {
+                align-items: center;
+
+                li {
+                    a {
+                        justify-content: center;
+                        gap: 0;
+                        width: 40px;
+                        height: 40px;
+                        padding: 0;
+                        border-radius: 16px;
+                        border: 1px solid transparent;
+                        background: transparent;
+
+                        &:hover {
+                            transform: translateY(-1px);
+                            background: rgba($primary-main, 0.06);
+                            border-color: rgba($primary-main, 0.14);
+                        }
+
+                        svg {
+                            opacity: 0.9;
+                        }
+
+                        &.active {
+                            border-color: rgba($primary-main, 0.22);
+                        }
+
+                        span {
+                            display: none;
+                        }
+                    }
+                }
+            }
+        }
+
+        .sidebar_main_tags {
+            .sidebar_tags_label {
+                display: none;
+            }
+
+            ul {
+                display: none;
+            }
+        }
+
+        .powered-by {
+            padding: 10px;
+
+            span {
+                display: none;
+            }
+
+            .optigo-logo {
+                img {
+                    max-width: 34px;
+                }
+            }
+        }
+    }
 
     // Main content wrapper
     .sidebar-content {
@@ -102,6 +178,7 @@
                     justify-content: flex-start;
                     gap: $sidebar-item-gap;
                     padding: $sidebar-item-padding-y $sidebar-item-padding-x;
+                    border: 1px solid transparent;
                     border-radius: $sidebar-item-radius;
                     text-decoration: none;
                     color: $titleColor;
@@ -111,6 +188,7 @@
 
                     &:hover {
                         background-color: rgba(255, 255, 255, 0.7);
+                        border-color: rgba($primary-main, 0.14);
                         color: $titleColor;
                         transform: translateX(2px);
                     }
@@ -129,6 +207,15 @@
                         svg {
                             color: $text-white;
                             opacity: 1;
+                        }
+                    }
+
+                    .sidebar_main_link {
+                        border: 1px solid transparent;
+                        border-radius: $sidebar-item-radius;
+
+                        &:hover {
+                            border-color: rgba($primary-main, 0.14);
                         }
                     }
 
@@ -254,7 +341,9 @@
 .agentic-chat-header {
     display: flex;
     align-items: center;
-    margin-bottom: 1rem;
+    justify-content: space-between;
+    border-bottom: 1px solid $sidebar-borderColor;
+    padding-block: 0.65rem;
     cursor: pointer;
     transition: all $transition-duration ease;
 
@@ -265,28 +354,41 @@
     }
 
     .icon-bg {
-        width: 2rem;
-        height: 2rem;
+        width: 40px;
+        height: 40px;
+        border-radius: 16px;
         background: $sidebar-Activebg;
-        border-radius: 0.5rem;
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 10px 22px rgba(115, 103, 240, 0.22);
 
         .icon {
-            width: 1.5rem;
-            height: 1.5rem;
+            width: 20px;
+            height: 20px;
             color: $text-white;
         }
     }
 
     .title {
-        font-size: 1.25rem;
+        font-size: 25px;
         font-weight: 600;
         color: $titleColor;
         margin: 0;
         line-height: 1.2;
+    }
+
+    .sidebar-toggle {
+        width: 32px;
+        height: 32px;
+        border-radius: 12px;
+        border: 1px solid $sidebar-borderColor;
+        background: rgba($primary-main, 0.04);
+        transition: transform $transition-duration ease, background-color $transition-duration ease;
+
+        &:hover {
+            background: rgba($primary-main, 0.08);
+            transform: translateY(-1px);
+        }
     }
 
     &:hover {

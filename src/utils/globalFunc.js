@@ -139,7 +139,6 @@ export const getCustomerDisplayName = (customer) => {
 };
 
 export const getCustomerAvatarSeed = (customer) => {
-    console.log(customer);
     const name = String(customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? '').trim();
     if (name) return name;
 
@@ -150,7 +149,6 @@ export const getCustomerAvatarSeed = (customer) => {
 };
 
 export const getWhatsAppAvatarConfig = (name, size = 40) => {
-    console.log(name);
     const cleaned = String(name ?? '').trim();
     const { bg, fg } = getSoftAvatarColors(cleaned || 'unknown');
 

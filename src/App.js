@@ -38,31 +38,68 @@ function RedirectIfAuthenticated({ children }) {
   return children;
 }
 
-function Layout({ children, onStatusSelect, selectedStatus, onTagSelect, selectedTag }) {
+function Layout({ children }) {
   const location = useLocation();
   const match = matchPath('/conversation/:conversationId', location.pathname);
   const showCustomerDetails = Boolean(match);
 
+  const [isBreakpointSidebarCollapsed, setIsBreakpointSidebarCollapsed] = useState(() => {
+    try {
+      return typeof window !== 'undefined' && window.innerWidth <= 1440;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const SIDEBAR_COLLAPSED_STORAGE_KEY = 'internal_sidebar_collapsed';
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY);
+      if (stored == null) return false;
+      return stored === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsBreakpointSidebarCollapsed(window.innerWidth <= 1440);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(isCollapsed));
+    } catch (e) {
+    }
+  }, [isCollapsed]);
+
+  const isSidebarCollapsedEffective = isCollapsed || isBreakpointSidebarCollapsed;
+  const sidebarWidth = isSidebarCollapsedEffective ? '76px' : '260px';
+
   return (
-    <Box>
+    <Box className={isSidebarCollapsedEffective ? 'layout--sidebar-collapsed' : 'layout'}>
       <TagsProvider>
         <ArchieveProvider>
           <Header />
           <Sidebar
-            onStatusSelect={onStatusSelect}
-            selectedStatus={selectedStatus}
-            onTagSelect={onTagSelect}
-            selectedTag={selectedTag}
+            isCollapsed={isSidebarCollapsedEffective}
+            onCollapsedChange={setIsCollapsed}
           />
 
           {/* Global CustomerDetails view */}
           {showCustomerDetails && (
-            <Box sx={{ marginLeft: '300px', padding: '16px', borderBottom: '1px solid #ccc' }}>
+            <Box sx={{ marginLeft: sidebarWidth, padding: '16px', borderBottom: '1px solid #ccc' }}>
               <CustomerDetails />
             </Box>
           )}
 
-          <Box sx={{ marginLeft: '260px' }}>
+          <Box sx={{ marginLeft: sidebarWidth }}>
             {children}
           </Box>
         </ArchieveProvider>
@@ -290,7 +327,7 @@ function App() {
             <Lottie
               animationData={loader}
               loop={true}
-              style={{ width: '100%', height: '100%' }}
+              style={{ width: '100%', height: '80%' }}
             />
             <Box sx={{ textAlign: 'center', mt: 2, color: '#333', fontWeight: 500 }}>
               Syncing Data...
