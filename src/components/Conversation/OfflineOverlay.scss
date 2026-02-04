@@ -1,0 +1,119 @@
+@use "../../global.scss" as *;
+
+.offline-overlay-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    background-color: #f8f9fa;
+    /* Light gray background */
+    padding: 24px;
+    text-align: center;
+    animation: fadeIn 0.3s ease-in-out;
+
+    .offline-image-container {
+        margin-bottom: 32px;
+        position: relative;
+
+        img {
+            width: 280px;
+            height: auto;
+            max-width: 100%;
+            display: block;
+            border-radius: 50%;
+        }
+
+        .error-badge {
+            position: absolute;
+            bottom: 20px;
+            right: 40px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            padding: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+            .MuiSvgIcon-root {
+                color: $error-main;
+                font-size: 32px;
+            }
+        }
+
+        @media (max-width: 1440px) {
+            img {
+                width: 200px;
+            }
+        }
+    }
+
+    .offline-title {
+        color: $titleColor;
+        font-weight: 600;
+        margin-bottom: 12px;
+        font-size: 28px;
+    }
+
+    .offline-message {
+        color: $secondaryColor;
+        margin-bottom: 32px;
+        max-width: 500px;
+        line-height: 1.6;
+        font-size: 16px;
+    }
+
+    .action-button {
+        background-color: #fff;
+        border: 1px solid $sidebar-borderColor;
+        border-radius: 50px;
+        padding: 12px 32px;
+        color: $titleColor;
+        font-weight: 500;
+        text-transform: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        margin-bottom: 16px;
+        width: 100%;
+        max-width: 420px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 16px;
+        transition: all 0.2s ease;
+
+        &:hover {
+            background-color: #f9fafb;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .MuiSvgIcon-root {
+            color: $primary-main;
+        }
+    }
+
+    .retry-button {
+        margin-top: 16px;
+        background-color: $primary-main;
+        color: #fff;
+        font-weight: 600;
+        border-radius: 50px;
+        padding: 10px 40px;
+        text-transform: none;
+        box-shadow: none;
+
+        &:hover {
+            background-color: $primary-main;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}

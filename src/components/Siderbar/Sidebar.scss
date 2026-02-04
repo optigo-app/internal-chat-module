@@ -34,31 +34,67 @@
 
                 li {
                     a {
+                        flex-direction: column;
                         justify-content: center;
-                        gap: 0;
-                        width: 40px;
-                        height: 40px;
-                        padding: 0;
-                        border-radius: 16px;
+                        gap: 4px;
+                        width: auto;
+                        min-width: 56px;
+                        height: auto;
+                        min-height: 56px;
+                        padding: 8px 4px;
+                        border-radius: $sidebar-item-radius;
                         border: 1px solid transparent;
                         background: transparent;
 
                         &:hover {
                             transform: translateY(-1px);
-                            background: rgba($primary-main, 0.06);
-                            border-color: rgba($primary-main, 0.14);
                         }
 
                         svg {
                             opacity: 0.9;
+                            width: 20px;
+                            height: 20px;
                         }
 
+
                         &.active {
-                            border-color: rgba($primary-main, 0.22);
+                            background: transparent !important;
+                            box-shadow: none !important;
+                            border-color: transparent !important;
+
+                            .sidebar-item-icon {
+                                background: $sidebar-Activebg;
+                                color: $text-white;
+                                box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+                            }
+
+                            svg {
+                                color: $text-white !important;
+                                opacity: 1;
+                            }
+
+                            span {
+                                color: $text2ndColor !important;
+                            }
+                        }
+
+                        .sidebar-item-icon {
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            width: 38px;
+                            height: 38px;
+                            border-radius: 12px;
+                            transition: all 0.2s ease;
                         }
 
                         span {
-                            display: none;
+                            display: block;
+                            font-size: 10px;
+                            font-weight: 500;
+                            text-align: center;
+                            line-height: 1;
+                            color: $text2ndColor;
                         }
                     }
                 }
@@ -198,15 +234,12 @@
                         color: $text-white !important;
                         box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
 
-                        &:hover {
-                            background: $sidebar-Activebg;
-                            color: $text-white !important;
-                            transform: translateX(2px);
-                        }
-
-                        svg {
+                        svg,
+                        .sidebar-item-icon {
                             color: $text-white;
                             opacity: 1;
+                            line-height: 0.5;
+
                         }
                     }
 
@@ -357,15 +390,14 @@
         width: 40px;
         height: 40px;
         border-radius: 16px;
-        background: $sidebar-Activebg;
         display: flex;
         align-items: center;
         justify-content: center;
 
         .icon {
-            width: 20px;
-            height: 20px;
-            color: $text-white;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
     }
 

@@ -33,8 +33,10 @@ import { Helmet } from 'react-helmet-async';
 import { notify } from '../../utils/notificationTemplates';
 import NotificationPermissionBar from '../_ui/NotificationPermissionBar';
 import AddConversation from '../AddConversation/AddConversation';
+import useOnlineStatus from '../../utils/internetCheck';
 
 const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, selectedStatus = 'All', selectedTag = 'All', isConversationRead = false, viewConversationRead = false, onConversationList = () => { } }) => {
+    const isOnline = useOnlineStatus();
     const location = useLocation();
     const navigate = useNavigate();
     const { archieve, addArchieve } = useArchieveContext();
@@ -210,7 +212,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     };
 
     const handleSocketUpdate = useCallback((incoming, isStatusChange = false) => {
-        // debugger;
         setChatMembers((prev) => {
             if (!prev?.data) return prev;
 
@@ -612,6 +613,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
 
     return (
         <Box className="customer_lists_mainDiv" ref={containerRef} sx={{ position: 'relative' }}>
+            {!isOnline && <Box className="offline-sidebar-overlay" />}
             <Helmet>
                 <title>{totalUnread > 0 ? `(${totalUnread}) TeCoChat` : 'TeCoChat'}</title>
             </Helmet>
@@ -619,7 +621,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 <Typography variant="h6" className="header_title">Chat Members</Typography>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <IconButton onClick={() => setShowNewChat(true)} size="small" sx={{ p: 0.8 }}>
+                    <IconButton onClick={() => setShowNewChat(true)} size="small" sx={{ p: 0.8 }} className='add_conv'>
                         <MessageSquarePlus size={20} />
                     </IconButton>
                     <Chip

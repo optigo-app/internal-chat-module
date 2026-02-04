@@ -131,6 +131,11 @@
             color: $titleColor;
             margin: 0;
         }
+
+        .add_conv {
+            color: $titleColor;
+            font-weight: 700;
+        }
     }
 
     .customer_lists_search {
@@ -658,4 +663,16 @@
     to {
         transform: translateX(0);
     }
+}
+
+.offline-sidebar-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.4);
+    z-index: 9999;
+    cursor: not-allowed;
+    backdrop-filter: blur(1px);
 }

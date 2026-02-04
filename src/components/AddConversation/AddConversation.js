@@ -142,6 +142,12 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
                 }
             })
             ?.filter((member) => {
+                // Hide currently logged in user
+                const myId = Number(auth?.id ?? auth?.userId);
+                const memberId = Number(member?.UserId ?? member?.id);
+                return myId !== memberId;
+            })
+            ?.filter((member) => {
                 const isFavorite = member.IsStar === 1;
                 switch (tabValue) {
                     case 2: return isFavorite && tabValue === 2;

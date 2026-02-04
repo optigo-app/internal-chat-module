@@ -14,7 +14,18 @@ const Customers = ({ selectedStatus, selectedTag }) => {
     const location = useLocation();
 
     const handleCustomerSelect = useCallback((customer) => {
-        setSelectedCustomer(customer);
+        const list = converListRef.current || [];
+        const existing = list.find(c => {
+            const cId = Number(c.ReceiverId || c.CustomerId || c.UserId);
+            const targetId = Number(customer.ReceiverId || customer.CustomerId || customer.UserId);
+            return cId === targetId;
+        });
+
+        if (existing) {
+            setSelectedCustomer(existing);
+        } else {
+            setSelectedCustomer(customer);
+        }
         setIsConversationRead(false);
     }, []);
 

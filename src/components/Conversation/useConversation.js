@@ -246,7 +246,6 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     };
 
     useEffect(() => {
-        debugger;
         if (!auth?.token || !auth?.userId) {
             return;
         }
@@ -264,8 +263,6 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             }
 
             setTempConversationId(data?.ConversationId);
-            const currentSelectedCustomer = selectedCustomerRef.current;
-
             setMessages((prevMessages) => {
                 const prevData = Array.isArray(prevMessages) ? prevMessages : prevMessages?.data || [];
 

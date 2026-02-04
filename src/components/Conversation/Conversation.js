@@ -17,8 +17,12 @@ import PersonIcon from '@mui/icons-material/Person';
 import { addReactionApi } from '../../API/SendMessage/addReactionApi';
 import { removeReactionApi } from '../../API/SendMessage/removeReactionApi';
 import { emitSendReaction } from '../../socket';
+import useOnlineStatus from '../../utils/internetCheck';
+import OfflineOverlay from './OfflineOverlay';
 
 const Conversation = ({ selectedCustomer, onConversationRead, onViewConversationRead, onCustomerSelect }) => {
+    const isOnline = useOnlineStatus();
+
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [contextMenu, setContextMenu] = useState(null);
     const containerRef = useRef(null);
@@ -561,6 +565,14 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const handleFileChangeCallback = useCallback((e) => {
         handleFileChange(e, toast);
     }, [handleFileChange]);
+
+    if (!isOnline) {
+        return (
+            <div className="conversation-container">
+                <OfflineOverlay />
+            </div>
+        );
+    }
 
     if (!selectedCustomer) {
         return (

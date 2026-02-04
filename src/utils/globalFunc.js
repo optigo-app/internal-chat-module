@@ -330,3 +330,5 @@ export const validateMediaFiles = (files) => {
         totalSize: currentTotal
     };
 };
+
+

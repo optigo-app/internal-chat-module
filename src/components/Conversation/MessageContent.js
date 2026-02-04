@@ -613,8 +613,6 @@ const MessageContent = ({
                     </Typography>
                 )}
 
-
-
                 {/* Image */}
                 {msg?.MessageType === "image" && ((_, index) => {
                     const mediaKey = getMediaKey(msg, index);
@@ -1361,13 +1359,6 @@ const MessageContent = ({
                     />
                 )
             }
-            {/* {msg?.Direction == 1 && (
-                <Box className="message-username-sendinfo" sx={{
-                    marginTop: msg?.Direction === 1 && msg?.ReactionEmojis && msg?.ReactionEmojis !== "" && msg.ReactionEmojis !== "[]" ? "20px" : "0px"
-                }}>
-                    @{msg?.SenderInfo}
-                </Box>
-            )} */}
         </div>
     );
 };
