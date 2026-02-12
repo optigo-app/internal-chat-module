@@ -13,7 +13,7 @@
     font-family: $font-family;
 
     .customer_lists_header {
-        padding: 14px 16px;
+        padding: 10px 16px;
         border-bottom: 1px solid $sidebar-borderColor;
 
         display: flex;
@@ -23,7 +23,7 @@
 
         .header_title {
             font-family: $font-family;
-            font-weight: 700;
+            font-weight: 500;
             color: $titleColor;
             margin: 0;
         }

@@ -129,6 +129,7 @@ const LoginPage1 = () => {
             }
 
             const socket = initializeSocket(userInfo.token)
+            
             const username = [
                 userInfo.firstname,
                 userInfo.middlename,

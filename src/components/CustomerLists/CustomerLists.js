@@ -1,4 +1,4 @@
-import { FileText, Image, Video, ArrowLeft, Pin, ChevronDown, Star, MessageSquarePlus, X } from 'lucide-react';
+import { FileText, Image, Video, ArrowLeft, Pin, ChevronDown, Star, Archive } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CheckCheck } from "lucide-react";
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -20,6 +20,8 @@ import {
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { Clear, Search } from '@mui/icons-material';
+import MapsUgcIcon from '@mui/icons-material/MapsUgc';
+import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import PersonIcon from '@mui/icons-material/Person';
 import './CustomerLists.scss';
 import { fetchConversationLists } from '../../API/ConverLists/ConversationLists';
@@ -33,7 +35,9 @@ import { Helmet } from 'react-helmet-async';
 import { notify } from '../../utils/notificationTemplates';
 import NotificationPermissionBar from '../_ui/NotificationPermissionBar';
 import AddConversation from '../AddConversation/AddConversation';
+import CreateGroup from '../AddConversation/CreateGroup';
 import useOnlineStatus from '../../utils/internetCheck';
+import useFaviconBadge from '../../hooks/useFaviconBadge';
 
 const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, selectedStatus = 'All', selectedTag = 'All', isConversationRead = false, viewConversationRead = false, onConversationList = () => { } }) => {
     const isOnline = useOnlineStatus();
@@ -51,6 +55,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const [selectMember, setSelectMember] = useState({});
     const [hoveredId, setHoveredId] = useState(null);
     const [showNewChat, setShowNewChat] = useState(false);
+    const [showCreateGroup, setShowCreateGroup] = useState(false);
     const containerRef = useRef(null);
     const pageSize = 100;
     const searchTimeoutRef = useRef(null);
@@ -157,13 +162,17 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     }, [isSyncing]);
 
     const loadMembersRef = useRef(loadMembers);
+
     useEffect(() => {
         loadMembersRef.current = loadMembers;
     }, [loadMembers]);
 
+    console.log("jhsjhds", chatMembers)
+
     const selectedConversationIdRef = useRef(selectedCustomer?.ConversationId);
     const selectedCustomerRef = useRef(selectedCustomer);
     const isConversationReadingRef = useRef(false);
+
     useEffect(() => {
         selectedConversationIdRef.current = selectedCustomer?.ConversationId;
         selectedCustomerRef.current = selectedCustomer;
@@ -502,16 +511,8 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             });
     };
 
-    const activeMembers = getFilteredMembers(false);
-    const archivedMembers = getFilteredMembers(true);
     const isArchiveOpen = location.pathname === '/archieve';
-
-    // Use the appropriate list for the main rendering loop
-    // If archive is open, we'll render the overlay separately, so the "main" list underneath should technically be the active members
-    // But to avoid complex prop drilling/rendering logic duplication, we will define `displayMembers` based on context
-    // Actually, we can just render the Overlay *in addition* to the main list.
-    // So the MAIN list (filteredMembers) should ALWAYS be activeMembers.
-    const filteredMembers = activeMembers;
+    const filteredMembers = getFilteredMembers(isArchiveOpen);
 
     const archivedCount = chatMembers?.data?.filter(m => m.IsArchived === 1)?.length || 0;
 
@@ -611,6 +612,8 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         return acc + (count > 0 ? 1 : 0);
     }, 0) || 0;
 
+    useFaviconBadge(totalUnread);
+
     return (
         <Box className="customer_lists_mainDiv" ref={containerRef} sx={{ position: 'relative' }}>
             {!isOnline && <Box className="offline-sidebar-overlay" />}
@@ -618,20 +621,31 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 <title>{totalUnread > 0 ? `(${totalUnread}) TeCoChat` : 'TeCoChat'}</title>
             </Helmet>
             <Box className="customer_lists_header">
-                <Typography variant="h6" className="header_title">Chat Members</Typography>
-
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <IconButton onClick={() => setShowNewChat(true)} size="small" sx={{ p: 0.8 }} className='add_conv'>
-                        <MessageSquarePlus size={20} />
-                    </IconButton>
-                    <Chip
-                        label={`${archieve} archive`}
-                        size="small"
-                        color="primary"
-                        variant="outlined"
-                        onClick={() => navigate('/archieve')}
-                    />
+                <Box className="add_conv_box">
+                    {isArchiveOpen && (
+                        <IconButton
+                            onClick={() => navigate(-1)}
+                            size="small"
+                            className='add_conv'
+                        >
+                            <ArrowLeft size={24} />
+                        </IconButton>
+                    )}
+                    <Typography variant="h6" className="header_title">
+                        {isArchiveOpen ? 'Archived Chats' : 'Chat Members'}
+                    </Typography>
                 </Box>
+
+                {!isArchiveOpen && (
+                    <Box className="add_conv_box">
+                        <IconButton onClick={() => setShowNewChat(true)} size="small" className='add_conv'>
+                            <MapsUgcIcon />
+                        </IconButton>
+                        <IconButton onClick={() => setShowCreateGroup(true)} size="small" className='add_conv group_add'>
+                            <GroupAddIcon />
+                        </IconButton>
+                    </Box>
+                )}
             </Box>
 
             <NotificationPermissionBar />
@@ -640,7 +654,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             <Box className="customer_lists_search">
                 <TextField
                     fullWidth
-                    placeholder="Search conversations"
+                    placeholder={isArchiveOpen ? "Search archived" : "Search conversations"}
                     variant="outlined"
                     size="small"
                     value={searchTerm}
@@ -681,160 +695,20 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     />
                 </Box>
             )}
-
-            {isArchiveOpen && (
+            {showCreateGroup && (
                 <Box className="new-chat-overlay">
-                    <Box className="customer_lists_mainDiv_2">
-                        <div className="customer_lists_header">
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <IconButton
-                                    onClick={() => navigate(-1)}
-                                    size="small"
-                                    sx={{ p: 0.5, mr: 1 }}
-                                >
-                                    <ArrowLeft size={20} />
-                                </IconButton>
-                                <Typography variant="h6" className="header_title">Archived Chats</Typography>
-                            </Box>
-                            <IconButton
-                                onClick={() => navigate(-1)}
-                                size="small"
-                                sx={{ p: 0.5 }}
-                            >
-                                <X size={20} />
-                            </IconButton>
-                        </div>
-
-                        {/* Search Input for Archive - Reusing Main Search Logic/UI for consistency or duplicate? 
-                            Ideally Archive has its own search but for now let's reuse logic.
-                        */}
-                        <div className="customer_lists_search">
-                            <TextField
-                                fullWidth
-                                placeholder="Search archived"
-                                variant="outlined"
-                                size="small"
-                                value={searchTerm}
-                                onChange={handleSearchChange}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <Search fontSize="small" />
-                                        </InputAdornment>
-                                    ),
-                                    endAdornment: searchTerm && (
-                                        <InputAdornment
-                                            position="end"
-                                            style={{ cursor: 'pointer' }}
-                                            onClick={() => {
-                                                setSearchTerm('');
-                                                loadMembers(1, true, '');
-                                            }}
-                                        >
-                                            <Clear fontSize="small" />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            />
-                        </div>
-
-                        <div className="customer_lists_main">
-                            <ul>
-                                {archivedMembers?.map((member) => {
-                                    const isSelectedAndReading =
-                                        selectedCustomer?.ConversationId === member.ConversationId &&
-                                        ((isConversationRead || viewConversationRead) ||
-                                            (isConversationRead && viewConversationRead));
-                                    const isSelected = selectedCustomer?.ConversationId === member.ConversationId;
-                                    const shouldShowUnreadBadge =
-                                        member.unreadCount > 0 && !isSelectedAndReading;
-
-                                    return (
-                                        <li
-                                            key={member.ConversationId}
-                                            className={`member-item ${isSelected ? 'active' : ''}`}
-                                            onClick={() => {
-                                                handleCustomerClick(member);
-                                            }}
-                                        >
-                                            <div className={`member-item ${isSelected ? 'active' : ''} ${isSelectedAndReading ? 'reading' : ''}`}>
-                                                <div className="member-avatar">
-                                                    {!hasCustomerName(member) ? (
-                                                        <Avatar
-                                                            {...getWhatsAppAvatarConfig(getCustomerAvatarSeed(member))}
-                                                        >
-                                                            <PersonIcon fontSize="small" />
-                                                        </Avatar>
-                                                    ) : (
-                                                        <Avatar {...member.avatarConfig} />
-                                                    )}
-                                                </div>
-
-                                                <div className="member-info">
-                                                    <div className="member-header">
-                                                        <Typography
-                                                            variant="subtitle1"
-                                                            className={shouldShowUnreadBadge ? 'member-name-unread' : 'member-name'}
-                                                        >
-                                                            {member.name}
-                                                        </Typography>
-
-                                                        {(member?.lastMessageText && member?.lastMessageText !== 'No message') && (
-                                                            <Typography variant="caption" className="member-time">
-                                                                {member?.lastMessageTime}
-                                                            </Typography>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="member-message">
-                                                        <Typography
-                                                            variant="body2"
-                                                            className={shouldShowUnreadBadge ? 'last-message-unread' : 'last-message'}
-                                                            style={{ display: 'flex', alignItems: 'center' }}
-                                                        >
-                                                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                {getMessageStatusIcon(member)}
-                                                                {member.LastMessageType === 1 && (member.LastMessage || 'Text')}
-                                                                {member.LastMessageType === 2 && <><Image size={12} /><span>Image</span></>}
-                                                                {member.LastMessageType === 3 && <><Video size={14} /><span>Video</span></>}
-                                                                {member.LastMessageType === 4 && <><FileText size={12} /><span>Document</span></>}
-                                                                {!member.LastMessageType && <span>Text</span>}
-                                                            </span>
-                                                        </Typography>
-
-                                                        <div className="member-actions-bar">
-                                                            {/* Minimal actions for Archive view or full actions? Assuming full actions ok */}
-                                                            <Tooltip title="Unarchive" arrow>
-                                                                <IconButton
-                                                                    size="small"
-                                                                    className="action-btn"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleMenuAction("UnArchive", member);
-                                                                    }}
-                                                                >
-                                                                    <Pin size={17} style={{ transform: 'rotate(180deg)' }} />
-                                                                </IconButton>
-                                                            </Tooltip>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </li>
-                                    );
-                                })}
-                                {archivedMembers?.length === 0 && (
-                                    <li style={{ textAlign: 'center', padding: '20px' }}>
-                                        <Typography variant="body2" color="textSecondary">
-                                            No archived conversations.
-                                        </Typography>
-                                    </li>
-                                )}
-                            </ul>
-                        </div>
-                    </Box>
+                    <CreateGroup
+                        onBack={() => setShowCreateGroup(false)}
+                        onClose={() => setShowCreateGroup(false)}
+                        onContinue={(selected) => {
+                            console.log('Final selected members for group:', selected);
+                            // logic for next step or API call
+                            setShowCreateGroup(false);
+                        }}
+                    />
                 </Box>
             )}
+
 
             {/* Filters */}
             <Box
@@ -895,12 +769,37 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
 
             <Box className="customer_lists_main" >
                 <ul ref={containerRef}>
+                    {archivedCount > 0 && !searchTerm && !isArchiveOpen && tabValue !== 2 && (
+                        <li
+                            className="member-item archived-row"
+                            onClick={() => navigate('/archieve')}
+                        >
+                            <div className="member-item">
+                                <div className="member-avatar">
+                                    <div className="archived-icon-wrapper">
+                                        <Archive size={20} />
+                                    </div>
+                                </div>
+                                <div className="member-info">
+                                    <div className="member-header">
+                                        <Typography variant="subtitle1" className="member-name">
+                                            Archived
+                                        </Typography>
+                                        <Typography variant="caption" className="archived-count">
+                                            {archivedCount}
+                                        </Typography>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                    )}
+
                     {loading && (!chatMembers?.data || chatMembers?.data.length === 0) ? (
                         <li
                             style={{
                                 textAlign: 'center',
                                 display: 'flex',
-                                justifyContent: 'center',
+                                justify_content: 'center',
                                 padding: '20px'
                             }}
                         >
@@ -909,7 +808,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     ) : (
                         filteredMembers?.length > 0 ? (
                             <>
-
                                 {filteredMembers
                                     .filter(member => !member.isSearchResult)
                                     .map((member) => {
@@ -961,11 +859,9 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                                                 {member.name}
                                                             </Typography>
 
-                                                            {(member?.lastMessageText && member?.lastMessageText !== 'No message') && (
-                                                                <Typography variant="caption" className="member-time">
-                                                                    {member?.lastMessageTime}
-                                                                </Typography>
-                                                            )}
+                                                            <Typography variant="caption" className="member-time">
+                                                                {member?.lastMessageTime}
+                                                            </Typography>
                                                         </div>
 
                                                         <div className="member-message">

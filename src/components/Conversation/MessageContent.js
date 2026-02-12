@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Box, CircularProgress, IconButton, Skeleton, Typography } from '@mui/material';
+import DownloadIcon from '@mui/icons-material/Download';
 import { alpha, useTheme } from '@mui/material/styles';
-import { ChevronDown, Download, FileText, CheckCheck, Image as ImageIcon, Video as VideoIcon, Play, FileType, FileSpreadsheet, FileArchive, FileCode, Forward, ArrowBigDownDash, ArrowBigDown } from 'lucide-react';
+import { ChevronDown, FileText, CheckCheck, Image as ImageIcon, Video as VideoIcon, Play, FileType, FileSpreadsheet, FileArchive, FileCode, Forward, ArrowBigDownDash, ArrowBigDown } from 'lucide-react';
 import { Emoji } from 'emoji-picker-react';
 import { FormatDateIST } from '../../utils/DateFnc';
-import DynamicTemplate from '../DynamicTemplate/DynamicTemplate';
 import QuickReactionMenu from './QuickReactionMenu';
 import ReactionDetailsMenu from './ReactionMenu';
 import { handleDownloadFile, getDocumentMeta, renderTextWithLinks } from '../../utils/globalFunc';
@@ -1189,13 +1189,11 @@ const MessageContent = ({
                                         opacity: 0.6,
                                         transform: 'translateX(4px)',
                                         transition: 'all 0.2s ease',
-                                        border: '1px solid',
-                                        borderColor: theme.palette.text.primary,
-                                        borderRadius: '50%',
+                                        boxShadow: 'rgba(0, 0, 0, 0.25) 0px 54px 55px, rgba(0, 0, 0, 0.12) 0px -12px 30px, rgba(0, 0, 0, 0.12) 0px 4px 6px, rgba(0, 0, 0, 0.17) 0px 12px 13px, rgba(0, 0, 0, 0.09) 0px -3px 5px;',
                                     }}
                                     title="Download"
                                 >
-                                    <ArrowBigDown size={20} />
+                                    <DownloadIcon fontSize='medium' />
                                 </IconButton>
                             </Box>
                         );

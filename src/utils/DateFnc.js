@@ -3,7 +3,7 @@ export function formatChatTimestamp(input) {
     if (isNaN(date.getTime())) return '';
 
     const now = new Date();
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const timeZone = 'UTC';
 
     const getTzDateKey = (d) => new Intl.DateTimeFormat('en-CA', {
         timeZone,
@@ -15,14 +15,14 @@ export function formatChatTimestamp(input) {
     const dateKey = getTzDateKey(date);
     const nowKey = getTzDateKey(now);
 
-    const nowStart = new Date(`${nowKey}T00:00:00`);
-    const dateStart = new Date(`${dateKey}T00:00:00`);
-    const diffDays = Math.floor((nowStart.getTime() - dateStart.getTime()) / (24 * 60 * 60 * 1000));
+    const MS_DAY = 24 * 60 * 60 * 1000;
+    const nowStart = new Date(`${nowKey}T00:00:00Z`);
+    const dateStart = new Date(`${dateKey}T00:00:00Z`);
+    const diffDays = Math.floor((nowStart.getTime() - dateStart.getTime()) / MS_DAY);
 
-    const yesterdayKey = new Date(nowStart.getTime() - (24 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+    const yesterdayKey = new Date(nowStart.getTime() - MS_DAY).toISOString().slice(0, 10);
 
     if (dateKey === nowKey) {
-        // Show time: e.g., 5:30 PM in local timezone
         return new Intl.DateTimeFormat('en-US', {
             timeZone,
             hour: 'numeric',
@@ -33,10 +33,9 @@ export function formatChatTimestamp(input) {
 
     if (dateKey === yesterdayKey) {
         return 'Yesterday';
-    }
+    }   
 
     if (diffDays >= 0 && diffDays < 7) {
-        // Within last 7 days: show weekday (e.g., Mon)
         return new Intl.DateTimeFormat('en-US', {
             timeZone,
             weekday: 'short',

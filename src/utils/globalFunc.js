@@ -1,6 +1,7 @@
 import React from 'react';
 import { SHA1 } from "crypto-js";
 import Hex from "crypto-js/enc-hex";
+import imageCompression from 'browser-image-compression';
 
 const hashString = (value) => {
     const str = String(value ?? '');
@@ -272,18 +273,18 @@ export const getFileExt = (name = '') => {
 export const getDocumentMeta = (name = '') => {
     const ext = getFileExt(name);
 
-    if (ext === 'pdf') return { label: 'PDF', tone: 'pdf', iconName: 'FileText', iconUrl: '/pdf.png' };
-    if (ext === 'doc' || ext === 'docx') return { label: 'DOCS', tone: 'doc', iconName: 'FileType', iconUrl: '/doc.png' };
-    if (ext === 'xls' || ext === 'xlsx' || ext === 'csv') return { label: 'EXCEL', tone: 'sheet', iconName: 'FileSpreadsheet', iconUrl: '/xls.png' };
-    if (ext === 'ppt' || ext === 'pptx') return { label: 'PPT', tone: 'ppt', iconName: 'FileType', iconUrl: '/ppt.png' };
-    if (ext === 'zip' || ext === 'rar' || ext === '7z') return { label: 'ZIP', tone: 'archive', iconName: 'FileArchive', iconUrl: '/doc.png' };
-    if (ext === 'psd') return { label: 'PSD', tone: 'psd', iconName: 'FileType', iconUrl: '/doc.png' };
-    if (ext === 'txt') return { label: 'TEXT', tone: 'default', iconName: 'FileText', iconUrl: '/txt.png' };
+    if (ext === 'pdf') return { label: 'PDF', tone: 'pdf', iconName: 'FileText', iconUrl: '/icons/pdf.png' };
+    if (ext === 'doc' || ext === 'docx') return { label: 'DOCS', tone: 'doc', iconName: 'FileType', iconUrl: '/icons/doc.png' };
+    if (ext === 'xls' || ext === 'xlsx' || ext === 'csv') return { label: 'EXCEL', tone: 'sheet', iconName: 'FileSpreadsheet', iconUrl: '/icons/xls.png' };
+    if (ext === 'ppt' || ext === 'pptx') return { label: 'PPT', tone: 'ppt', iconName: 'FileType', iconUrl: '/icons/ppt.png' };
+    if (ext === 'zip' || ext === 'rar' || ext === '7z') return { label: 'ZIP', tone: 'archive', iconName: 'FileArchive', iconUrl: '/icons/doc.png' };
+    if (ext === 'psd') return { label: 'PSD', tone: 'psd', iconName: 'FileType', iconUrl: '/icons/doc.png' };
+    if (ext === 'txt') return { label: 'TEXT', tone: 'default', iconName: 'FileText', iconUrl: '/icons/txt.png' };
     if (ext === 'json' || ext === 'xml' || ext === 'html' || ext === 'js' || ext === 'ts' || ext === 'css') {
-        return { label: 'CODE', tone: 'code', iconName: 'FileCode', iconUrl: '/doc.png' };
+        return { label: 'CODE', tone: 'code', iconName: 'FileCode', iconUrl: '/icons/doc.png' };
     }
 
-    return { label: ext.toUpperCase() || 'FILE', tone: 'default', iconName: 'File', iconUrl: '/doc.png' };
+    return { label: ext.toUpperCase() || 'FILE', tone: 'default', iconName: 'File', iconUrl: '/icons/doc.png' };
 };
 
 export const validateMediaFiles = (files) => {
@@ -330,5 +331,39 @@ export const validateMediaFiles = (files) => {
         totalSize: currentTotal
     };
 };
+
+export async function compressImagesToWebP(files, customOptions = {}) {
+    const inputFiles = Array.isArray(files) ? files : [files];
+
+    const options = {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+        fileType: "image/webp",
+        initialQuality: 0.8,
+        ...customOptions,
+    };
+
+    const results = [];
+
+    for (const file of inputFiles) {
+        if (!file?.type?.startsWith("image/")) continue;
+
+        const compressedFile = await imageCompression(file, options);
+
+        results.push({
+            id: `${file.name}-${Date.now()}`,
+            originalName: file.name,
+            originalSize: file.size,
+            compressedName:
+                file.name.replace(/\.[^/.]+$/, "") + ".webp",
+            compressedSize: compressedFile.size,
+            blob: compressedFile,
+            previewUrl: URL.createObjectURL(compressedFile),
+        });
+    }
+
+    return results;
+}
 
 

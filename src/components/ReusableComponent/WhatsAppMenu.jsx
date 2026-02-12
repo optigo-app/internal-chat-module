@@ -55,7 +55,7 @@ const WhatsAppMenu = ({ anchorEl, open, onClose, items = [], onAction, context }
             }}
           >
             {item.icon && (
-              <ListItemIcon sx={{minWidth: '30px'}}>
+              <ListItemIcon sx={{ minWidth: '30px' }}>
                 {item.icon}
               </ListItemIcon>
             )}

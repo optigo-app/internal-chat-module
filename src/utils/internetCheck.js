@@ -19,5 +19,5 @@ function useOnlineStatus() {
 
     return isOnline;
 }
-    
+
 export default useOnlineStatus;

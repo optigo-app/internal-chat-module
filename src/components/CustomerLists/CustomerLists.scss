@@ -118,7 +118,7 @@
     font-family: $font-family;
 
     .customer_lists_header {
-        padding: 14px 16px;
+        padding: 10px 16px;
         border-bottom: 1px solid $sidebar-borderColor;
         display: flex;
         justify-content: space-between;
@@ -127,14 +127,21 @@
 
         .header_title {
             font-family: $font-family;
-            font-weight: 700;
+            font-weight: 500;
             color: $titleColor;
             margin: 0;
         }
 
-        .add_conv {
-            color: $titleColor;
-            font-weight: 700;
+        .add_conv_box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            .add_conv {
+                color: $secondaryColor;
+                font-weight: 500;
+                padding: 8px;
+            }
         }
     }
 
@@ -675,4 +682,75 @@
     z-index: 9999;
     cursor: not-allowed;
     backdrop-filter: blur(1px);
+}
+
+.archived-row {
+    margin-bottom: 8px !important;
+    border-radius: 12px;
+
+    .member-item {
+        padding: 14px 16px;
+    }
+
+    .archived-icon-wrapper {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba($primary-main, 0.08);
+        color: $primary-main;
+
+        svg {
+            width: 20px;
+            height: 20px;
+            stroke-width: 2.2;
+        }
+    }
+
+    .member-info {
+        border-bottom: none !important;
+        padding-bottom: 0 !important;
+        display: flex;
+        align-items: center;
+
+        .member-header {
+            width: 100%;
+            margin-bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+    }
+
+    .member-name {
+        font-weight: 600 !important;
+        font-size: 15px !important;
+        color: $titleColor !important;
+    }
+
+    .archived-count {
+        background: rgba($primary-main, 0.12);
+        color: $primary-main;
+        font-weight: 700;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        min-width: 20px;
+        text-align: center;
+    }
+
+    &:hover {
+        background-color: rgba($primary-main, 0.04) !important;
+
+        .archived-icon-wrapper {
+            background-color: rgba($primary-main, 0.15);
+            transform: scale(1.05);
+        }
+
+        .archived-count {
+            background: rgba($primary-main, 0.2);
+        }
+    }
 }

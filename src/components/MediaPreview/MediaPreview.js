@@ -311,7 +311,7 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                                 ) : ((item.name || item.file?.name || '').toLowerCase()).endsWith('.doc') || ((item.name || item.file?.name || '').toLowerCase()).endsWith('.docx') ? (
                                                     <div className="no-preview-container">
                                                         <div className="file-icon">
-                                                            <img src="./doc.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
+                                                            <img src="./icons/doc.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
                                                         </div>
                                                         <div className="file-name">{item.name || item.file?.name}</div>
                                                         <div className="file-meta">
@@ -380,15 +380,15 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                         if (mime.startsWith('image') || isPhotoThumb) {
                                             thumbSrc = item.url || item.file.preview;
                                         } else if (mime.startsWith('video')) {
-                                            thumbSrc = "./video.png";
+                                            thumbSrc = "./icons/video.png";
                                         } else if (name.endsWith('.pdf')) {
-                                            thumbSrc = "./pdf.png";
+                                            thumbSrc = "./icons/pdf.png";
                                         } else if (name.endsWith('.doc') || name.endsWith('.docx')) {
-                                            thumbSrc = "./doc.png";
+                                            thumbSrc = "./icons/doc.png";
                                         } else if (name.endsWith('.xls') || name.endsWith('.xlsx') || name.endsWith('.csv')) {
-                                            thumbSrc = "./xls.png";
+                                            thumbSrc = "./icons/xls.png";
                                         } else if (name.endsWith('.txt')) {
-                                            thumbSrc = "./txt.png";
+                                            thumbSrc = "./icons/txt.png";
                                         }
 
                                         return (

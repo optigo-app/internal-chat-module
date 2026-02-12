@@ -417,7 +417,7 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
                 {item.type === 'video' && (
                   <div className="thumbnail-video">
                     <img
-                      src={`${process.env.PUBLIC_URL}/video.png`}
+                      src={`${process.env.PUBLIC_URL}/icons/video.png`}
                       alt="Video"
                       className="thumbnail-video-icon"
                     />

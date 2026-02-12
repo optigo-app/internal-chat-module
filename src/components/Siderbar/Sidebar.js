@@ -156,7 +156,7 @@ const Sidebar = ({ isCollapsed = false, onCollapsedChange = () => { } }) => {
                 <div className={isCollapsed ? "powered-by collapsed" : "powered-by"}>
                     <span>Powered by </span>
                     <div className="optigo-logo">
-                        <img src="/logo1.png" alt="Optigo logo" />
+                        <img src="/icons/logo1.png" alt="Optigo logo" loading='lazy'/>
                     </div>
                 </div>
             </div>

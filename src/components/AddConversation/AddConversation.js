@@ -168,16 +168,16 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
     return (
         <div className="customer_lists_mainDiv_2">
             <div className="customer_lists_header">
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Box className="add_conv_box">
                     {onBack && (
-                        <IconButton onClick={onBack} size="small" sx={{ mr: 1, p: 0.5 }}>
+                        <IconButton onClick={onBack} size="small" className='add_conv'>
                             <ArrowBack size={20} />
                         </IconButton>
                     )}
                     <Typography variant="h6" className="header_title">New Chat</Typography>
                 </Box>
                 {onClose && (
-                    <IconButton onClick={onClose} size="small" sx={{ p: 0.5 }}>
+                    <IconButton onClick={onClose} size="small" className='add_conv'>
                         <X size={20} />
                     </IconButton>
                 )}

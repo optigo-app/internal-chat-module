@@ -1,5 +1,6 @@
 import CryptoJS from "crypto-js";
 import { filesUploadApi } from "./filesUploadApi";
+import { compressImagesToWebP } from "../../utils/globalFunc";
 
 export const uploadMediaAPi = async ({
   folderName = "ChatMedia",
@@ -9,10 +10,33 @@ export const uploadMediaAPi = async ({
   try {
     if (!Array.isArray(files) || files.length === 0) return [];
 
+    const processedFiles = await Promise.all(
+      files.map(async (file) => {
+        try {
+          if (!(file instanceof File)) return file;
+          if (!file?.type?.startsWith("image/")) return file;
+
+          const compressedResults = await compressImagesToWebP(file);
+          const compressed = Array.isArray(compressedResults)
+            ? compressedResults[0]
+            : null;
+
+          if (!compressed?.blob) return file;
+
+          return new File([compressed.blob], compressed.compressedName || file.name, {
+            type: compressed.blob.type || "image/webp",
+            lastModified: file.lastModified,
+          });
+        } catch (e) {
+          return file;
+        }
+      })
+    );
+
     const uniqueNo = CryptoJS.lib.WordArray.random(16).toString();
 
     const res = await filesUploadApi({
-      attachments: files.map((file) => ({ file })),
+      attachments: processedFiles.map((file) => ({ file })),
       folderName,
       uniqueNo,
       onProgress,
