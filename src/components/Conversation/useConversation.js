@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, useContext } from 'react';
 import { conversationView } from '../../API/ConversationView/ConversationView';
 import { sendDocumentMessage, sendImageMessage, sendTextMessage, sendVideoMessage } from '../../API/SendMessage/SendMessageApi';
-import { normalizeServerMessages as normalizeServerMessagesHelper, groupMessagesByDateHelper } from './conversationUtils';
+import { normalizeServerMessages as normalizeServerMessagesHelper, groupMessagesByDateHelper, saveConversationToCache } from './conversationUtils';
 
 import { addMessageReactionHandler, addInternalMessageHandler, emitInternalMessageSend, addInternalStatusHandler, emitInternalMessageRead } from '../../socket';
 import { readMessageApi } from '../../API/SendMessage/ReadMessageApi';
@@ -14,6 +14,8 @@ import { replyToMessageApi } from '../../API/SendMessage/replyToMessageApi';
 import imageNotFound from '../../assets/image-not-found.jpg';
 import { generateMediaFolderName, validateMediaFiles } from '../../utils/globalFunc';
 import { showToast } from '../../utils/toastHelper';
+
+let isAppFirstLoad = true;
 
 export const useConversation = (selectedCustomer, onConversationRead, onViewConversationRead) => {
     const [inputValue, setInputValue] = useState("");
@@ -54,6 +56,17 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         setMediaFiles([]);
         setShowMedia(false);
     }, [selectedCustomer]);
+
+    useEffect(() => {
+        if (isAppFirstLoad) {
+            // After the first render cycle of any useConversation instance,
+            // we mark the app as "no longer first load" so subsequent switches use cache.
+            const timer = setTimeout(() => {
+                isAppFirstLoad = false;
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, []);
 
     const markLoaded = useCallback((key) => {
         setLoadedMedia(prev => ({ ...prev, [key]: true }));
@@ -104,10 +117,15 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
         const rawSenderId = Number(rawData?.SenderId ?? rawData?.Sender);
         const myId = Number(auth?.id ?? auth?.userId);
-        const derivedDirection = (rawSenderId && myId && rawSenderId === myId) ? 1 : 0;
-        const normalizedDirection = (typeof normalized?.Direction === 'number')
-            ? (normalized.Direction === 1 ? 1 : 0)
-            : derivedDirection;
+        const isMyMessage = !!(rawSenderId && myId && rawSenderId === myId);
+
+        // Priority 1: SenderId check. Priority 2: Trust normalized.Direction from utility.
+        // Backend sometimes sends Direction: 2 for incoming, normalize it to 0.
+        const normalizedDirection = isMyMessage ? 1 :
+            (normalized?.Direction === 1 ? 0 :
+                (normalized?.Direction === 2 ? 0 :
+                    (normalized?.Direction ?? 0)));
+
         const normalizedWithDirection = {
             ...normalized,
             Direction: normalizedDirection,
@@ -389,6 +407,13 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     const handleReadMessage = async (custConverId, signal = null) => {
         if (!custConverId) return;
 
+        // Visibility Guard: Don't mark as read if the tab is hidden.
+        // We relaxed this from hasFocus() to only visibilityState to ensure
+        // blue ticks appear when the window is visible but not necessarily focused.
+        if (document.visibilityState !== 'visible') {
+            return;
+        }
+
         // Note: We call the API for the conversation, but socket emit is strictly guarded
         const response = await readMessageApi(auth, { ConversationId: custConverId, signal });
 
@@ -416,7 +441,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     };
 
     const loadConversation = useCallback(
-        async (page = 1, reset = false) => {
+        async (page = 1, reset = false, ignoreCache = false) => {
             if (loading || !selectedCustomer?.ConversationId) return;
             const requestId = ++latestRequestRef.current;
             if (abortControllerRef.current) {
@@ -424,11 +449,41 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             }
             const controller = new AbortController();
             abortControllerRef.current = controller;
-            setLoading(true);
+
+            const selectedId = selectedCustomer?.ConversationId;
+            // Caching Logic: If not first load and we are on page 1, try to load from sessionStorage
+            const cacheKey = `chat_cache_${selectedId}`;
+            let didShowCache = false;
+            if (page === 1 && reset && !isAppFirstLoad && !ignoreCache) {
+                const cachedData = sessionStorage.getItem(cacheKey);
+                if (cachedData) {
+                    try {
+                        const parsed = JSON.parse(cachedData);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            setMessages({ data: parsed, total: parsed.length });
+                            setHasMore(true); // Default to true to allow paging if needed
+                            didShowCache = true;
+
+                            // Optimization: If no unread messages, trust the cache and skip the background API call.
+                            const unreadCount = Number(selectedCustomer?.unreadCount ?? selectedCustomer?.UnreadCount ?? 0);
+                            if (unreadCount === 0) {
+                                return; // Skip API call
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Error parsing chat cache:", e);
+                    }
+                }
+            }
+
+            // Only show loading spinner if we didn't already show something from cache
+            if (!didShowCache) {
+                setLoading(true);
+            }
 
             try {
                 const response = await conversationView(
-                    selectedCustomer?.ConversationId,
+                    selectedId,
                     page,
                     pageSize,
                     auth,
@@ -444,30 +499,50 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                         ? response.data
                         : [];
                 const serverMessages = normalizeServerMessages(rawServerMessages);
+
                 setMessages((prevMessages) => {
-                    const prevData = reset ? [] : prevMessages?.data || [];
-                    const optimisticMessages = prevData.filter(
+                    const prevData = Array.isArray(prevMessages?.data)
+                        ? prevMessages.data
+                        : (Array.isArray(prevMessages) ? prevMessages : []);
+
+                    // If reset is true, we usually clear everything. 
+                    // HOWEVER, if socket messages arrived for THIS conversation while the API was loading,
+                    // we MUST keep them. We filter prevData for messages matching the current conversation.
+                    const recentSocketMessages = reset
+                        ? prevData.filter(m => Number(m.ConversationId) === Number(selectedId))
+                        : prevData;
+
+                    const optimisticMessages = recentSocketMessages.filter(
                         (m) =>
                             m &&
                             m.Direction === 1 &&
                             (m.status === "pending" || m.status === 3)
                     );
+
                     const messageMap = new Map();
-                    const getId = (msg) => msg?.Id ?? msg?.id ?? `${msg?.Direction}_${msg?.Message}_${msg?.DateTime}`;
-                    for (const msg of prevData) {
+                    const getId = (msg) => msg?.Id ?? msg?.id ?? msg?.MessageId ?? `${msg?.Direction}_${msg?.Message}_${msg?.DateTime}`;
+
+                    // 1. Start with filtered existing messages (socket or previous page)
+                    for (const msg of recentSocketMessages) {
                         const id = getId(msg);
-                        if (!messageMap.has(id)) messageMap.set(id, msg);
+                        if (id && !messageMap.has(id)) messageMap.set(id, msg);
                     }
+
+                    // 2. Overwrite/add with server messages
                     for (const sm of serverMessages) {
                         const id = getId(sm);
+                        if (!id) continue;
                         const existing = messageMap.get(id);
-                        if (!existing || new Date(sm.DateTime) > new Date(existing.DateTime)) {
+                        // Only overwrite if it's the same ID or if the server message is newer
+                        if (!existing || new Date(sm.DateTime) >= new Date(existing.DateTime)) {
                             messageMap.set(id, sm);
                         }
                     }
+
+                    // 3. Re-apply optimistic messages
                     for (const om of optimisticMessages) {
                         const id = getId(om);
-                        if (!messageMap.has(id)) {
+                        if (id && !messageMap.has(id)) {
                             const omTs = new Date(om.DateTime).getTime();
                             const existsOnServer = serverMessages.some((sm) => {
                                 const smTs = new Date(sm?.DateTime).getTime();
@@ -594,10 +669,24 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         }
 
         // Mark messages as read when user opens/views this conversation
-        // We use the same abort controller created by loadConversation if possible, 
-        // or just ensure handleReadMessage is also abortable.
-        // loadConversation update abortControllerRef.current, so we can use it.
         handleReadMessage(selectedCustomer?.ConversationId, abortControllerRef.current?.signal);
+    }, [selectedCustomer?.ConversationId]);
+
+    // Handle marking as read when window regained focus or visibility
+    useEffect(() => {
+        const handleAutoRead = () => {
+            if (document.visibilityState === 'visible' && selectedCustomer?.ConversationId) {
+                handleReadMessage(selectedCustomer.ConversationId);
+            }
+        };
+
+        window.addEventListener('focus', handleAutoRead);
+        document.addEventListener('visibilitychange', handleAutoRead);
+
+        return () => {
+            window.removeEventListener('focus', handleAutoRead);
+            document.removeEventListener('visibilitychange', handleAutoRead);
+        };
     }, [selectedCustomer?.ConversationId]);
 
     useEffect(() => {
@@ -618,6 +707,16 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             }
         };
     }, [selectedCustomer, onConversationRead, onViewConversationRead]);
+
+    // Cache sync effect: Whenever messages change, update sessionStorage for the current conversation
+    useEffect(() => {
+        const conversationId = selectedCustomer?.ConversationId;
+        const messagesData = Array.isArray(messages) ? messages : messages?.data;
+
+        if (conversationId && Array.isArray(messagesData) && messagesData.length > 0) {
+            saveConversationToCache(conversationId, messagesData);
+        }
+    }, [messages, selectedCustomer?.ConversationId]);
 
     const handleAttachClick = (event) => {
         setShowMedia((prev) => !prev);
@@ -775,50 +874,134 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                         sendDocumentMessage;
 
             const res = await sendFn(auth, { senderId: auth?.id, receiverId, conversationId, caption, attachments });
-            const sentId = res?.Data?.rd?.[0]?.MessageId;
+            const sentIdString = res?.Data?.rd?.[0]?.MessageId;
+            const sentIds = sentIdString ? String(sentIdString).split(',').map(id => id.trim()) : [];
 
             const ReceiverId = selectedCustomer?.ReceiverId;
-            if (ReceiverId) {
-                emitInternalMessageSend({
-                    ReceiverId,
-                    ufcc: auth?.ufcc,
-                    Id: sentId || tempId,
-                    MessageId: sentId,
-                    SenderId: auth?.id,
-                    Direction: 2,
-                    Status: 1,
-                    MessageStatus: 1,
-                    MessageType: type,
-                    Message: caption,
-                    Time: time,
-                    Date: date,
-                    DateTime: dateTime,
-                    mediaItems,
-                    previewUrl: uploadedUrls[0],
-                    fileName: mediaItems?.[0]?.filename,
-                    fileType: mediaItems?.[0]?.mimeType,
-                    ConversationId: selectedCustomer?.ConversationId || tempConversationId,
-                });
-            }
+            
+            // If multiple documents, create separate messages for each
+            if (type === 'document' && sentIds.length > 1 && sentIds.length === safeFiles.length) {
+                // Remove the grouped temporary message
+                setMessages(prev => ({
+                    data: normalizeMessages(prev).filter(m => m.Id !== tempId),
+                    total: prev?.total || 0
+                }));
 
-            setMessages(prev => ({
-                data: normalizeMessages(prev).map(m =>
-                    m.Id === tempId
-                        ? {
-                            ...m,
-                            ...(sentId && { Id: sentId, MessageId: sentId }),
-                            previewUrl: uploadedUrls[0] || m.previewUrl,
-                            mediaItems,
-                            fileName: mediaItems[0]?.filename || m.fileName,
-                            fileType: mediaItems[0]?.mimeType || m.fileType,
-                            isUploading: false,
-                            percent: 100,
-                            Status: 1
+                // Create separate message for each document
+                sentIds.forEach((messageId, index) => {
+                    const singleMediaItem = [{
+                        url: uploadedUrls[index],
+                        filename: safeFiles[index]?.name,
+                        mimeType: safeFiles[index]?.type
+                    }];
+
+                    // Add individual message to state
+                    setMessages(prev => ({
+                        data: [
+                            ...normalizeMessages(prev),
+                            {
+                                Id: messageId,
+                                MessageId: messageId,
+                                Direction: 1,
+                                Status: 1,
+                                MessageType: type,
+                                previewUrl: uploadedUrls[index],
+                                Message: caption,
+                                Time: time,
+                                Date: date,
+                                DateTime: dateTime,
+                                mediaItems: singleMediaItem,
+                                fileName: safeFiles[index]?.name,
+                                fileType: safeFiles[index]?.type,
+                                isUploading: false,
+                                percent: 100,
+                                ConversationId: selectedCustomer?.ConversationId || tempConversationId,
+                                SenderId: auth?.id
+                            }
+                        ],
+                        total: (prev?.total || 0) + 1
+                    }));
+
+                    // Emit socket event for each document
+                    if (ReceiverId) {
+                        if (ReceiverId && Number(ReceiverId) === Number(auth?.id)) {
+                            console.warn("⚠️ Warning: Sending media to SELF (ReceiverId === SenderId).");
                         }
-                        : m
-                ),
-                total: (prev?.total || 0) + 1,
-            }));
+                        emitInternalMessageSend({
+                            ufcc: auth?.ufcc,
+                            ReceiverId,
+                            Id: messageId,
+                            MessageId: messageId,
+                            SenderId: auth?.id,
+                            Direction: 2,
+                            Status: 1,
+                            MessageStatus: 1,
+                            MessageType: type,
+                            Message: caption,
+                            Time: time,
+                            Date: date,
+                            DateTime: dateTime,
+                            mediaItems: singleMediaItem,
+                            previewUrl: uploadedUrls[index],
+                            fileName: safeFiles[index]?.name,
+                            fileType: safeFiles[index]?.type,
+                            ConversationId: selectedCustomer?.ConversationId || tempConversationId,
+                            SenderName: auth?.username || auth?.userId || auth?.name,
+                            RecieverName: auth?.username || auth?.userId || auth?.name,
+                        });
+                    }
+                });
+            } else {
+                // For images, videos, or single document - keep existing behavior
+                const sentId = sentIds[0] || sentIdString;
+                
+                if (ReceiverId) {
+                    if (ReceiverId && Number(ReceiverId) === Number(auth?.id)) {
+                        console.warn("⚠️ Warning: Sending media to SELF (ReceiverId === SenderId).");
+                    }
+                    emitInternalMessageSend({
+                        ufcc: auth?.ufcc,
+                        ReceiverId,
+                        Id: sentId || tempId,
+                        MessageId: sentId,
+                        SenderId: auth?.id,
+                        Direction: 2,
+                        Status: 1,
+                        MessageStatus: 1,
+                        MessageType: type,
+                        Message: caption,
+                        Time: time,
+                        Date: date,
+                        DateTime: dateTime,
+                        mediaItems,
+                        previewUrl: uploadedUrls[0],
+                        fileName: mediaItems?.[0]?.filename,
+                        fileType: mediaItems?.[0]?.mimeType,
+                        ConversationId: selectedCustomer?.ConversationId || tempConversationId,
+                        SenderName: auth?.username || auth?.userId || auth?.name,
+                        RecieverName: auth?.username || auth?.userId || auth?.name,
+                    });
+                }
+
+                setMessages(prev => ({
+                    data: normalizeMessages(prev).map(m =>
+                        m.Id === tempId
+                            ? {
+                                ...m,
+                                ...(sentId && { Id: sentId, MessageId: sentId }),
+                                previewUrl: uploadedUrls[0] || m.previewUrl,
+                                mediaItems,
+                                fileName: mediaItems[0]?.filename || m.fileName,
+                                fileType: mediaItems[0]?.mimeType || m.fileType,
+                                isUploading: false,
+                                percent: 100,
+                                Status: 1
+                            }
+                            : m
+                    ),
+                    total: (prev?.total || 0) + 1,
+                }));
+            }
         } catch (err) {
             console.error("uploadAndSendMedia error:", err);
             toast.error("Failed to send media");
@@ -832,6 +1015,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     };
 
     const handleSendMessage = async (containerRef, scrollToBottom, messageOverride = null) => {
+        debugger
         const caption = (messageOverride !== null ? messageOverride : inputValue).trim();
         const { time, date, dateTime } = getISTTime();
         console.log("Sending message:", { date, time, dateTime });
@@ -912,6 +1096,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                     Status: "pending",
                     MessageType: "text",
                     ConversationId: selectedCustomer?.ConversationId || tempConversationId,
+                    SenderId: auth?.id, // Ensure SenderId is present for direction logic
                     ...(replySnapshot && replyToMessageId
                         ? {
                             ContextType: 2,
@@ -952,13 +1137,16 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             if (sentId) {
                 const ReceiverId = selectedCustomer?.ReceiverId || selectedCustomer?.UserId;
                 if (ReceiverId) {
+                    if (ReceiverId && Number(ReceiverId) === Number(auth?.id)) {
+                        console.warn("⚠️ Warning: Sending message to SELF (ReceiverId === SenderId). This might be due to incorrect ReceiverId assignment.");
+                    }
                     emitInternalMessageSend({
-                        ReceiverId,
                         ufcc: auth?.ufcc,
+                        ReceiverId,
                         Id: auth.SocketId,
                         MessageId: sentId,
                         SenderId: auth?.id,
-                        Direction: 2,
+                        Direction: 1,
                         Status: 1,
                         MessageStatus: 1,
                         MessageType: "text",
@@ -970,7 +1158,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                         ...(!selectedCustomer?.ReceiverId
                             ? { ConversationName: auth?.username || auth?.userId }
                             : {}),
-                        RecieverName: auth?.username || auth?.userId,
+                        SenderName: auth?.username || auth?.userId || auth?.name, // Fixed typo from RecieverName
+                        RecieverName: auth?.username || auth?.userId || auth?.name, // Kept for backward compat temporarily
                         ...(replySnapshot && replyToMessageId
                             ? {
                                 ContextType: 2,
@@ -984,7 +1173,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                 }
                 setMessages((prev) => ({
                     data: normalizeMessages(prev).map((m) =>
-                        m.Id === tempId ? { ...m, Id: sentId, MessageId: sentId, Status: 1 } : m
+                        m.Id === tempId ? { ...m, Id: sentId, MessageId: sentId, Status: 1, SenderId: auth?.id, Direction: 1 } : m
                     ),
                     total: prev?.total || 0,
                 }));
@@ -994,7 +1183,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             toast.error("Failed to send message");
             setMessages((prev) => ({
                 data: normalizeMessages(prev).map((m) =>
-                    m.Id === tempId ? { ...m, Status: 3 } : m
+                    m.Id === tempId ? { ...m, Status: 4 } : m
                 ),
                 total: prev?.total || 0,
             }));
@@ -1096,12 +1285,28 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             toast.error("No valid recipients found.");
             return;
         }
-
+        debugger
         const params = {
             MessageId: forwardMessage?.MessageId ?? messId ?? null,
             ConversationIds: conversationIdsArr.join(",") || null,
             UserIds: userIdsArr.join(",") || null,
-            ReplyToAttachmentId: forwardMessage?.ReplyToAttachmentId || null,
+            ForwardedAttachmentIds: (() => {
+                // If forwarding a single attachment from media viewer
+                if (forwardMessage?.ReplyToAttachmentId) {
+                    return String(forwardMessage.ReplyToAttachmentId);
+                }
+
+                // If forwarding multiple attachments
+                let attachments = forwardMessage?.Attachments;
+                if (!attachments) return '';
+                if (typeof attachments === 'string') {
+                    try { attachments = JSON.parse(attachments); }
+                    catch { return ''; }
+                }
+                return Array.isArray(attachments)
+                    ? attachments.map(a => a?.Id).filter(Boolean).join(",") || ''
+                    : '';
+            })()
         };
 
         try {
@@ -1128,6 +1333,32 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                                     const isMedia = forwardMessage?.Type === "image" || forwardMessage?.Type === "video" || forwardMessage?.Type === "document" ||
                                         forwardMessage?.MessageType === "image" || forwardMessage?.MessageType === "video" || forwardMessage?.MessageType === "document";
 
+                                    if (receiverId && Number(receiverId) === Number(auth?.id)) {
+                                        console.warn("⚠️ Warning: Forwarding message to SELF.");
+                                    }
+
+                                    // Filter mediaItems if forwarding a single attachment from media viewer
+                                    let mediaItemsToSend = forwardMessage?.mediaItems || [];
+                                    let previewUrlToSend = forwardMessage?.previewUrl || null;
+                                    let fileNameToSend = forwardMessage?.fileName || null;
+                                    let fileTypeToSend = forwardMessage?.fileType || null;
+
+                                    if (forwardMessage?.ReplyToAttachmentId && Array.isArray(mediaItemsToSend)) {
+                                        const singleItem = mediaItemsToSend.find(item =>
+                                            item.attachmentId === forwardMessage.ReplyToAttachmentId ||
+                                            item.AttachmentId === forwardMessage.ReplyToAttachmentId ||
+                                            item.Id === forwardMessage.ReplyToAttachmentId ||
+                                            item.id === forwardMessage.ReplyToAttachmentId
+                                        );
+
+                                        if (singleItem) {
+                                            mediaItemsToSend = [singleItem];
+                                            previewUrlToSend = singleItem.url || singleItem.src || previewUrlToSend;
+                                            fileNameToSend = singleItem.filename || singleItem.fileName || fileNameToSend;
+                                            fileTypeToSend = singleItem.mimeType || fileTypeToSend;
+                                        }
+                                    }
+
                                     emitInternalMessageSend({
                                         Id: realMessageId, // Use the REAL MessageId from API
                                         ReceiverId: receiverId,
@@ -1136,21 +1367,22 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                                         Sender: auth?.id,
                                         ConversationId: convId,
                                         ConversationName: auth?.username || auth?.userName || auth?.userId,
+                                        SenderName: auth?.username || auth?.userId || auth?.name,
+                                        RecieverName: auth?.username || auth?.userId || auth?.name,
                                         Message: forwardMessage?.Message || (isMedia ? "" : "Forwarded Message"),
                                         MessageId: realMessageId, // Use the REAL MessageId from API
                                         Status: 1, // Sent
                                         MessageStatus: 1,
-                                        Direction: 2, // Incoming for the receiver (or 1 for sender? usually Sender sees Direction 1. The socket event name implies internal *send* notification, so this looks right for updating the sender's UI)
-                                        Direction: 2,
+                                        Direction: 2, // Incoming for the receiver
                                         DateTime: new Date().toISOString(),
                                         MessageType: forwardMessage?.Type || forwardMessage?.MessageType || "text",
                                         Type: forwardMessage?.Type || forwardMessage?.MessageType || "text",
                                         IsForwarded: true,
                                         ForwardedFrom: auth?.id, // Ensure Forwarded indicator shows locally
-                                        mediaItems: forwardMessage?.mediaItems || [],
-                                        previewUrl: forwardMessage?.previewUrl || null,
-                                        fileName: forwardMessage?.fileName || null,
-                                        fileType: forwardMessage?.fileType || null,
+                                        mediaItems: mediaItemsToSend,
+                                        previewUrl: previewUrlToSend,
+                                        fileName: fileNameToSend,
+                                        fileType: fileTypeToSend,
                                         Time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                                         Date: new Date().toLocaleDateString(),
                                     });
@@ -1222,8 +1454,9 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
         const parsed = typeof raw === 'number' ? raw : parseInt(raw, 10);
 
-        // Support legacy Status codes (1=sent, 3=read) and new MessageStatus codes (1=sent, 2=read)
-        if (parsed === 2 || parsed === 3) return 'read';
+        // Support Status codes: 1=sent (1 tick), 2=delivered (2 gray), 3=read (2 blue)
+        if (parsed === 3) return 'read';
+        if (parsed === 2) return 'delivered';
         if (parsed === 1 || parsed === 0) return 'sent';
         return null;
     };
@@ -1292,5 +1525,6 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         scrollToMessage,
         getMessageStatusIcon,
         formatDateHeader,
+        refresh: () => loadConversation(1, true, true),
     };
 }

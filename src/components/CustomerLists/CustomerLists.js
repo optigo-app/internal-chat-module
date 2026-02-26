@@ -30,6 +30,7 @@ import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig,
 import WhatsAppMenu from '../ReusableComponent/WhatsAppMenu';
 import { getMessagePreview, processApiResponse, getCustomerListMenuItems } from './CustomerListFunc';
 import { updateConversationApi } from '../../API/SendMessage/updateConversationApi';
+import { updateChatCache } from '../Conversation/conversationUtils';
 import { addInternalMessageHandler, addInternalStatusHandler } from '../../socket';
 import { Helmet } from 'react-helmet-async';
 import { notify } from '../../utils/notificationTemplates';
@@ -167,8 +168,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         loadMembersRef.current = loadMembers;
     }, [loadMembers]);
 
-    console.log("jhsjhds", chatMembers)
-
     const selectedConversationIdRef = useRef(selectedCustomer?.ConversationId);
     const selectedCustomerRef = useRef(selectedCustomer);
     const isConversationReadingRef = useRef(false);
@@ -228,14 +227,20 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             if (conversationId == null) return prev;
 
             // RESOLVED NAME (default logic)
+            // Prioritize explicit SENDER name over Conversation/Customer name for notifications
             let resolvedName = (() => {
+                const senderInfo = (incoming?.FirstName || incoming?.LastName)
+                    ? ((incoming?.FirstName || '') + ' ' + (incoming?.LastName || '')).trim()
+                    : (incoming?.SenderInfo || incoming?.SenderName || incoming?.senderName || '');
+
                 const candidate = String(
-                    incoming?.CustomerName ??
-                    incoming?.ConversationName ??
-                    incoming?.UserName ??
-                    incoming?.name ??
-                    incoming?.DisplayEmail ??
-                    incoming?.RecieverName ??
+                    senderInfo ||
+                    incoming?.CustomerName ||
+                    incoming?.ConversationName ||
+                    incoming?.UserName ||
+                    incoming?.name ||
+                    incoming?.DisplayEmail ||
+                    incoming?.RecieverName ||
                     ''
                 ).trim();
                 return candidate || getCustomerDisplayName(incoming);
@@ -289,14 +294,22 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             }
 
             const nextUnreadCount = (currentCount) => {
+                // Status changes don't affect unread count (handled by nextUnreadOnStatus)
                 if (isStatusChange) return currentCount;
+
+                // Outgoing messages: preserve existing unread count
                 if (isOutgoing) return currentCount;
+
+                // Incoming message in open conversation: reset to 0 (user is viewing it)
                 if (isOpenConversation) return 0;
+
+                // Incoming message in closed conversation: increment
                 return (currentCount || 0) + 1;
             };
 
             const nextUnreadOnStatus = (currentCount) => {
                 if (!isStatusChange) return currentCount;
+                // Reset unread count when Status is 1 (based on old working logic)
                 const raw = incoming?.MessageStatus ?? incoming?.Status;
                 if (Number(raw) === 1) return 0;
                 return currentCount;
@@ -310,6 +323,21 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     ? (String(incomingId) === String(currentChat.LastMessageId))
                     : (currentChat.lastMessageText === messagePreviewText &&
                         currentChat.lastMessageTime === formattedTime);
+
+                // Guard: If this is a status-only event (like internal:msg_read) without a MessageId,
+                // only update unread count, don't modify message preview or other fields
+                if (isStatusChange && !incomingId && !incoming?.Message) {
+                    const unreadFinal = nextUnreadOnStatus(currentUnread);
+
+                    updatedData[index] = {
+                        ...currentChat,
+                        unreadCount: unreadFinal,
+                        UnreadCount: unreadFinal,
+                    };
+
+                    updatedData.sort(conversationComparator);
+                    return { ...prev, data: updatedData };
+                }
 
                 if (isSameMessage && !isStatusChange) {
                     return prev;
@@ -386,7 +414,11 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     LastMessageStatus: incoming?.MessageStatus ?? incoming?.Status ?? incoming?.status,
                     LastMessageDirection: normalizedDirection,
                     LastMessageId: incoming?.MessageId ?? incoming?.Id,
-                    ReceiverId: incoming?.ReceiverId,
+                    // FIX: For incoming messages, the "Receiver" of the chat item (the person we talk to) 
+                    // is the SENDER of the message.
+                    ReceiverId: isOutgoing
+                        ? (incoming?.ReceiverId || incoming?.UserId || incoming?.CustomerId)
+                        : (incoming?.SenderId || incoming?.Sender || incoming?.UserId),
                     avatar: null,
                     avatarConfig: getWhatsAppAvatarConfig(avatarSeed),
                 };
@@ -394,9 +426,14 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             }
 
             updatedData.sort(conversationComparator);
+
+            // SYNC TO CACHE
+            // This ensures that when the user switches to this chat later, the cache is up-to-date.
+            updateChatCache(conversationId, incoming, auth, isStatusChange);
+
             return { ...prev, data: updatedData };
         });
-    }, [auth?.id, auth?.userId, conversationComparator]);
+    }, [auth?.id, auth?.userId, auth, conversationComparator]);
 
     useEffect(() => {
         if (!auth?.token || !auth?.userId) return;

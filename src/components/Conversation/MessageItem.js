@@ -86,6 +86,7 @@ const MessageItem = ({
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
         >
+
             {msg.Direction === 0 && (
                 !hasCustomerName(selectedCustomer) ? (
                     (() => {

@@ -14,10 +14,35 @@ export const NotificationProvider = ({ children }) => {
     useEffect(() => {
         if (typeof window === "undefined" || !("Notification" in window)) return;
 
+        // Initial check
+        setPermissionStatus(Notification.permission);
         if (Notification.permission === "granted") {
             setEnabledOpen(true);
         }
-        setPermissionStatus(Notification.permission);
+
+        // Listen for changes (e.g. user changes settings via browser UI)
+        if (navigator.permissions && navigator.permissions.query) {
+            navigator.permissions.query({ name: 'notifications' }).then((permissionStatus) => {
+                permissionStatus.onchange = () => {
+                    console.log("Permission changed to:", permissionStatus.state);
+                    setPermissionStatus(permissionStatus.state);
+
+                    if (permissionStatus.state === 'granted') {
+                        setEnabledOpen(true);
+                        setShowGuide(false); // Close modal if open
+                        showToast("Notifications enabled!", "success");
+                        new Notification("Notifications enabled!", {
+                            body: "You'll receive real-time updates.",
+                            icon: LOGO_ICON
+                        });
+                    } else if (permissionStatus.state === 'denied') {
+                        setShowGuide(false); // Optionally close modal or keep basic blocked UI
+                    }
+                };
+            }).catch(err => {
+                console.error("Permission query error:", err);
+            });
+        }
     }, []);
 
     const requestPermission = async () => {
@@ -25,20 +50,23 @@ export const NotificationProvider = ({ children }) => {
 
         if (Notification.permission === 'default') {
             setShowGuide(true);
+        } else if (Notification.permission === 'denied') {
+            // New behavior: Show guide even if denied, so we can instruct them to unblock
+            setShowGuide(true);
         } else {
-            // If already blocked or granted, don't show guide, just try to request (browser will handle)
             executeNativeRequest();
         }
     };
 
-    const executeNativeRequest = async () => {
+    const executeNativeRequest = async (fromModal = false) => {
         try {
             const status = await Notification.requestPermission();
             setPermissionStatus(status);
-            setShowGuide(false);
+            if (!fromModal) setShowGuide(false); // Only close if not from modal (modal handles its own closing/state)
 
             if (status === "granted") {
                 setEnabledOpen(true);
+                setShowGuide(false);
                 showToast("Notifications enabled!", "success");
 
                 new Notification("Notifications enabled!", {
@@ -46,7 +74,10 @@ export const NotificationProvider = ({ children }) => {
                     icon: LOGO_ICON
                 });
             } else if (status === "denied") {
-                showToast("Notifications blocked. You can enable them in your browser settings if you wish to see desktop alerts.", "warning");
+                // Only show toast if NOT from the modal (because modal already explains it's blocked)
+                if (!fromModal) {
+                    showToast("Notifications blocked. You can enable them in your browser settings if you wish to see desktop alerts.", "warning");
+                }
             }
         } catch (error) {
             console.error("Error requesting notification permission:", error);

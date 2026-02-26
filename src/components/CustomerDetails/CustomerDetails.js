@@ -14,28 +14,23 @@ import {
 import './CustomerDetails.scss';
 import { LoginContext } from '../../context/LoginData';
 import { fetchMediaLists } from '../../API/MediaLists/MediaLists';
-import { MediaApi } from '../../API/InitialApi/MediaApi';
 import MediaSection from './MediaSection';
 import DocumentsSection from './DocumentsSection';
-import LinksSection from './LinksSection';
 import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig, hasCustomerName } from '../../utils/globalFunc';
-import { FileText, Image, Link } from 'lucide-react';
+import { FileText, Image, Video } from 'lucide-react';
 
 const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
     const [activeTab, setActiveTab] = useState('media');
     const [mediaItems, setMediaItems] = useState({
         images: [],
         videos: [],
-        documents: [],
-        links: []
+        documents: []
     });
     const [pagination, setPagination] = useState({
         images: { page: 1, hasMore: true, isLoading: false },
         videos: { page: 1, hasMore: true, isLoading: false },
-        documents: { page: 1, hasMore: true, isLoading: false },
-        links: { page: 1, hasMore: true, isLoading: false }
+        documents: { page: 1, hasMore: true, isLoading: false }
     });
-    const [mediaCache, setMediaCache] = useState({});
     const { auth } = useContext(LoginContext);
     const pageSize = 6;
     
@@ -45,7 +40,7 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
     const inFlightRequestsRef = useRef(new Set());
     const fetchedPagesRef = useRef(new Set());
 
-    const getItemKey = (item) => item?.Id ?? item?.MediaUrl;
+    const getItemKey = (item) => item?.Id ?? item?.FileUrl;
     const mergeUniqueByKey = (prevList, nextList) => {
         const map = new Map();
         (prevList || []).forEach((it) => {
@@ -59,52 +54,39 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
         return Array.from(map.values());
     };
 
-    const fetchMediaItem = async (mediaUrl) => {
-        if (!mediaUrl || mediaCache[mediaUrl]) return mediaCache[mediaUrl];
-
-        try {
-            const blob = await MediaApi(auth?.whatsappKey, auth?.whatsappNumber, mediaUrl);
-            if (blob) {
-                const objectUrl = URL.createObjectURL(blob);
-                setMediaCache(prev => ({ ...prev, [mediaUrl]: objectUrl }));
-                return objectUrl;
-            }
-        } catch (error) {
-            console.error('Error fetching media:', error);
-        }
-        return null;
-    };
-
     const processMediaItems = (items) => {
         const categorized = {
             images: [],
             videos: [],
-            documents: [],
-            links: []
+            documents: []
         };
 
         items.forEach(item => {
-            const mediaItem = { ...item };
+            const mimeType = item.MimeType || '';
+            const mediaItem = {
+                ...item,
+                src: item.FileUrl,
+                name: item.FileName,
+                type: mimeType
+            };
 
-            if (item.MessageType === 'image') {
+            if (mimeType.startsWith('image/')) {
                 categorized.images.push(mediaItem);
-            } else if (item.MessageType === 'video') {
+            } else if (mimeType.startsWith('video/')) {
                 categorized.videos.push(mediaItem);
-            } else if (item.MessageType === 'document') {
-                categorized.documents.push(mediaItem);
             } else {
-                categorized.links.push(mediaItem);
+                categorized.documents.push(mediaItem);
             }
         });
 
+        console.log('Categorized items:', categorized);
         return categorized;
     };
 
     const fetchMediaData = async (type, page = 1) => {
         if (!customer?.ConversationId) return;
 
-        const group = (type === 'images' || type === 'videos') ? 'media' : 'docs';
-        const requestKey = `${customer.ConversationId}:${group}:${page}`;
+        const requestKey = `${customer.ConversationId}:all:${page}`;
         if (inFlightRequestsRef.current.has(requestKey) || fetchedPagesRef.current.has(requestKey)) return;
 
         inFlightRequestsRef.current.add(requestKey);
@@ -123,63 +105,34 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
             if (response?.data) {
                 const categorized = processMediaItems(response.data);
 
-                // For images, also update videos (since they come from the same API)
-                if (type === 'images' || type === 'videos') {
-                    setMediaItems(prev => ({
-                        ...prev,
-                        images: page === 1 ? categorized.images : mergeUniqueByKey(prev.images, categorized.images),
-                        videos: page === 1 ? categorized.videos : mergeUniqueByKey(prev.videos, categorized.videos)
-                    }));
+                // Update all categories since API returns all file types together
+                setMediaItems(prev => ({
+                    images: page === 1 ? categorized.images : mergeUniqueByKey(prev.images, categorized.images),
+                    videos: page === 1 ? categorized.videos : mergeUniqueByKey(prev.videos, categorized.videos),
+                    documents: page === 1 ? categorized.documents : mergeUniqueByKey(prev.documents, categorized.documents)
+                }));
 
-                    const hasMoreItems = response.data.length === pageSize;
-                    setPagination(prev => ({
-                        ...prev,
-                        images: {
-                            ...prev.images,
-                            page,
-                            hasMore: hasMoreItems,
-                            isLoading: false
-                        },
-                        videos: {
-                            ...prev.videos,
-                            page,
-                            hasMore: hasMoreItems,
-                            isLoading: false
-                        }
-                    }));
-                } 
-                // For documents, also update links (since they come from the same API)
-                else if (type === 'documents' || type === 'links') {
-                    setMediaItems(prev => ({
-                        ...prev,
-                        documents: page === 1 ? categorized.documents : mergeUniqueByKey(prev.documents, categorized.documents),
-                        links: page === 1 ? categorized.links : mergeUniqueByKey(prev.links, categorized.links)
-                    }));
-
-                    const hasMoreItems = response.data.length === pageSize;
-                    setPagination(prev => ({
-                        ...prev,
-                        documents: {
-                            ...prev.documents,
-                            page,
-                            hasMore: hasMoreItems,
-                            isLoading: false
-                        },
-                        links: {
-                            ...prev.links,
-                            page,
-                            hasMore: hasMoreItems,
-                            isLoading: false
-                        }
-                    }));
-                }
-
-                // Pre-fetch media URLs for all items
-                await Promise.all(
-                    response.data
-                        .filter(item => item.MediaUrl)
-                        .map(item => fetchMediaItem(item.MediaUrl))
-                );
+                const hasMoreItems = response.data.length === pageSize;
+                setPagination(prev => ({
+                    images: {
+                        ...prev.images,
+                        page,
+                        hasMore: hasMoreItems,
+                        isLoading: false
+                    },
+                    videos: {
+                        ...prev.videos,
+                        page,
+                        hasMore: hasMoreItems,
+                        isLoading: false
+                    },
+                    documents: {
+                        ...prev.documents,
+                        page,
+                        hasMore: hasMoreItems,
+                        isLoading: false
+                    }
+                }));
 
                 fetchedPagesRef.current.add(requestKey);
             }
@@ -203,14 +156,14 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
 
     // Updated version to handle combined data
     const loadMoreMedia = () => {
-        if (!pagination.images.isLoading && (pagination.images.hasMore || pagination.videos.hasMore)) {
+        if (!pagination.images.isLoading && pagination.images.hasMore) {
             const nextPage = pagination.images.page + 1;
             fetchMediaData('images', nextPage);
         }
     };
 
     const loadMoreDocuments = () => {
-        if (!pagination.documents.isLoading && (pagination.documents.hasMore || pagination.links.hasMore)) {
+        if (!pagination.documents.isLoading && pagination.documents.hasMore) {
             const nextPage = pagination.documents.page + 1;
             fetchMediaData('documents', nextPage);
         }
@@ -219,64 +172,42 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
     useEffect(() => {
         if (customer.ConversationId) {
             // Reset state when customer changes
-            setMediaItems({ images: [], videos: [], documents: [], links: [] });
+            setMediaItems({ images: [], videos: [], documents: [] });
             setPagination({
                 images: { page: 1, hasMore: true, isLoading: false },
                 videos: { page: 1, hasMore: true, isLoading: false },
-                documents: { page: 1, hasMore: true, isLoading: false },
-                links: { page: 1, hasMore: true, isLoading: false }
+                documents: { page: 1, hasMore: true, isLoading: false }
             });
 
             inFlightRequestsRef.current.clear();
             fetchedPagesRef.current.clear();
 
-            // Initial fetch for media (images and videos) and documents/links
+            // Initial fetch for all media types
             fetchMediaData('images', 1);
-            fetchMediaData('documents', 1);
         }
     }, [customer.ConversationId]);
 
     const handleMediaClick = (media) => {
         // Handle media preview or open in new tab
-        if (media.MessageType === 'image' || media.MessageType === 'video') {
-            window.open(mediaCache[media.MediaUrl] || media.MediaUrl, '_blank');
-        } else if (media.MessageType === 'document') {
+        if (media.type?.startsWith('image/') || media.type?.startsWith('video/')) {
+            window.open(media.src || media.FileUrl, '_blank');
+        } else {
             // Handle document preview or download
-            handleDownload(media.MediaUrl, media.MediaName || `document_${media.Id}`);
+            handleDownload(media.src || media.FileUrl, media.name || media.FileName || `document_${media.Id}`);
         }
     };
 
     const handleDownload = async (url, filename) => {
         try {
             const link = document.createElement('a');
-            const objectUrl = mediaCache[url] || await fetchMediaItem(url);
-
-            if (objectUrl) {
-                link.href = objectUrl;
-                link.download = filename || 'download';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
+            link.href = url;
+            link.download = filename || 'download';
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         } catch (error) {
             console.error('Download failed:', error);
-        }
-    };
-
-    const handleShare = (url) => {
-        if (navigator.share) {
-            navigator.share({
-                title: 'Check this out',
-                url: url
-            }).catch(console.error);
-        } else {
-            // Fallback for browsers that don't support Web Share API
-            navigator.clipboard.writeText(url).then(() => {
-                // Show success message
-                alert('Link copied to clipboard!');
-            }).catch(err => {
-                console.error('Could not copy text: ', err);
-            });
         }
     };
 
@@ -374,28 +305,37 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
                                     <span>Media</span>
                                 </button>
                                 <button
+                                    className={`tab-button ${activeTab === 'videos' ? 'active' : ''}`}
+                                    onClick={() => setActiveTab('videos')}
+                                >
+                                    <Video size={20} />
+                                    <span>Videos</span>
+                                </button>
+                                <button
                                     className={`tab-button ${activeTab === 'docs' ? 'active' : ''}`}
                                     onClick={() => setActiveTab('docs')}
                                 >
                                     <FileText size={20} />
                                     <span>Docs</span>
                                 </button>
-                                <button
-                                    className={`tab-button ${activeTab === 'links' ? 'active' : ''}`}
-                                    onClick={() => setActiveTab('links')}
-                                >
-                                    <Link size={20} />
-                                    <span>Links</span>
-                                </button>
                             </div>
 
                             <div className="tab-content">
                                 {activeTab === 'media' && (
                                     <MediaSection
-                                        mediaItems={mediaItems}
-                                        mediaCache={mediaCache}
-                                        isLoading={pagination.images.isLoading || pagination.videos.isLoading}
-                                        hasMore={pagination.images.hasMore || pagination.videos.hasMore}
+                                        mediaItems={{ images: mediaItems.images, videos: [] }}
+                                        isLoading={pagination.images.isLoading}
+                                        hasMore={pagination.images.hasMore}
+                                        onLoadMore={loadMoreMedia}
+                                        onMediaClick={handleMediaClick}
+                                        paginationFlag={enablePagination}
+                                    />
+                                )}
+                                {activeTab === 'videos' && (
+                                    <MediaSection
+                                        mediaItems={{ images: [], videos: mediaItems.videos }}
+                                        isLoading={pagination.videos.isLoading}
+                                        hasMore={pagination.videos.hasMore}
                                         onLoadMore={loadMoreMedia}
                                         onMediaClick={handleMediaClick}
                                         paginationFlag={enablePagination}
@@ -404,22 +344,11 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
                                 {activeTab === 'docs' && (
                                     <DocumentsSection
                                         documents={mediaItems.documents}
-                                        mediaCache={mediaCache}
                                         isLoading={pagination.documents.isLoading}
                                         hasMore={pagination.documents.hasMore}
                                         onLoadMore={loadMoreDocuments}
                                         onDocumentClick={handleMediaClick}
                                         onDownload={handleDownload}
-                                        paginationFlag={enablePagination}
-                                    />
-                                )}
-                                {activeTab === 'links' && (
-                                    <LinksSection
-                                        links={mediaItems.links}
-                                        isLoading={pagination.links.isLoading}
-                                        hasMore={pagination.links.hasMore}
-                                        onLoadMore={loadMoreDocuments}
-                                        onShare={handleShare}
                                         paginationFlag={enablePagination}
                                     />
                                 )}

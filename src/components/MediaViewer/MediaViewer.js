@@ -7,9 +7,10 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import './MediaViewer.scss';
 import { handleDownloadFile, getCustomerDisplayName, getWhatsAppAvatarConfig, getCustomerAvatarSeed, hasCustomerName, getFileExt, getDocumentMeta } from '../../utils/globalFunc';
+import { FormatDateIST, formatChatTimestamp } from '../../utils/DateFnc';
 import PersonIcon from '@mui/icons-material/Person';
 
-const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, onReply, onForward }) => {
+const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, onReply, onForward, message }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [loading, setLoading] = useState(() => {
     const initialState = {};
@@ -145,6 +146,13 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
 
   const currentMedia = mediaItems[currentIndex];
 
+  const dateStr = message.Date;
+  const timeStr = message?.Time || message?.dateTime ? message?.Time || message?.dateTime : message?.DateTime ? FormatDateIST(message.DateTime, "dd-mm-yyyy").time.toLowerCase() : '';
+  const dateObj = new Date(dateStr);
+  const formattedDate = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).format(dateObj);
+  const timeStrUpper = timeStr.replace(/am|pm/g, (match) => match.toUpperCase());
+  let messageTimestamp = `${formattedDate} at ${timeStrUpper}`;
+
   return (
     <Dialog
       open
@@ -184,7 +192,7 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
           )}
           <div className="media-viewer-user-info">
             <div className="media-viewer-username">{getCustomerDisplayName(selectedCustomer)}</div>
-            <div className="media-viewer-timestamp">Today at {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()}</div>
+            <div className="media-viewer-timestamp">{messageTimestamp}</div>
           </div>
         </div>
 

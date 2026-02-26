@@ -300,7 +300,7 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                                 {((item.name || item.file?.name || '').toLowerCase()).endsWith('.pdf') ? (
                                                     <div className="no-preview-container">
                                                         <div className="file-icon">
-                                                            <img src="./pdf.png" alt="Pdf" style={{ height: "100px", width: "100%" }} />
+                                                            <img src="./icons/pdf.png" alt="Pdf" style={{ height: "100px", width: "100%" }} />
                                                         </div>
                                                         <div className="file-name">{item.name || item.file?.name}</div>
                                                         <div className="file-meta">
@@ -322,7 +322,7 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                                 ) : ((item.name || item.file?.name || '').toLowerCase()).endsWith('.xls') || ((item.name || item.file?.name || '').toLowerCase()).endsWith('.xlsx') || ((item.name || item.file?.name || '').toLowerCase()).endsWith('.csv') ? (
                                                     <div className="no-preview-container">
                                                         <div className="file-icon">
-                                                            <img src="./xls.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
+                                                            <img src="./icons/xls.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
                                                         </div>
                                                         <div className="file-name">{item.name || item.file?.name}</div>
                                                         <div className="file-meta">
@@ -333,7 +333,7 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                                 ) : ((item.name || item.file?.name || '').toLowerCase()).endsWith('.txt') ? (
                                                     <div className="no-preview-container">
                                                         <div className="file-icon">
-                                                            <img src="./txt.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
+                                                            <img src="./icons/txt.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
                                                         </div>
                                                         <div className="file-name">{item.name || item.file?.name}</div>
                                                         <div className="file-meta">

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useContext, useLayoutEffect } from 'react';
-import { Box, Typography, Avatar, useMediaQuery } from '@mui/material';
+import { Box, Typography, Avatar, useMediaQuery, IconButton, Tooltip } from '@mui/material';
 import './Conversation.scss';
 import CustomerDetails from '../CustomerDetails/CustomerDetails';
 import { formatDateHeader } from '../../utils/DateFnc';
@@ -14,6 +14,7 @@ import MessageArea from './MessageArea';
 import ViewContext from './ViewContext';
 import { useConversation } from './useConversation';
 import PersonIcon from '@mui/icons-material/Person';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { addReactionApi } from '../../API/SendMessage/addReactionApi';
 import { removeReactionApi } from '../../API/SendMessage/removeReactionApi';
 import { emitSendReaction } from '../../socket';
@@ -96,6 +97,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         scrollToMessage,
         getMessageStatusIcon,
         processFiles,
+        refresh,
     } = useConversation(selectedCustomer, onConversationRead, onViewConversationRead);
 
     useEffect(() => {
@@ -606,6 +608,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     mediaItems={mediaViewerItems}
                     initialIndex={mediaViewerIndex}
                     selectedCustomer={selectedCustomer}
+                    message={mediaViewerMessage}
                     onClose={() => setMediaViewerOpen(false)}
                     onReply={(attachmentId) => {
                         handleReply(mediaViewerMessage, attachmentId);
@@ -649,6 +652,21 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                         </Typography>
                                     ) : null}
                                 </div>
+                            </div>
+                            <div className="header-right">
+                                <Tooltip title="Refresh conversation">
+                                    <IconButton
+                                        onClick={refresh}
+                                        size="small"
+                                        disabled={loading}
+                                        sx={{
+                                            color: '#6b7280',
+                                            '&:hover': { color: '#374151', backgroundColor: 'rgba(0,0,0,0.04)' }
+                                        }}
+                                    >
+                                        <RefreshIcon fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
                             </div>
                         </div>
                     )}

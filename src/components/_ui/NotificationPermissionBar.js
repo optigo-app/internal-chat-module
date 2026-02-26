@@ -8,7 +8,8 @@ const NotificationPermissionBar = () => {
     const { permissionStatus, requestPermission } = useNotificationManager();
     const [dismissed, setDismissed] = React.useState(false);
 
-    if (permissionStatus !== 'default' || dismissed) {
+    // Show if default OR denied (so we can guide them to unblock)
+    if (permissionStatus === 'granted' || dismissed) {
         return null;
     }
 

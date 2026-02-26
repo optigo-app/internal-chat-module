@@ -3,9 +3,9 @@ import { CommonAPI } from "../InitialApi/CommonApi";
 export const fetchMediaLists = async (page = 1, pageSize = 6, conversationId, userId) => {
     try {
         const body = {
-            "con": `{\"id\":\"\",\"mode\":\"wa_media_list_chat\",\"appuserid\":\"${userId}\"}`,
+            "con": `{\"id\":\"\",\"mode\":\"FilesList\",\"appuserid\":\"${userId}\"}`,
             "p": `{\"ConversationId\": ${conversationId},\"Page\": ${page}, \"PageSize\": ${pageSize}}`,
-            "f": "Chat ( Media list )"
+            "f": "Chat ( File list )"
         }
 
         const response = await CommonAPI(body);

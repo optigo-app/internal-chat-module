@@ -54,7 +54,7 @@ export function initializeSocket(token) {
     if (socketInstance?.connected && isAuthenticated) {
         return socketInstance;
     }
-    
+
     if (socketInstance) {
         socketInstance.disconnect();
         socketInstance = null;
@@ -114,7 +114,6 @@ export function initializeSocket(token) {
     socketInstance.on('internal:reaction_send', dispatchReactionEvent);
 
     socketInstance.on('internal:msg_receive', (data) => {
-        console.log("kdjskjdjs",data)
         internalMessageHandlers.forEach(handler => {
             try {
                 handler(data);

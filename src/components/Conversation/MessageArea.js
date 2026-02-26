@@ -159,15 +159,21 @@ const MessageArea = ({
             }}
         >
             <DragDropOverlay isDragging={isDragging} />
-            {loading ? (
+
+            {loading && (!groupMessagesByDate || Object.keys(groupMessagesByDate).length === 0) && (
                 <Box
                     sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'center',
                         alignItems: 'center',
-                        height: '100%',
-                        minHeight: '300px',
+                        backgroundColor: 'rgba(249, 250, 251, 0.8)',
+                        zIndex: 10,
                         gap: 2
                     }}
                 >
@@ -176,102 +182,100 @@ const MessageArea = ({
                         Loading conversation...
                     </Typography>
                 </Box>
-            ) : (
-                <>
-                    <div
-                        className="messages-list"
-                        ref={containerRef}
-                        style={{
-                            maxHeight: '100vh',
-                            overflowY: 'auto',
-                            overflowX: 'hidden',
-                            position: 'relative',
-                            backgroundImage: 'linear-gradient(rgba(249, 250, 251, 0.78), rgba(249, 250, 251, 0.78)), url(/bg-3.jpg)',
-                            backgroundSize: 'auto, contain',
-                            backgroundPosition: 'center, center',
-                            backgroundRepeat: 'repeat, repeat',
-                            backgroundAttachment: 'scroll, fixed',
-                            pointerEvents: isMediaPreviewOpen ? 'none' : 'auto',
-                            filter: isMediaPreviewOpen ? 'blur(2px)' : 'none',
-                            opacity: isSwitchingConversation ? 0 : 1,
-                            transition: 'opacity 0.1s ease-in-out',
-                        }}
-                    >
-                        {/* Scroll to Bottom Button - always smooth when user clicks */}
-                        <ScrollToBottomButton
-                            open={showScrollToBottom}
-                            onClick={() => scrollToBottom('smooth')}
-                            right={scrollToBottomRightOffset ?? 30}
-                            bottom={scrollToBottomBottomOffset}
-                        />
+            )}
 
-                        {Object.entries(groupMessagesByDate || {}).map(([date, dateMessages]) => (
-                            <React.Fragment key={`date-group-${date}`}>
-                                {dateMessages && dateMessages.length > 0 && (
-                                    <div className="date-group">
-                                        {/* Date Header */}
-                                        <div className="date-header" style={{
-                                            display: 'flex',
-                                            justifyContent: 'center',
-                                            margin: '20px 0 10px 0'
-                                        }}>
-                                            <Typography
-                                                variant="caption"
-                                                className='typoDate'
-                                            >
-                                                {formatDateHeader(date)}
-                                            </Typography>
-                                        </div>
+            <div
+                className="messages-list"
+                ref={containerRef}
+                style={{
+                    maxHeight: '100vh',
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    position: 'relative',
+                    backgroundImage: 'linear-gradient(rgba(249, 250, 251, 0.78), rgba(249, 250, 251, 0.78)), url(/bg-3.jpg)',
+                    backgroundSize: 'auto, contain',
+                    backgroundPosition: 'center, center',
+                    backgroundRepeat: 'repeat, repeat',
+                    backgroundAttachment: 'scroll, fixed',
+                    pointerEvents: isMediaPreviewOpen ? 'none' : 'auto',
+                    filter: isMediaPreviewOpen ? 'blur(2px)' : 'none',
+                    opacity: (isSwitchingConversation && (!groupMessagesByDate || Object.keys(groupMessagesByDate).length === 0)) ? 0 : 1,
+                    transition: 'opacity 0.2s ease-in-out',
+                }}
+            >
+                {/* Scroll to Bottom Button - always smooth when user clicks */}
+                <ScrollToBottomButton
+                    open={showScrollToBottom}
+                    onClick={() => scrollToBottom('smooth')}
+                    right={scrollToBottomRightOffset ?? 30}
+                    bottom={scrollToBottomBottomOffset}
+                />
 
-                                        {/* Messages for this date */}
-                                        {dateMessages.map((msg, index) => (
-                                            <MessageItem
-                                                key={msg.Id ?? msg.MessageId ?? index}
-                                                msg={msg}
-                                                index={index}
-                                                auth={auth}
-                                                selectedCustomer={selectedCustomer}
-                                                blinkMessageId={blinkMessageId}
-                                                hoveredMessageId={hoveredMessageId}
-                                                setHoveredMessageId={setHoveredMessageId}
-                                                reactionMenuMessageId={reactionMenuMessageId}
-                                                reactionMenuAnchorEl={reactionMenuAnchorEl}
-                                                setReactionMenuAnchorEl={setReactionMenuAnchorEl}
-                                                setReactionMenuMessageId={setReactionMenuMessageId}
-                                                closeReactionMenu={closeReactionMenu}
-                                                handleMessageEmojiClick={handleMessageEmojiClick}
-                                                handleMenuClick={handleMenuClick}
-                                                handleContextMenu={handleContextMenu}
-                                                scrollToMessage={scrollToMessage}
-                                                containerRef={containerRef}
-                                                parseTemplateData={parseTemplateData}
-                                                getMediaKey={getMediaKey}
-                                                getMediaSrcForMessage={getMediaSrcForMessage}
-                                                loadedMedia={loadedMedia}
-                                                markLoaded={markLoaded}
-                                                handleMediaClick={handleMediaClick}
-                                                getMessageStatusIcon={getMessageStatusIcon}
-                                                handleRemoveReaction={handleRemoveReaction}
-                                                messageById={messageById}
-                                                handleForward={handleForward}
-                                            />
-                                        ))}
-                                    </div>
-                                )}
-                            </React.Fragment>
-                        ))}
-                        <div ref={messagesEndRef} />
-                    </div>
+                {Object.entries(groupMessagesByDate || {}).map(([date, dateMessages]) => (
+                    <React.Fragment key={`date-group-${date}`}>
+                        {dateMessages && dateMessages.length > 0 && (
+                            <div className="date-group">
+                                {/* Date Header */}
+                                <div className="date-header" style={{
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    margin: '20px 0 10px 0'
+                                }}>
+                                    <Typography
+                                        variant="caption"
+                                        className='typoDate'
+                                    >
+                                        {formatDateHeader(date)}
+                                    </Typography>
+                                </div>
 
-                    {isMediaPreviewOpen && (
-                        <MediaPreview
-                            mediaFiles={mediaFiles}
-                            scrollToBottom={scrollToBottom}
-                            setMediaFiles={setMediaFiles}
-                            handleClosePreview={handleClosePreview}
-                        />
-                    )}
-                </>
+                                {/* Messages for this date */}
+                                {dateMessages.map((msg, index) => (
+                                    <MessageItem
+                                        key={msg.Id ?? msg.MessageId ?? index}
+                                        msg={msg}
+                                        index={index}
+                                        auth={auth}
+                                        selectedCustomer={selectedCustomer}
+                                        blinkMessageId={blinkMessageId}
+                                        hoveredMessageId={hoveredMessageId}
+                                        setHoveredMessageId={setHoveredMessageId}
+                                        reactionMenuMessageId={reactionMenuMessageId}
+                                        reactionMenuAnchorEl={reactionMenuAnchorEl}
+                                        setReactionMenuAnchorEl={setReactionMenuAnchorEl}
+                                        setReactionMenuMessageId={setReactionMenuMessageId}
+                                        closeReactionMenu={closeReactionMenu}
+                                        handleMessageEmojiClick={handleMessageEmojiClick}
+                                        handleMenuClick={handleMenuClick}
+                                        handleContextMenu={handleContextMenu}
+                                        scrollToMessage={scrollToMessage}
+                                        containerRef={containerRef}
+                                        parseTemplateData={parseTemplateData}
+                                        getMediaKey={getMediaKey}
+                                        getMediaSrcForMessage={getMediaSrcForMessage}
+                                        loadedMedia={loadedMedia}
+                                        markLoaded={markLoaded}
+                                        handleMediaClick={handleMediaClick}
+                                        getMessageStatusIcon={getMessageStatusIcon}
+                                        handleRemoveReaction={handleRemoveReaction}
+                                        messageById={messageById}
+                                        handleForward={handleForward}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </React.Fragment>
+                ))}
+                <div ref={messagesEndRef} />
+            </div>
+
+            {isMediaPreviewOpen && (
+                <MediaPreview
+                    mediaFiles={mediaFiles}
+                    scrollToBottom={scrollToBottom}
+                    setMediaFiles={setMediaFiles}
+                    handleClosePreview={handleClosePreview}
+                />
             )}
         </div>
     );

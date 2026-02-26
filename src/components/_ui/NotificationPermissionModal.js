@@ -4,10 +4,14 @@ import { ArrowUpLeft } from 'lucide-react';
 import { useNotificationManager } from '../../contexts/NotificationContext';
 
 const NotificationPermissionModal = () => {
-    const { showGuide, setShowGuide, executeNativeRequest } = useNotificationManager();
+    const { showGuide, setShowGuide, executeNativeRequest, permissionStatus } = useNotificationManager();
+
+    const isBlocked = permissionStatus === 'denied';
 
     const handleOk = () => {
-        executeNativeRequest();
+        // User wants to try "Allow" again even if blocked. 
+        // Note: Browsers will likely auto-deny if hard-blocked, but this satisfies the request to "ask again".
+        executeNativeRequest(true);
     };
 
     return (
@@ -18,7 +22,7 @@ const NotificationPermissionModal = () => {
             BackdropComponent={Backdrop}
             BackdropProps={{
                 timeout: 500,
-                sx: { backgroundColor: 'rgba(11, 20, 26, 0.85)' } // Dark WhatsApp-style backdrop
+                sx: { backgroundColor: 'rgba(11, 20, 26, 0.85)' }
             }}
         >
             <Fade in={showGuide}>
@@ -40,19 +44,18 @@ const NotificationPermissionModal = () => {
                         color: 'white',
                     }}
                 >
-                    {/* Arrow Icon pointing up-left */}
                     <Box
                         sx={{
-                            backgroundColor: 'rgba(115, 103, 240, 0.15)',
+                            backgroundColor: isBlocked ? 'rgba(234, 84, 85, 0.15)' : 'rgba(115, 103, 240, 0.15)',
                             borderRadius: '50%',
                             p: 2,
                             mb: 3,
-                            border: '1px solid rgba(115, 103, 240, 0.3)',
+                            border: isBlocked ? '1px solid rgba(234, 84, 85, 0.3)' : '1px solid rgba(115, 103, 240, 0.3)',
                         }}
                     >
                         <ArrowUpLeft
                             size={48}
-                            color="#7367f0"
+                            color={isBlocked ? "#ea5455" : "#7367f0"} // Red if blocked, Purple if default
                             strokeWidth={3}
                         />
                     </Box>
@@ -65,7 +68,7 @@ const NotificationPermissionModal = () => {
                             letterSpacing: '-0.5px'
                         }}
                     >
-                        Allow notifications
+                        {isBlocked ? 'Notifications are blocked' : 'Allow notifications'}
                     </Typography>
 
                     <Typography
@@ -77,14 +80,22 @@ const NotificationPermissionModal = () => {
                             lineHeight: 1.6
                         }}
                     >
-                        To get notifications for new messages, click <strong>Allow</strong> above.
+                        {isBlocked ? (
+                            <>
+                                We cannot ask for permission because it was blocked.
+                                <br />
+                                Please click the <strong>Lock icon</strong> 🔒 in your address bar, find <strong>Notifications</strong>, and select <strong>Allow</strong>. Then refresh the page.
+                            </>
+                        ) : (
+                            <>To get notifications for new messages, click <strong>Allow</strong> above.</>
+                        )}
                     </Typography>
 
                     <Button
                         onClick={handleOk}
                         variant="contained"
                         sx={{
-                            backgroundColor: '#7367f0', // Project Theme Color
+                            backgroundColor: isBlocked ? '#ea5455' : '#7367f0',
                             color: 'white',
                             borderRadius: '50px',
                             px: 5,
@@ -93,12 +104,12 @@ const NotificationPermissionModal = () => {
                             textTransform: 'none',
                             fontSize: '1rem',
                             '&:hover': {
-                                backgroundColor: '#685dd8',
-                                boxShadow: '0 4px 12px rgba(115, 103, 240, 0.4)'
+                                backgroundColor: isBlocked ? '#d34344' : '#685dd8',
+                                boxShadow: isBlocked ? '0 4px 12px rgba(234, 84, 85, 0.4)' : '0 4px 12px rgba(115, 103, 240, 0.4)'
                             },
                         }}
                     >
-                        OK
+                        {isBlocked ? 'Allow' : 'OK'}
                     </Button>
                 </Box>
             </Fade>

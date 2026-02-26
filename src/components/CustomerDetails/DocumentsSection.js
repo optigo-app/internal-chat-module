@@ -5,7 +5,6 @@ import { Download, FileText } from 'lucide-react';
 
 const DocumentsSection = ({
     documents,
-    mediaCache,
     isLoading,
     hasMore,
     onLoadMore,
@@ -117,8 +116,9 @@ const DocumentsSection = ({
             <List disablePadding sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                 {documents.map((doc, index) => {
                     const isLastElement = index === documents.length - 1;
-                    const name = doc.MediaName || `Document ${doc.Id}`;
-                    const type = doc.MimeType || 'Document';
+                    const name = doc.name || doc.FileName || `Document ${doc.Id}`;
+                    const type = doc.type || doc.MimeType || 'Document';
+                    const url = doc.src || doc.FileUrl;
 
                     return (
                         <Box key={doc.Id} ref={isLastElement ? lastDocumentElementRef : null}>
@@ -145,7 +145,7 @@ const DocumentsSection = ({
                                         size="small"
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            onDownload(doc.MediaUrl, doc.MediaName || `document_${doc.Id}`);
+                                            onDownload(url, name);
                                         }}
                                         title="Download document"
                                         sx={{

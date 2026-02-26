@@ -135,7 +135,7 @@ export const normalizeServerMessages = (messagesArray, auth) => {
             };
         }
 
-        const isMyMessage = msg.SenderId === (auth?.id ?? auth?.userId);
+        const isMyMessage = Number(msg.SenderId || msg.Sender) === Number(auth?.id ?? auth?.userId);
 
         const dateTime = msg.DateTime || msg.SentAt || msg.LastUpdatedDate;
         let date = msg.Date;
@@ -147,7 +147,9 @@ export const normalizeServerMessages = (messagesArray, auth) => {
             }
         }
 
-        const senderInfo = (msg.FirstName || '') + ' ' + (msg.LastName || '');
+        const senderInfo = (msg.FirstName || msg.LastName)
+            ? ((msg.FirstName || '') + ' ' + (msg.LastName || '')).trim()
+            : (msg.RecieverName || msg.ReceiverName || msg.SenderName || msg.SenderInfo || '');
         const trimmedSenderInfo = senderInfo.trim();
 
         const hasReply = !!msg.ReplyTo && msg.ReplyTo !== 0;
@@ -164,8 +166,12 @@ export const normalizeServerMessages = (messagesArray, auth) => {
         // Map backend MessageStatus to internal Status codes
         let normalizedStatus = msg.Status;
         if (typeof msg.MessageStatus === 'number') {
-            // New mapping: 1 = sent, 2 = read
-            normalizedStatus = msg.MessageStatus === 1 ? 1 : 3; // 1: sent, 3: read
+            // Mapping: 0: sent/delivered, 1: sent, 2: read
+            if (msg.MessageStatus === 2) {
+                normalizedStatus = 3; // internal 3 is Read (blue ticks)
+            } else if (msg.MessageStatus === 1 || msg.MessageStatus === 0) {
+                normalizedStatus = 1; // internal 1 is Sent (gray ticks)
+            }
         }
 
         const resolvedMessageType = forceTextReply
@@ -184,13 +190,16 @@ export const normalizeServerMessages = (messagesArray, auth) => {
             Id: msg.Id ?? msg.MessageId,
             MessageId: msg.MessageId ?? msg.Id,
             IsMyMessage: typeof msg.IsMyMessage === 'boolean' ? msg.IsMyMessage : isMyMessage,
-            Direction: typeof msg.Direction === 'number' ? msg.Direction : (isMyMessage ? 1 : 0),
+            Direction: isMyMessage ? 1 : (typeof msg.Direction === 'number' ? (msg.Direction === 1 || msg.Direction === 2 ? 0 : msg.Direction) : 0),
             MessageType: resolvedMessageType,
             Status: normalizedStatus,
             DateTime: dateTime,
             Date: date,
             ReactionEmojis: msg.ReactionEmojis ?? msg.Reactions ?? '[]',
-            SenderInfo: msg.SenderInfo || trimmedSenderInfo || msg.SenderEmail || '',
+            SenderInfo: trimmedSenderInfo || msg.SenderEmail || '',
+            FirstName: msg.FirstName || '',
+            LastName: msg.LastName || '',
+            SenderProfilePicture: msg.SenderProfilePicture || msg.avatar || '',
             ContextType: contextType,
             ContextId: contextId,
             ReplyContextMsg: replyContextMsg,
@@ -234,4 +243,82 @@ export const groupMessagesByDateHelper = (messages) => {
     });
 
     return grouped;
+};
+
+/**
+ * Centralized utility to update the sessionStorage chat cache.
+ * Can be called from useConversation (active chat) or CustomerLists (background chats).
+ */
+/**
+ * Saves a list of messages to the chat cache, truncating to the last 50 messages.
+ */
+export const saveConversationToCache = (conversationId, messages) => {
+    if (!conversationId || !Array.isArray(messages) || messages.length === 0) return;
+
+    const cacheKey = `chat_cache_${conversationId}`;
+    try {
+        // Limit cache to last 100 messages to maintain speed and stay within sessionStorage limits
+        const truncated = messages.slice(-100);
+        sessionStorage.setItem(cacheKey, JSON.stringify(truncated));
+    } catch (e) {
+        console.error("Error saving chat cache:", e);
+    }
+};
+
+export const updateChatCache = (conversationId, rawData, auth, isStatusChange = false) => {
+    if (!conversationId || !rawData) return;
+
+    const cacheKey = `chat_cache_${conversationId}`;
+    const cachedDataStr = sessionStorage.getItem(cacheKey);
+
+    try {
+        let cachedMessages = [];
+        if (cachedDataStr) {
+            try {
+                cachedMessages = JSON.parse(cachedDataStr);
+            } catch (e) {
+                console.error("Error parsing chat cache:", e);
+                cachedMessages = [];
+            }
+        }
+        if (!Array.isArray(cachedMessages)) cachedMessages = [];
+
+        // Normalize the incoming message
+        const [normalized] = normalizeServerMessages([rawData], auth) || [];
+        if (!normalized) return;
+
+        const incomingId = normalized.Id || normalized.MessageId;
+        const index = cachedMessages.findIndex(m =>
+            (m.Id && m.Id === incomingId) ||
+            (m.MessageId && m.MessageId === incomingId)
+        );
+
+        let updatedMessages;
+        if (index !== -1) {
+            // Update existing message (e.g. status change)
+            updatedMessages = [...cachedMessages];
+            updatedMessages[index] = {
+                ...updatedMessages[index],
+                ...normalized,
+                // Preserve local-only flags if any
+                isUploading: updatedMessages[index].isUploading,
+                percent: updatedMessages[index].percent,
+            };
+        } else if (!isStatusChange) {
+            // Add new message (only if it's not a status change event for a message we don't have)
+            updatedMessages = [...cachedMessages, normalized];
+            // Sort to ensure correct order
+            updatedMessages.sort((a, b) => new Date(a.DateTime).getTime() - new Date(b.DateTime).getTime());
+        } else {
+            // It's a status change for a message not in our cache (could be an older message)
+            // In this case, we don't add it to the cache to avoid gaps or incorrect ordering
+            return;
+        }
+
+        // Limit cache to last 100 messages
+        const truncatedMessages = updatedMessages.slice(-100);
+        sessionStorage.setItem(cacheKey, JSON.stringify(truncatedMessages));
+    } catch (e) {
+        console.error("Error updating chat cache:", e);
+    }
 };

@@ -5,7 +5,6 @@ import { Image, Play } from 'lucide-react';
 
 const MediaSection = ({
     mediaItems,
-    mediaCache,
     isLoading,
     hasMore,
     onLoadMore,
@@ -15,6 +14,8 @@ const MediaSection = ({
 
     // Combine images and videos
     const combinedMedia = [...(mediaItems.images || []), ...(mediaItems.videos || [])];
+    const isVideosOnly = mediaItems.videos?.length > 0 && mediaItems.images?.length === 0;
+    const isImagesOnly = mediaItems.images?.length > 0 && mediaItems.videos?.length === 0;
 
     // Smooth empty-state transition
     const [showEmptyState, setShowEmptyState] = useState(false);
@@ -87,11 +88,13 @@ const MediaSection = ({
                 }}
             >
                 <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1.5, opacity: 0.5 }}>
-                    <Image size={44} />
+                    {isVideosOnly ? <Play size={44} /> : <Image size={44} />}
                 </Box>
-                <Typography sx={{ fontWeight: 600, color: 'text.primary' }}>No media found</Typography>
+                <Typography sx={{ fontWeight: 600, color: 'text.primary' }}>
+                    {isVideosOnly ? 'No videos found' : 'No media found'}
+                </Typography>
                 <Typography variant="body2" sx={{ mt: 0.5, color: 'text.secondary' }}>
-                    Shared photos and videos will appear here
+                    {isVideosOnly ? 'Shared videos will appear here' : 'Shared photos and videos will appear here'}
                 </Typography>
             </Box>
         );
@@ -103,14 +106,14 @@ const MediaSection = ({
                 variant="subtitle2"
                 sx={{ color: 'text.secondary', fontWeight: 500, mb: 1 }}
             >
-                Media
+                {isVideosOnly ? 'Videos' : isImagesOnly ? 'Media' : 'Media'}
             </Typography>
             <ImageList cols={3} gap={6} sx={{ m: 0 }}>
                 {combinedMedia.map((item, index) => {
-                    const isVideo = item.MessageType === 'video';
+                    const isVideo = item.type?.startsWith('video/') || item.MimeType?.startsWith('video/');
                     const isLastElement = index === combinedMedia.length - 1;
-                    const title = item.MediaName || (isVideo ? 'Video' : 'Image');
-                    const src = mediaCache[item.MediaUrl] || '';
+                    const title = item.name || item.FileName || (isVideo ? 'Video' : 'Image');
+                    const src = item.src || item.FileUrl || '';
 
                     return (
                         <ImageListItem

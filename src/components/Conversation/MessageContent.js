@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, CircularProgress, IconButton, Skeleton, Typography } from '@mui/material';
-import DownloadIcon from '@mui/icons-material/Download';
 import { alpha, useTheme } from '@mui/material/styles';
-import { ChevronDown, FileText, CheckCheck, Image as ImageIcon, Video as VideoIcon, Play, FileType, FileSpreadsheet, FileArchive, FileCode, Forward, ArrowBigDownDash, ArrowBigDown } from 'lucide-react';
+import { ChevronDown, FileText, Check, CheckCheck, Image as ImageIcon, Video as VideoIcon, Play, FileType, FileSpreadsheet, FileArchive, FileCode, Forward, ArrowBigDownDash, ArrowBigDown, Download } from 'lucide-react';
 import { Emoji } from 'emoji-picker-react';
 import { FormatDateIST } from '../../utils/DateFnc';
 import QuickReactionMenu from './QuickReactionMenu';
@@ -571,7 +570,7 @@ const MessageContent = ({
                                         <Box sx={{ display: "flex", alignItems: "center", lineHeight: 1 }}>
                                             {(() => {
                                                 const statusKey = getMessageStatusIcon(msg);
-                                                const isVisible = statusKey === 'sent' || statusKey === 'read';
+                                                const isVisible = statusKey === 'sent' || statusKey === 'read' || statusKey === 'delivered';
                                                 const color = statusKey === 'read'
                                                     ? theme.palette.primary.blue
                                                     : alpha(theme.palette.text.primary, 0.6);
@@ -1184,16 +1183,15 @@ const MessageContent = ({
                                     className="doc-download-btn"
                                     onClick={(e) => e.stopPropagation()}
                                     sx={{
-                                        color: theme.palette.text.primary,
-                                        flex: '0 0 auto',
-                                        opacity: 0.6,
-                                        transform: 'translateX(4px)',
-                                        transition: 'all 0.2s ease',
-                                        boxShadow: 'rgba(0, 0, 0, 0.25) 0px 54px 55px, rgba(0, 0, 0, 0.12) 0px -12px 30px, rgba(0, 0, 0, 0.12) 0px 4px 6px, rgba(0, 0, 0, 0.17) 0px 12px 13px, rgba(0, 0, 0, 0.09) 0px -3px 5px;',
+                                        color: 'text.secondary',
+                                        '&:hover': { 
+                                            bgcolor: 'action.hover', 
+                                            color: 'text.primary' 
+                                        }
                                     }}
                                     title="Download"
                                 >
-                                    <DownloadIcon fontSize='medium' />
+                                    <Download size={18} />
                                 </IconButton>
                             </Box>
                         );
@@ -1279,7 +1277,7 @@ const MessageContent = ({
                             <Box sx={{ display: "flex", alignItems: "center", lineHeight: 1 }}>
                                 {(() => {
                                     const statusKey = getMessageStatusIcon(msg);
-                                    const isVisible = statusKey === 'sent' || statusKey === 'read';
+                                    const isVisible = statusKey === 'sent' || statusKey === 'read' || statusKey === 'delivered';
                                     const color = statusKey === 'read'
                                         ? theme.palette.primary.blue
                                         : alpha(theme.palette.text.primary, 0.6);
