@@ -3,9 +3,7 @@ import { io } from 'socket.io-client';
 const isLocal = ["localhost", "nzen", 'tecochat.web', 'web'].includes(window.location.hostname);
 
 // Base URLs
-const API_SOCKETBASE_URL = isLocal
-    ? "http://newnextjs.web"
-    : "https://apilx.optigoapps.com";
+const API_SOCKETBASE_URL = isLocal ? "http://newnextjs.web" : "https://apilx.optigoapps.com";
 
 // Pick correct URL
 const getSocketURL = () => {

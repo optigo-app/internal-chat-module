@@ -1,587 +1,841 @@
 @use "../../global.scss" as *;
 
-// Variables
-$whatsapp-green: $primary-main;
-$whatsapp-dark-green: $primary-main;
-$whatsapp-light-green: $primary-light-bg;
-$header-bg: $button-Bgcolor;
+// ─── Design Tokens ───────────────────────────────────────────────────────────
+$bg-panel: #f0f2f5;
+$bg-white: #ffffff;
+$bg-card: #ffffff;
 $text-primary: $titleColor;
 $text-secondary: $secondaryColor;
-$text-muted: $text2ndColor;
-$border-color: rgba(0, 0, 0, 0.08);
-$hover-bg: $bg-light;
-$danger-color: $error-main;
-$white: #ffffff;
+$text-danger: $error-main;
+$border-light: rgba(134, 150, 160, 0.12);
+$accent: $primary-main;
+$radius-card: 16px;
+$radius-pill: 100px;
+$shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
+$shadow-avatar: 0 8px 28px rgba(0, 0, 0, 0.12);
+$transition-base: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 
-// Mixins
-@mixin flex-center {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+// ─── Spacing Scale (8px base) ─────────────────────────────────────────────────
+$sp-1: 4px;
+$sp-2: 8px;
+$sp-3: 12px;
+$sp-4: 16px;
+$sp-5: 20px;
+$sp-6: 24px;
+$sp-8: 32px;
+$sp-10: 40px;
 
-@mixin flex-between {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-@mixin transition {
-    transition: all $transition-duration ease;
-}
-
-// Main Container
-.customer-details-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.22);
-    backdrop-filter: blur(2px);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.25s ease;
-    z-index: 1199;
-
-    &.open {
-        opacity: 1;
-        pointer-events: auto;
-    }
-}
-
+// ─── Container ────────────────────────────────────────────────────────────────
 .customer-details-container {
     position: fixed;
     top: 0;
     right: 0;
-    width: 100%;
-    max-width: 420px;
+    width: 420px;
     height: 100vh;
-    background: $white;
-    border-left: 1px solid $border-color;
-    border-top-left-radius: 24px;
-    border-bottom-left-radius: 24px;
+    background: $bg-panel;
     z-index: 1200;
-    @include transition;
+    transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
     transform: translateX(100%);
-    will-change: transform;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
 
     &.slide-in {
         transform: translateX(0);
     }
 
-    &.visible {
-        opacity: 1;
-    }
-
-    @media (max-width: 768px) {
-        max-width: 100%;
-    }
-
     &.panel {
         position: relative;
-        inset: auto;
-        top: auto;
-        right: auto;
         width: 100%;
-        max-width: none;
-        height: 100%;
         transform: none;
-        border-top-left-radius: 0;
-        border-bottom-left-radius: 0;
-        z-index: auto;
-    }
-}
-
-.details-content {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
-
-// Header
-.header-section {
-    @include flex-between;
-    padding: 16px 20px;
-    background: $header-bg;
-    color: $white;
-    box-shadow: $box-shadow-value;
-    border-top-left-radius: 24px;
-
-    .customer-details-container.panel & {
-        border-top-left-radius: 0;
-        padding: 10px 12px;
-        background: rgba(255, 255, 255, 0.92);
-        color: $text-primary;
         box-shadow: none;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     }
 
-    .header-left {
+    // ─── View Slide Animations ───────────────────────────────────────────────
+    .views-container {
+        flex: 1;
         display: flex;
-        align-items: center;
-        gap: 16px;
+        flex-direction: column;
+        position: relative;
 
-        .back-button {
-            color: $white !important;
-            padding: 8px !important;
+        .view-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            background: $bg-white;
+            transform: translateX(0);
+            transition: transform 0.3s ease-out;
 
-            &:hover {
-                background: rgba(255, 255, 255, 0.12) !important;
-            }
-        }
-
-        .header-title {
-            font-size: 20px !important;
-            font-weight: 500 !important;
-            color: $white;
-        }
-
-        .customer-details-container.panel & {
-            .header-title {
-                font-size: 14px !important;
-                font-weight: 600 !important;
-                color: $text-primary;
+            &.forward {
+                animation: slideInRight 0.3s ease-out;
             }
 
-            .back-button {
-                color: $text-primary !important;
-
-                &:hover {
-                    background: rgba(0, 0, 0, 0.06) !important;
-                }
+            &.backward {
+                animation: slideInLeft 0.3s ease-out;
             }
         }
     }
 
-    .header-right {
+    @keyframes slideInLeft {
+        from {
+            transform: translateX(-100%);
+            opacity: 0.8;
+        }
+
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0.8;
+        }
+
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    .details-content {
         display: flex;
-        gap: 8px;
-
-        .MuiIconButton-root {
-            color: $white !important;
-            padding: 8px !important;
-
-            &:hover {
-                background: rgba(255, 255, 255, 0.12) !important;
-            }
-        }
-
-        .customer-details-container.panel & {
-            .MuiIconButton-root {
-                color: $text-primary !important;
-
-                &:hover {
-                    background: rgba(0, 0, 0, 0.06) !important;
-                }
-            }
-        }
+        flex-direction: column;
+        height: 100%;
+        background: $bg-panel;
     }
 }
 
-// Content Scroll
+// ─── Header ───────────────────────────────────────────────────────────────────
+.header-section {
+    display: flex;
+    align-items: center;
+    gap: $sp-3;
+    padding: 0 $sp-4;
+    background: $bg-white;
+    min-height: 56px;
+    border-top: 1px solid $border-light;
+    border-bottom: 1px solid $border-light;
+    flex-shrink: 0;
+
+    .back-button,
+    .close-button {
+        color: $text-secondary !important;
+        padding: $sp-1 !important;
+        border-radius: $sp-2 !important;
+
+        &:hover {
+            background: rgba($text-secondary, 0.08) !important;
+        }
+    }
+
+    .header-title {
+        font-size: 17px !important;
+        font-weight: 600 !important;
+        color: $text-primary;
+        flex: 1;
+        letter-spacing: -0.01em;
+    }
+}
+
+// ─── Scroll Area ──────────────────────────────────────────────────────────────
 .content-scroll {
     flex: 1;
     overflow-y: auto;
-    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: $sp-2;
+    padding-bottom: $sp-10;
+
+    &::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.12);
+        border-radius: $sp-3;
+    }
 }
 
-// Profile Section
+.info-view-container {
+    display: flex;
+    flex-direction: column;
+    gap: $sp-2;
+    margin-bottom: 30px;
+}
+
+// ─── Media Panel ──────────────────────────────────────────────────────────────
+.media-panel-view {
+    background: $bg-white;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+
+    .mui-tabs-container {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: $bg-white;
+    }
+
+    .tab-content {
+        padding: $sp-5;
+    }
+}
+
+// ─── Profile Card ─────────────────────────────────────────────────────────────
 .profile-section {
-    text-align: center;
-    padding: 25px 24px;
-    border-bottom: 1px solid $border-color;
+    background: $bg-white;
+    padding: $sp-8 $sp-5 $sp-6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+
+    // Subtle top accent stripe for group profile
+    &.group-profile {
+        padding-top: $sp-6;
+
+        &::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 72px;
+            background: linear-gradient(135deg, rgba($accent, 0.06) 0%, rgba($accent, 0.02) 100%);
+            pointer-events: none;
+        }
+    }
 
     .avatar-container {
         position: relative;
-        display: inline-block;
-        margin-bottom: 20px;
+        margin-bottom: $sp-5;
+        z-index: 1;
 
         .profile-avatar {
-            width: 80px !important;
-            height: 80px !important;
-            cursor: pointer;
-            @include transition;
+            width: 120px !important;
+            height: 120px !important;
+            box-shadow: $shadow-avatar;
+            border: 3px solid $bg-white;
+            transition: $transition-base;
 
             &:hover {
-                opacity: 0.9;
+                transform: scale(1.04);
             }
         }
+    }
 
-        .status-indicator {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            border: 3px solid $white;
+    .group-avatar-container {
+        position: relative;
+        cursor: pointer;
+        border-radius: 50%;
+        overflow: hidden;
+
+        &:hover .avatar-overlay {
+            opacity: 1;
+        }
+
+        .avatar-overlay {
             position: absolute;
-            bottom: -9px;
-            right: 4px;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.42);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.22s ease;
+            gap: $sp-1;
+            text-align: center;
+
+            span {
+                font-size: 10px;
+                font-weight: 500;
+                text-transform: uppercase;
+                letter-spacing: 0.6px;
+                line-height: 1.3;
+            }
+        }
+    }
+
+    // Name row: supports inline editing
+    .name-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        position: relative;
+        padding: 0 $sp-8;
+        margin-bottom: $sp-1;
+
+        .customer-name {
+            text-align: center;
+            margin-bottom: 0 !important;
+        }
+
+        .edit-icon-btn {
+            position: absolute;
+            right: 0;
+            color: $text-secondary !important;
+            padding: $sp-2 !important;
+            border-radius: $sp-2 !important;
+
+            &:hover {
+                background: rgba($accent, 0.08) !important;
+                color: $accent !important;
+            }
         }
     }
 
     .customer-name {
-        font-size: 24px !important;
-        font-weight: 500 !important;
+        font-size: 22px !important;
+        font-weight: 700 !important;
         color: $text-primary;
-        margin-bottom: 4px !important;
+        letter-spacing: -0.02em;
+        line-height: 1.25;
     }
 
     .customer-phone {
-        font-size: 16px !important;
-        color: $text-secondary;
-        margin-bottom: 8px !important;
-    }
-
-    .last-seen {
         font-size: 14px !important;
-        color: $text-muted;
+        color: $text-secondary;
+        margin-top: $sp-1 !important;
     }
-}
 
-// About Section
-.about-section {
-    padding: 20px 24px;
-    border-bottom: 1px solid $border-color;
+    .group-subtext {
+        font-size: 13px;
+        color: $text-secondary;
+        margin-top: $sp-1;
 
-    .about-header {
-        @include flex-between;
-        margin-bottom: 8px;
-
-        .section-title {
-            font-size: 14px !important;
-            color: $text-muted;
-            font-weight: 500 !important;
-        }
-
-        .edit-btn {
-            background: none;
-            border: none;
-            color: $whatsapp-green;
-            font-size: 14px;
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 4px;
-            @include transition;
-
-            &:hover {
-                background: rgba($whatsapp-green, 0.1);
-            }
+        .accent-text {
+            color: $accent;
+            font-weight: 600;
         }
     }
 
-    .about-text {
-        font-size: 16px !important;
-        color: $text-primary;
-        margin-bottom: 4px !important;
-    }
+    // Name edit field
+    .MuiTextField-root {
+        .MuiInput-underline:after {
+            border-bottom-color: $accent;
+        }
 
-    .joined-date {
-        font-size: 12px !important;
-        color: $text-muted;
+        input {
+            font-size: 20px;
+            font-weight: 700;
+            color: $text-primary;
+            text-align: center;
+        }
     }
 }
 
-// Action Buttons
+// ─── Quick Action Buttons ─────────────────────────────────────────────────────
 .action-buttons {
+    background: $bg-white;
     display: flex;
-    justify-content: space-around;
-    padding: 20px 24px;
-    background: $hover-bg;
-    border-bottom: 1px solid $border-color;
+    justify-content: center;
+    align-items: flex-start;
+    gap: $sp-8;
+    padding: $sp-4 $sp-5 $sp-5;
 
-    .action-button {
+    .action-item {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 8px;
-        background: none;
-        border: none;
-        padding: 12px 16px;
-        border-radius: 8px;
+        gap: $sp-2;
         cursor: pointer;
-        @include transition;
+        transition: $transition-base;
 
         &:hover {
-            background: rgba(255, 255, 255, 0.8);
-        }
+            transform: translateY(-3px);
 
-        .action-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            @include flex-center;
-            color: $white;
-
-            &.audio {
-                background: $whatsapp-green;
+            .action-btn-circle {
+                background: rgba($accent, 0.08) !important;
+                border-color: rgba($accent, 0.22) !important;
+                box-shadow: 0 4px 14px rgba($accent, 0.14) !important;
             }
 
-            &.video {
-                background: $whatsapp-green;
-            }
-
-            &.search {
-                background: $whatsapp-green;
-            }
-
-            .MuiSvgIcon-root {
-                font-size: 20px;
+            .MuiTypography-caption {
+                color: $accent;
             }
         }
 
-        span {
+        .action-btn-circle {
+            width: 52px !important;
+            height: 52px !important;
+            border: 1.5px solid #e2e8ed !important;
+            color: $accent !important;
+            background: rgba($accent, 0.03) !important;
+            transition: $transition-base !important;
+        }
+
+        .MuiTypography-caption {
             font-size: 12px;
+            font-weight: 600;
             color: $text-secondary;
-            font-weight: 500;
+            transition: color 0.2s;
+            text-align: center;
+        }
+    }
+
+    // Group-specific action cards
+    &.group-block-actions {
+        padding: $sp-4 $sp-5 $sp-5;
+        gap: $sp-3;
+
+        .action-block-item {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            padding: $sp-2;
+            background: rgba($accent, 0.03);
+            border: 1.5px solid rgba($accent, 0.1);
+            border-radius: 14px;
+            cursor: pointer;
+            transition: $transition-base;
+            gap: $sp-2;
+
+            &:hover {
+                background: rgba($accent, 0.07);
+                border-color: rgba($accent, 0.25);
+                box-shadow: 0 4px 14px rgba($accent, 0.1);
+                transform: translateY(-2px);
+
+                .action-circle {
+                    background: rgba($accent, 0.12) !important;
+                }
+            }
+
+            .action-circle {
+                width: 42px !important;
+                height: 42px !important;
+                background: rgba($accent, 0.06) !important;
+                color: $accent !important;
+                border: none !important;
+                transition: background 0.2s ease !important;
+            }
+
+            span {
+                font-size: 13px;
+                font-weight: 600;
+                color: $accent;
+                letter-spacing: 0.1px;
+            }
+        }
+
+        .action-block-item.disabled {
+            background: rgba(0, 0, 0, 0.025);
+            border-color: rgba(0, 0, 0, 0.07);
+            cursor: not-allowed;
+            opacity: 0.55;
+
+            &:hover {
+                background: rgba(0, 0, 0, 0.025);
+                border-color: rgba(0, 0, 0, 0.07);
+                box-shadow: none;
+                transform: none;
+
+                .action-circle {
+                    background: transparent !important;
+                }
+            }
+
+            .action-circle {
+                background: rgba(0, 0, 0, 0.04) !important;
+                color: $text-secondary !important;
+            }
+
+            span {
+                color: $text-secondary;
+            }
         }
     }
 }
 
-// Settings Section
-.settings-section {
-    border-bottom: 1px solid $border-color;
+// ─── Info Cards (About, Media, etc.) ─────────────────────────────────────────
+.info-block {
+    background: $bg-white;
+    padding: $sp-5 $sp-5;
+    display: flex;
+    flex-direction: column;
 
-    .setting-item {
-        @include flex-between;
-        padding: 16px 24px;
+    &.clickable {
         cursor: pointer;
-        @include transition;
+        transition: background 0.18s;
 
         &:hover {
-            background: $hover-bg;
+            background: #f8f9fa;
         }
+    }
 
-        &.toggle-item {
-            .setting-left {
-                flex: 1;
+    .block-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: $sp-1;
+            color: $text-secondary;
+
+            .count {
+                font-size: 14px;
+                font-weight: 500;
+            }
+
+            .chevron {
+                color: #b0b8bf;
             }
         }
+    }
 
-        &.danger {
-            .setting-left {
-                span {
-                    color: $danger-color;
+    .block-label {
+        font-size: 12px !important;
+        color: $text-secondary;
+        font-weight: 600 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        margin-bottom: $sp-1;
+    }
+
+    .block-value {
+        font-size: 15px !important;
+        color: $text-secondary !important;
+    }
+
+    &.desc-block {
+        .desc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: $sp-1;
+
+            .accent-label {
+                color: $accent !important;
+                font-weight: 700 !important;
+                font-size: 12px !important;
+                text-transform: uppercase;
+                letter-spacing: 0.6px;
+            }
+
+            .edit-icon-btn {
+                color: $text-secondary !important;
+                padding: $sp-1 !important;
+                border-radius: $sp-2 !important;
+
+                &:hover {
+                    background: rgba($accent, 0.08) !important;
+                    color: $accent !important;
                 }
             }
 
-            .MuiSvgIcon-root {
-                color: $danger-color;
+        }
+    }
+
+    // Media grid
+    .media-preview-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: $sp-2;
+        margin-top: $sp-2;
+
+        .preview-item {
+            aspect-ratio: 1;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #edf0f3;
+
+            img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                transition: transform 0.25s ease;
             }
+
+            &:hover img {
+                transform: scale(1.06);
+            }
+        }
+    }
+
+    &.members-block {
+        padding-top: $sp-5;
+        padding-bottom: $sp-2;
+    }
+}
+
+// ─── Settings List ────────────────────────────────────────────────────────────
+.settings-list {
+    background: $bg-white;
+    display: flex;
+    flex-direction: column;
+    gap: $sp-2;
+    padding: $sp-2 $sp-3;
+
+    .setting-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: $sp-3 $sp-3;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: background 0.18s;
+
+        &:hover:not(.member-item) {
+            background: #f5f6f6;
+        }
+
+        &.no-border {
+            border-bottom: none;
         }
 
         .setting-left {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: $sp-3;
+            flex: 1;
 
-            .MuiSvgIcon-root {
+            svg {
                 color: $text-secondary;
-                font-size: 20px;
             }
 
             span {
-                font-size: 16px;
+                font-size: 15px;
                 color: $text-primary;
-            }
-        }
-
-        .setting-right {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-
-            .encryption-text {
-                font-size: 14px;
-                color: $text-muted;
+                font-weight: 400;
             }
 
-            .count {
-                font-size: 14px;
-                color: $text-muted;
+            .text-stack {
+                display: flex;
+                flex-direction: column;
+
+                .sub-text {
+                    font-size: 12px !important;
+                    color: $text-secondary;
+                    margin-top: 1px;
+                }
             }
         }
 
         .chevron {
-            color: $text-muted !important;
-            font-size: 16px !important;
+            color: #b1b3b5;
+        }
+    }
+
+    // Members list variant
+    &.members-list {
+        background: transparent;
+        box-shadow: none;
+        padding: 0 $sp-3;
+        gap: 0;
+
+        .setting-item {
+            padding: $sp-2 $sp-3;
+            border-radius: 14px;
+            margin: 1px 0;
+            transition: $transition-base;
+
+            &:hover {
+                background: rgba($accent, 0.035) !important;
+            }
+
+            &.add-member-row:hover {
+                background: rgba($accent, 0.05) !important;
+            }
+
+            .setting-left {
+                gap: $sp-3;
+
+                .action-circle-small {
+                    width: 42px;
+                    height: 42px;
+                    border-radius: 50%;
+                    background: $accent;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    flex-shrink: 0;
+
+                    svg {
+                        stroke-width: 2.5px;
+                    }
+                }
+
+                .action-text {
+                    color: $accent !important;
+                    font-weight: 600 !important;
+                    font-size: 15px !important;
+                }
+
+                .member-name {
+                    font-size: 15px;
+                    color: $text-primary;
+                    font-weight: 500;
+                }
+            }
+
+            .member-right-actions {
+                display: flex;
+                align-items: center;
+                gap: $sp-2;
+
+                .admin-badge {
+                    font-size: 11px;
+                    padding: 2px 8px;
+                    border: 1.5px solid rgba($accent, 0.18);
+                    border-radius: $sp-3;
+                    color: $accent;
+                    font-weight: 600;
+                    background: rgba($accent, 0.06);
+                    white-space: nowrap;
+                }
+
+                .member-chevron {
+                    color: $text-secondary;
+                    opacity: 0;
+                    transform: translateX(8px);
+                    transition: $transition-base;
+                    pointer-events: none;
+
+                    &.visible {
+                        opacity: 1;
+                        transform: translateX(0);
+                        pointer-events: auto;
+                    }
+                }
+            }
+        }
+
+        .view-all-btn {
+            margin-top: $sp-2;
+            padding: $sp-3 $sp-3;
+            text-decoration: underline;
+            text-decoration-color: $accent;
+            justify-content: center;
+
+            .setting-left {
+                justify-content: center;
+            }
+
+            &:hover {
+                background: rgba($accent, 0.04) !important;
+            }
         }
     }
 }
 
-// Toggle Switch
+// ─── Danger Zone ──────────────────────────────────────────────────────────────
+.danger-zone {
+    background: $bg-white;
+    display: flex;
+    flex-direction: column;
+    padding: $sp-2 $sp-3;
+
+    .danger-item {
+        display: flex;
+        align-items: center;
+        gap: $sp-3;
+        padding: $sp-3 $sp-3;
+        border-radius: 12px;
+        cursor: pointer;
+        color: $text-danger;
+        transition: background 0.18s;
+
+        &:hover {
+            background: rgba($text-danger, 0.04);
+        }
+
+        svg {
+            flex-shrink: 0;
+        }
+
+        span {
+            font-size: 15px;
+            font-weight: 400;
+        }
+    }
+}
+
+// ─── Toggle Switch ────────────────────────────────────────────────────────────
 .toggle-switch {
-    width: 48px;
-    height: 24px;
-    background: #ccc;
-    border-radius: 12px;
+    width: 36px;
+    height: 20px;
+    background: #d1d9e0;
+    border-radius: $sp-3;
     position: relative;
     cursor: pointer;
-    @include transition;
+    transition: background 0.22s;
+    flex-shrink: 0;
 
     &.active {
-        // background: $whatsapp-green;
-        background: #8e4ff3;
+        background: $accent;
 
         .toggle-slider {
-            transform: translateX(24px);
+            transform: translateX(16px);
         }
     }
 
     .toggle-slider {
-        width: 20px;
-        height: 20px;
-        background: $white;
-        border-radius: 50%;
         position: absolute;
         top: 2px;
         left: 2px;
-        @include transition;
+        width: 16px;
+        height: 16px;
+        background: $bg-white;
+        border-radius: 50%;
+        transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     }
 }
 
-// Media Section
-.media-section {
+// ─── Animations ───────────────────────────────────────────────────────────────
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
 
-    .media-tabs {
-        display: flex;
-        border-bottom: 1px solid $border-color;
-        gap: 6px;
-        padding: 10px 12px;
-        background: rgba(255, 255, 255, 0.9);
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
 
-        .tab-button {
-            flex: 1;
-            padding: 10px 12px;
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            color: $text2ndColor;
-            @include transition;
-            border: none;
-            border-radius: 16px;
+// ─── Add Member Dialog ────────────────────────────────────────────────────────
+.add-member-dialog {
+    .MuiDialogTitle-root {
+        padding: $sp-5 $sp-6 $sp-3;
 
-            &.active {
-                background: rgba($primary-main, 0.10);
-                color: $text-primary;
-                box-shadow: none;
-            }
+        .MuiIconButton-root {
+            margin-right: $sp-3;
+            color: $text-secondary !important;
 
             &:hover {
-                background: rgba(0, 0, 0, 0.04);
-            }
-
-            .MuiSvgIcon-root {
-                font-size: 20px;
-            }
-
-            span {
-                font-size: 12px;
-                font-weight: 500;
+                background: rgba(0, 0, 0, 0.04) !important;
             }
         }
     }
 
-    .tab-content {
-        padding: 16px 24px;
-    }
-}
-
-.customer-details-container.panel {
-    .media-section {
-
-        .media-tabs {
-            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-            padding: 8px 10px;
-
-            .tab-button {
-                padding: 8px 10px;
-                border-radius: 14px;
-
-                &.active {
-                    background: rgba($primary-main, 0.08);
-                }
-
-                span {
-                    font-size: 11px;
-                }
-            }
+    .MuiDialogContent-root {
+        &::-webkit-scrollbar {
+            width: 4px;
         }
 
-        .tab-content {
-            padding: 12px 14px;
+        &::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: $sp-3;
         }
     }
-}
 
-.starred-section,
-.groups-section,
-.danger-section {
-    padding: 1rem 1.5rem;
-    border-top: 1px solid #e0e0e0;
-
-    .setting-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0.9rem 0;
-        cursor: pointer;
-
-        .setting-left {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-
-            svg {
-                font-size: 1.6rem;
-                color: #54656f;
-            }
-
-            span {
-                font-size: 1rem;
-                color: #111b21;
-            }
-
-            .group-icon {
-                width: 36px;
-                height: 36px;
-                background-color: #d9fdd3;
-                border-radius: 50%;
-            }
-        }
-
-        .setting-right {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-
-            .count {
-                font-size: 0.95rem;
-                color: #54656f;
-            }
-
-            .chevron {
-                font-size: 1.2rem;
-                color: #54656f;
-            }
-        }
+    .MuiListItem-root:hover {
+        background-color: rgba($accent, 0.04) !important;
     }
-}
 
-.danger-section {
-
-    .setting-item {
-        border-top: 1px solid #f5f5f5;
-
-        .setting-left {
-            svg {
-                color: #ea0037; // red for danger icons
-            }
-
-            span {
-                color: #ea0037;
-                font-weight: 500;
-            }
-        }
+    .MuiCheckbox-root.Mui-checked {
+        color: $accent !important;
     }
 }

@@ -7,68 +7,21 @@ import {
     Box,
     Button,
     IconButton,
-    Chip,
-    Checkbox
+    Chip
 } from '@mui/material';
-import { Clear, Person as PersonIcon, ArrowBack, ArrowForward, CameraAlt, Check, SentimentSatisfiedAlt as EmojiIcon, Settings as SettingsIcon, Edit as EditIcon, Chat as ChatIcon, PersonAdd as PersonAddIcon, Link as LinkIcon, ManageAccounts as ManageAccountsIcon } from '@mui/icons-material';
+import { Clear, ArrowBack, ArrowForward, Check, SentimentSatisfiedAlt as EmojiIcon } from '@mui/icons-material';
 import { ChevronRight, X } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
-import { Popover, Switch, Divider, styled } from '@mui/material';
+import { Popover, Divider, styled } from '@mui/material';
 import './CreateGroup.scss';
 import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig } from '../../utils/globalFunc';
 import { fetchCustomerLists } from '../../API/CustomerLists/CustomerLists';
 import { LoginContext } from '../../context/LoginData';
-
-const IOSSwitch = styled((props) => (
-    <Switch focusVisibleClassName=".Mui-focusVisible" disableRipple {...props} />
-))(({ theme }) => ({
-    width: 42,
-    height: 26,
-    padding: 0,
-    '& .MuiSwitch-switchBase': {
-        padding: 0,
-        margin: 2,
-        transitionDuration: '300ms',
-        '&.Mui-checked': {
-            transform: 'translateX(16px)',
-            color: '#fff',
-            '& + .MuiSwitch-track': {
-                backgroundColor: theme.palette.primary.main,
-                opacity: 1,
-                border: 0,
-            },
-            '&.Mui-disabled + .MuiSwitch-track': {
-                opacity: 0.5,
-            },
-        },
-        '&.Mui-focusVisible .MuiSwitch-thumb': {
-            color: theme.palette.primary.main,
-            border: '6px solid #fff',
-        },
-        '&.Mui-disabled .MuiSwitch-thumb': {
-            color:
-                theme.palette.mode === 'light'
-                    ? theme.palette.grey[100]
-                    : theme.palette.grey[600],
-        },
-        '&.Mui-disabled + .MuiSwitch-track': {
-            opacity: theme.palette.mode === 'light' ? 0.7 : 0.3,
-        },
-    },
-    '& .MuiSwitch-thumb': {
-        boxSizing: 'border-box',
-        width: 22,
-        height: 22,
-    },
-    '& .MuiSwitch-track': {
-        borderRadius: 26 / 2,
-        backgroundColor: theme.palette.mode === 'light' ? '#E9E9EA' : '#39393D',
-        opacity: 1,
-        transition: theme.transitions.create(['background-color'], {
-            duration: 500,
-        }),
-    },
-}));
+import { createGroupApi } from '../../API/Groups/CreateGroupApi';
+import { toast } from 'react-hot-toast';
+import { CircularProgress } from '@mui/material';
+import ProfileAvatarUpload from '../ReusableComponent/ProfileAvatarUpload';
+import GroupPermissions from '../CustomerDetails/GroupPermissions';
 
 const CreateGroup = ({ onBack, onClose, onContinue }) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -77,13 +30,13 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
     const [step, setStep] = useState(1); // 1: Select Members, 2: Group Info
     const [direction, setDirection] = useState('backward'); // 'forward' or 'backward'
     const [groupName, setGroupName] = useState('');
-    const [groupIcon, setGroupIcon] = useState(null);
-    const [groupIconPreview, setGroupIconPreview] = useState(null);
+    const [groupNameTouched, setGroupNameTouched] = useState(false);
+    const [groupProfileUrl, setGroupProfileUrl] = useState('');
+    const [selectedProfileFile, setSelectedProfileFile] = useState(null);
     const [permissions, setPermissions] = useState({
         editGroupSettings: true,
         sendMessages: true,
         addOtherMembers: true,
-        inviteViaLink: false,
         approveNewMembers: false
     });
     const [emojiAnchorEl, setEmojiAnchorEl] = useState(null);
@@ -191,18 +144,6 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
         }
     }, [loading, hasMore, currentPage, loadMembers]);
 
-    const handleIconChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            setGroupIcon(file);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setGroupIconPreview(reader.result);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
     const handleBack = () => {
         setDirection('backward');
         if (step === 3) {
@@ -210,6 +151,9 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
         } else if (step === 2) {
             setStep(1);
         } else {
+            // Reset selected profile file when going back to previous screen
+            setSelectedProfileFile(null);
+            setGroupProfileUrl('');
             onBack();
         }
     };
@@ -226,7 +170,7 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
             const text = groupName;
             const before = text.substring(0, start);
             const after = text.substring(end);
-            const newValue = (before + emojiData.emoji + after).slice(0, 100);
+            const newValue = (before + emojiData.emoji + after).slice(0, 50);
             setGroupName(newValue);
 
             // Set cursor position after emoji in next tick
@@ -236,22 +180,97 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
                 input.focus();
             }, 0);
         } else {
-            setGroupName(prev => (prev + emojiData.emoji).slice(0, 80));
+            setGroupName(prev => (prev + emojiData.emoji).slice(0, 50));
         }
         setEmojiAnchorEl(null);
     };
 
-    const handlePermissionChange = (name) => (event) => {
-        setPermissions(prev => ({ ...prev, [name]: event.target.checked }));
+    const handlePermissionChange = (name, value) => {
+        setPermissions(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleFinalContinue = () => {
-        onContinue({
-            name: groupName,
-            icon: groupIcon,
-            members: selectedMembers,
-            permissions
-        });
+    const handleFinalContinue = async () => {
+        if (loading) return;
+
+        if (!groupName.trim()) {
+            setGroupNameTouched(true);
+            toast.error('Group Subject is required');
+            return;
+        }
+
+        // Validate group name length
+        if (groupName.length > 50) {
+            toast.error('Group name cannot exceed 50 characters');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const myId = Number(auth?.id ?? auth?.userId);
+
+            // Upload profile image first if selected
+            let uploadedProfileUrl = '';
+            if (selectedProfileFile) {
+                try {
+                    const { uploadMediaAPi } = await import('../../API/FileUpload/uploadHelpers');
+                    const uploadedFiles = await uploadMediaAPi({
+                        folderName: 'tecochat/profileImage',
+                        files: [selectedProfileFile],
+                        onProgress: (progress) => {
+                            console.log('Upload progress:', progress);
+                        }
+                    });
+
+                    if (uploadedFiles && Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
+                        const uploadedFile = uploadedFiles[0];
+                        uploadedProfileUrl = uploadedFile?.FileUrl || uploadedFile?.fileUrl || uploadedFile?.Url || uploadedFile?.url || uploadedFile?.path;
+                    }
+                } catch (uploadError) {
+                    console.error('Error uploading profile image:', uploadError);
+                    toast.error('Failed to upload group icon');
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            // Construct members list: self (admin) + selected members
+            const members = [
+                { UserId: myId, IsAdmin: 1 },
+                ...selectedMembers.map(member => ({
+                    UserId: Number(member.UserId || member.id),
+                    IsAdmin: 0
+                }))
+            ];
+
+            const response = await createGroupApi(auth, {
+                userId: myId,
+                groupName: groupName.trim(),
+                groupDesc: "",
+                groupMembers: members,
+                groupProfile: uploadedProfileUrl || "",
+                permissions: permissions
+            });
+
+            if (response?.success || response?.Status === "200") {
+                toast.success("Group created successfully");
+                if (onContinue) {
+                    onContinue({
+                        response,
+                        name: groupName,
+                        members: selectedMembers,
+                        permissions
+                    });
+                }
+                if (onClose) onClose();
+            } else {
+                toast.error(response?.message || "Failed to create group");
+            }
+        } catch (error) {
+            console.error("Create Group Error:", error);
+            toast.error("Internal server error occurred");
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -260,6 +279,15 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
         container.addEventListener('scroll', handleScroll, { passive: true });
         return () => container.removeEventListener('scroll', handleScroll);
     }, [handleScroll]);
+
+    // Cleanup preview URL when component unmounts
+    useEffect(() => {
+        return () => {
+            if (groupProfileUrl && groupProfileUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(groupProfileUrl);
+            }
+        };
+    }, [groupProfileUrl]);
 
     const filteredMembers = chatMembers?.data?.filter(member => {
         const myId = Number(auth?.id ?? auth?.userId);
@@ -286,7 +314,12 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
                     </Typography>
                 </Box>
                 {step === 1 &&
-                    <IconButton onClick={onClose} size="small" className='add_conv'>
+                    <IconButton onClick={() => {
+                        // Reset selected profile file when closing
+                        setSelectedProfileFile(null);
+                        setGroupProfileUrl('');
+                        onClose();
+                    }} size="small" className='add_conv'>
                         <X size={20} />
                     </IconButton>
                 }
@@ -385,28 +418,28 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
                     <div className={`step-content step-2 ${direction}`} key={2}>
                         <div className="group_info_step">
                             <div className="icon_upload_section">
-                                <label htmlFor="group-icon-upload" className="icon_label">
-                                    <input
-                                        accept="image/*"
-                                        id="group-icon-upload"
-                                        type="file"
-                                        hidden
-                                        onChange={handleIconChange}
-                                    />
-                                    <div className="icon_preview_container">
-                                        {groupIconPreview ? (
-                                            <img src={groupIconPreview} alt="Group Icon" className="preview_img" />
-                                        ) : (
-                                            <div className="placeholder_icon">
-                                                <CameraAlt />
-                                            </div>
-                                        )}
-                                        <div className="hover_overlay">
-                                            <CameraAlt />
-                                            <Typography variant="caption">CHANGE GROUP ICON</Typography>
-                                        </div>
-                                    </div>
-                                </label>
+                                <ProfileAvatarUpload
+                                    size={120}
+                                    currentImageUrl={groupProfileUrl}
+                                    avatarSeed={groupName || 'New Group'}
+                                    showOverlay={true}
+                                    overlayText="Add group\nicon"
+                                    onImageSelected={(file, previewUrl) => {
+                                        setSelectedProfileFile(file);
+                                        setGroupProfileUrl(previewUrl); // Set preview URL for display
+                                    }}
+                                    onUploadError={(error) => {
+                                        console.error('Image selection failed:', error);
+                                        toast.error('Failed to select group icon');
+                                    }}
+                                    onRemoveComplete={() => {
+                                        // Handle remove in create group context (clear preview)
+                                        setSelectedProfileFile(null);
+                                        setGroupProfileUrl('');
+                                    }}
+                                    className="group-icon-upload"
+                                    folderName="tecochat/profileImage"
+                                />
                             </div>
 
                             <div className="group_name_section">
@@ -418,8 +451,17 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
                                     placeholder="Group Subject"
                                     variant="standard"
                                     value={groupName}
-                                    onChange={(e) => setGroupName(e.target.value.slice(0, 100))}
-                                    helperText={`${groupName.length}/100`}
+                                    onChange={(e) => {
+                                        setGroupName(e.target.value.slice(0, 50));
+                                        if (!groupNameTouched) setGroupNameTouched(true);
+                                    }}
+                                    onBlur={() => setGroupNameTouched(true)}
+                                    error={groupNameTouched && !groupName.trim()}
+                                    helperText={
+                                        groupNameTouched && !groupName.trim()
+                                            ? 'Group Subject is required'
+                                            : `${groupName.length}/50`
+                                    }
                                     InputProps={{
                                         endAdornment: (
                                             <InputAdornment position="end">
@@ -508,85 +550,20 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
                             <Button
                                 variant="contained"
                                 className="continue_fab finalize"
-                                disabled={!groupName.trim()}
+                                disabled={!groupName.trim() || loading}
                                 onClick={handleFinalContinue}
                             >
-                                <Check />
+                                {loading ? <CircularProgress size={24} color="inherit" /> : <Check />}
                             </Button>
                         </Box>
                     </div>
                 ) : (
                     <div className={`step-content step-3 ${direction}`} key={3}>
-                        <div className="permissions_overlay_step">
-                            <div className="permission_group">
-                                <Typography className="group_label">Members can:</Typography>
-
-                                <div className="permission_item">
-                                    <EditIcon className="item_icon" />
-                                    <div className="item_text">
-                                        <Typography variant="body1">Edit group settings</Typography>
-                                        <Typography variant="caption" color="textSecondary">
-                                            This includes the name, icon, description, disappearing message timer, and the ability to pin, keep or unkeep messages.
-                                        </Typography>
-                                    </div>
-                                    <IOSSwitch
-                                        checked={permissions.editGroupSettings}
-                                        onChange={handlePermissionChange('editGroupSettings')}
-                                    />
-                                </div>
-
-                                <div className="permission_item">
-                                    <ChatIcon className="item_icon" />
-                                    <div className="item_text">
-                                        <Typography variant="body1">Send new messages</Typography>
-                                    </div>
-                                    <IOSSwitch
-                                        checked={permissions.sendMessages}
-                                        onChange={handlePermissionChange('sendMessages')}
-                                    />
-                                </div>
-
-                                <div className="permission_item">
-                                    <PersonAddIcon className="item_icon" />
-                                    <div className="item_text">
-                                        <Typography variant="body1">Add other members</Typography>
-                                    </div>
-                                    <IOSSwitch
-                                        checked={permissions.addOtherMembers}
-                                        onChange={handlePermissionChange('addOtherMembers')}
-                                    />
-                                </div>
-
-                                <div className="permission_item">
-                                    <LinkIcon className="item_icon" />
-                                    <div className="item_text">
-                                        <Typography variant="body1">Invite via link</Typography>
-                                    </div>
-                                    <IOSSwitch
-                                        checked={permissions.inviteViaLink}
-                                        onChange={handlePermissionChange('inviteViaLink')}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="permission_group">
-                                <Typography className="group_label">Admins can:</Typography>
-
-                                <div className="permission_item">
-                                    <ManageAccountsIcon className="item_icon" />
-                                    <div className="item_text">
-                                        <Typography variant="body1">Approve new members</Typography>
-                                        <Typography variant="caption" color="textSecondary">
-                                            When turned on, admins must approve anyone who wants to join this group. <span className="learn_more">Learn more</span>
-                                        </Typography>
-                                    </div>
-                                    <IOSSwitch
-                                        checked={permissions.approveNewMembers}
-                                        onChange={handlePermissionChange('approveNewMembers')}
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                        <GroupPermissions
+                            permissions={permissions}
+                            onPermissionChange={handlePermissionChange}
+                            onBack={() => { setDirection('backward'); setStep(2); }}
+                        />
                     </div>
                 )}
             </div>

@@ -15,9 +15,9 @@ const Customers = ({ selectedStatus, selectedTag }) => {
 
     const handleCustomerSelect = useCallback((customer) => {
         const list = converListRef.current || [];
-        const existing = list.find(c => {
-            const cId = Number(c.ReceiverId || c.CustomerId || c.UserId);
-            const targetId = Number(customer.ReceiverId || customer.CustomerId || customer.UserId);
+        const existing = list?.find(c => {
+            const cId = Number(c?.ReceiverId || c?.CustomerId || c?.UserId);
+            const targetId = Number(customer?.ReceiverId || customer?.CustomerId || customer?.UserId);
             return cId === targetId;
         });
 

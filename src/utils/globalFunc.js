@@ -122,16 +122,16 @@ export const getSoftAvatarColors = (seed) => {
 };
 
 export const hasCustomerName = (customer) => {
-    const name = customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName;
+    const name = (customer?.MemberName ?? customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? customer.Name) ?? '';
     return Boolean(String(name ?? '').trim());
 };
 
 export const getCustomerDisplayName = (customer) => {
-    const name = String(customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? '').trim();
+    const name = String(customer?.MemberName ?? customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? customer.Name ?? '').trim();
     if (name) return name;
 
-    const phone = String(customer?.CustomerPhone ?? '').trim();
-    if (phone) return phone;
+    const email = String(customer?.UserEmail ?? '').trim();
+    if (email) return email;
 
     const fallback = String(customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? '').trim();
     if (fallback) return fallback;
@@ -140,13 +140,13 @@ export const getCustomerDisplayName = (customer) => {
 };
 
 export const getCustomerAvatarSeed = (customer) => {
-    const name = String(customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? '').trim();
+    const name = String(customer?.MemberName ?? customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? '').trim();
     if (name) return name;
 
-    const phone = String(customer?.CustomerPhone ?? '').trim();
-    if (phone) return phone;
+    const email = String(customer?.UserEmail ?? '').trim();
+    if (email) return email;
 
-    return String(customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? '').trim();
+    return 'Unknown';
 };
 
 export const getWhatsAppAvatarConfig = (name, size = 40) => {

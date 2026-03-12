@@ -194,55 +194,62 @@ const theme = createTheme({
       styleOverrides: {
         body: {
           fontFamily: poppinsFont,
-      },
-    },
-  },
-  MuiButton: {
-    styleOverrides: {
-      root: {
-        fontFamily: poppinsFont,
-        fontWeight: 500,
-        textTransform: 'none',
-        borderRadius: 8,
-        padding: '8px 16px',
-      },
-    },
-  },
-  MuiTextField: {
-    styleOverrides: {
-      root: {
-        '& .MuiOutlinedInput-root': {
-          fontFamily: poppinsFont,
-        },
-        '& .MuiInputLabel-root': {
-          fontFamily: poppinsFont,
         },
       },
     },
-  },
-  MuiMenuItem: {
-    styleOverrides: {
-      root: {
-        fontFamily: poppinsFont,
-        fontWeight: 500,
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          fontFamily: poppinsFont,
+          fontWeight: 500,
+          textTransform: 'none',
+          borderRadius: 8,
+          padding: '8px 16px',
+        },
+      },
+    },
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          '& .MuiOutlinedInput-root': {
+            fontFamily: poppinsFont,
+          },
+          '& .MuiInputLabel-root': {
+            fontFamily: poppinsFont,
+          },
+        },
+      },
+    },
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          fontFamily: poppinsFont,
+          fontWeight: 500,
+        },
+      },
+    },
+    MuiTypography: {
+      styleOverrides: {
+        root: {
+          fontFamily: poppinsFont,
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          fontFamily: poppinsFont,
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          fontFamily: poppinsFont,
+        },
       },
     },
   },
-  MuiTypography: {
-    styleOverrides: {
-      root: {
-        fontFamily: poppinsFont,
-      },
-    },
-  },
-  MuiIconButton: {
-    styleOverrides: {
-      root: {
-        fontFamily: poppinsFont,
-      },
-    },
-  },
-},
 });
 
 export default theme; 

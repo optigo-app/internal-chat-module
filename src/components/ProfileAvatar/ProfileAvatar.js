@@ -18,7 +18,6 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import './ProfileAvatar.scss';
 import { LoginContext } from '../../context/LoginData';
 import { LogoutApi } from '../../API/Logout/Logout';
-import { DataSync } from '../../API/DataSync/DataSync';
 import { getWhatsAppAvatarConfig } from '../../utils/globalFunc';
 
 const ProfileAvatar = () => {
@@ -40,29 +39,6 @@ const ProfileAvatar = () => {
 
     const handleDataSync = async () => {
         if (!startSync) return;
-
-        try {
-            const syncSuccess = await startSync(async () => {
-                // This callback will be executed by startSync
-                const syncData = await DataSync(auth?.userId);
-
-                // You can add additional success handling here if needed
-                if (syncData) {
-                    // Show success message or update UI as needed
-                    console.log('Sync was successful');
-                    return true;
-                }
-                throw new Error('No data returned from sync');
-            });
-
-            if (!syncSuccess) {
-                // Handle sync failure (error is already logged by startSync)
-                console.log('Sync completed with errors');
-            }
-        } catch (error) {
-            // This catch block is a fallback in case something unexpected happens
-            console.error('Unexpected error during sync:', error);
-        }
     };
 
     const handleLogout = async () => {

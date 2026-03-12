@@ -119,8 +119,6 @@ const LoginPage1 = () => {
 
         try {
             const loginData = await fetchLoginApi(credentials);
-            console.log("TCL: handleSubmit -> loginData", loginData)
-
             const userInfo = loginData?.rd?.[0];
             if (userInfo?.stat !== 1) {
                 setFormError("Invalid credentials");
@@ -129,7 +127,7 @@ const LoginPage1 = () => {
             }
 
             const socket = initializeSocket(userInfo.token)
-            
+
             const username = [
                 userInfo.firstname,
                 userInfo.middlename,

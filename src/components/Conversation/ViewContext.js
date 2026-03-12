@@ -1,4 +1,3 @@
-import React from 'react';
 import { Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -44,7 +43,7 @@ const ViewContext = ({ contextMenu, handleCloseMenu, handleMenuAction, setContex
             }}
         >
             <MenuItem
-                onClick={() => handleMenuItemClick("Close")}
+                onClick={() => handleMenuItemClick("close")}
                 sx={{
                     mx: 0.75,
                     my: 0.25,

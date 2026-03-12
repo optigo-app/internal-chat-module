@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Avatar } from '@mui/material';
+import { Avatar, Skeleton } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import MessageContent from './MessageContent';
-import { getCustomerAvatarSeed, getWhatsAppAvatarConfig, hasCustomerName } from '../../utils/globalFunc';
+import { getWhatsAppAvatarConfig } from '../../utils/globalFunc';
 
 const MessageItem = ({
     msg,
@@ -34,6 +34,8 @@ const MessageItem = ({
     handleForward
 }) => {
     const hoverHideTimeoutRef = useRef(null);
+    const [imageLoadState, setImageLoadState] = useState('loading'); // 'loading', 'loaded', 'error'
+
     const messageDomId = msg.Id ?? msg.fileName;
     const isOutgoing = msg.Direction === 1;
     const isBlinking = blinkMessageId === messageDomId;
@@ -41,6 +43,23 @@ const MessageItem = ({
     const isHovered = hoveredMessageId === currentHoverId;
     const isReactionMenuOpenForCurrent = reactionMenuMessageId === currentHoverId && Boolean(reactionMenuAnchorEl);
     const shouldShowActions = isHovered || isReactionMenuOpenForCurrent;
+
+    // Reset image load state when message changes
+    useEffect(() => {
+        if (msg.SenderProfilePicture) {
+            setImageLoadState('loading');
+        } else {
+            setImageLoadState('error'); // No image URL, skip to fallback
+        }
+    }, [msg.SenderProfilePicture, msg.Id]);
+
+    const handleImageLoad = useCallback(() => {
+        setImageLoadState('loaded');
+    }, []);
+
+    const handleImageError = useCallback(() => {
+        setImageLoadState('error');
+    }, []);
 
     const handleMouseEnter = useCallback(() => {
         if (hoverHideTimeoutRef.current) {
@@ -78,6 +97,38 @@ const MessageItem = ({
         };
     }, []);
 
+    if (msg.SystemMsg === 1) {
+        return (
+            <div
+                className="system-message-container"
+                data-message-id={messageDomId}
+                style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    margin: '16px auto',
+                    width: '100%',
+                    padding: '0 20px'
+                }}
+            >
+                <div className="system-message-text" style={{
+                    backgroundColor: '#f1f1f1',
+                    padding: '4px 12px',
+                    borderRadius: '16px',
+                    fontSize: '10px',
+                    color: '#667781',
+                    boxShadow: '0 1px 0.5px rgba(0,0,0,0.06)',
+                    maxWidth: '85%',
+                    textAlign: 'center',
+                    lineHeight: '1.4',
+                    textTransform: 'capitalize',
+                    letterSpacing: '0.1px',
+                }}>
+                    {msg.Message}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div
             className={`message-item ${msg.Direction === 1 ? 'user-message' : 'customer-message'} ${isBlinking ? 'blink-message' : ''}`}
@@ -88,29 +139,45 @@ const MessageItem = ({
         >
 
             {msg.Direction === 0 && (
-                !hasCustomerName(selectedCustomer) ? (
-                    (() => {
-                        const cfg = getWhatsAppAvatarConfig(getCustomerAvatarSeed(selectedCustomer), 32);
+                (() => {
+                    const senderName = `${msg.FirstName || ''} ${msg.LastName || ''}`.trim() || 'User';
+                    const avatarSeed = senderName;
+                    const cfg = getWhatsAppAvatarConfig(avatarSeed, 38);
+                    if (msg.SenderProfilePicture && imageLoadState === 'loading') {
                         return (
-                            <Avatar
-                                {...cfg}
-                                sx={{ ...cfg.sx, mr: 1 }}
-                            >
-                                <PersonIcon fontSize="small" />
-                            </Avatar>
+                            <div style={{ marginRight: 8 }}>
+                                <Skeleton
+                                    variant="circular"
+                                    width={38}
+                                    height={38}
+                                    sx={{ bgcolor: 'grey.200' }}
+                                />
+                                <img
+                                    src={msg.SenderProfilePicture}
+                                    onLoad={handleImageLoad}
+                                    onError={handleImageError}
+                                    style={{ display: 'none' }}
+                                    alt=""
+                                />
+                            </div>
                         );
-                    })()
-                ) : (
-                    (() => {
-                        const cfg = selectedCustomer?.avatarConfig || getWhatsAppAvatarConfig(getCustomerAvatarSeed(selectedCustomer), 32);
+                    }
+                    if (msg.SenderProfilePicture && imageLoadState === 'loaded') {
                         return (
                             <Avatar
-                                {...cfg}
-                                sx={{ ...cfg.sx, mr: 1 }}
+                                src={msg.SenderProfilePicture}
+                                alt={senderName}
                             />
                         );
-                    })()
-                )
+                    }
+                    return (
+                        <Avatar
+                            {...cfg}
+                            sx={{ ...cfg.sx, mr: 1 }}
+                        >
+                        </Avatar>
+                    );
+                })()
             )}
 
             <MessageContent

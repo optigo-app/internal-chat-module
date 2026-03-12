@@ -8,6 +8,8 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme';
 import { LoginData } from './context/LoginData';
+import { FavoriteProvider } from './contexts/FavoriteContext';
+import { RemoveInGroupProvider } from './contexts/RemoveInGroupContext';
 
 import { HelmetProvider } from 'react-helmet-async';
 
@@ -18,7 +20,11 @@ root.render(
       <CssBaseline />
       <BrowserRouter>
         <LoginData>
-          <App />
+          <FavoriteProvider>
+            <RemoveInGroupProvider>
+              <App />
+            </RemoveInGroupProvider>
+          </FavoriteProvider>
         </LoginData>
       </BrowserRouter>
     </ThemeProvider>

@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { X, Paperclip, Trash2 } from 'lucide-react';
+import { X, Trash2 } from 'lucide-react';
 import './MediaPreview.scss';
-import WordPreview from '../WordPreview/WordPreview';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, FreeMode, Thumbs } from 'swiper/modules';
 

@@ -27,7 +27,9 @@ const ChatBox = ({
     inputValue,
     setInputValue,
     handleKeyPress,
-    handleSendMessage
+    handleSendMessage,
+    isRemovedFromGroup = false,
+    selectedCustomer
 }) => {
     const inputRef = useRef(null);
     const attachButtonRef = useRef(null);
@@ -105,7 +107,29 @@ const ChatBox = ({
                 <ReplyPreview message={replyToMessage} onCancel={handleCancelReply} />
             )}
 
-            <div className="input-container">
+            {/* Show blocked message when removed from group */}
+            {isRemovedFromGroup && selectedCustomer?.IsGroup === 1 ? (
+                <div className="blocked-message-container" style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '16px 20px',
+                    backgroundColor: '#f0f2f5',
+                    borderRadius: '12px',
+                    margin: '8px 16px',
+                    border: '1px solid #e4e6ea'
+                }}>
+                    <span style={{
+                        color: '#667781',
+                        fontSize: '14px',
+                        textAlign: 'center',
+                        fontStyle: 'italic'
+                    }}>
+                        You can't send messages. You're no longer a participant in this group.
+                    </span>
+                </div>
+            ) : (
+                <div className="input-container">
                 <IconButton ref={attachButtonRef} size="small" className="attach-button" onClick={handleAttachClick}>
                     <AttachFile />
                 </IconButton>
@@ -280,6 +304,7 @@ const ChatBox = ({
                     <SendHorizontal style={{ marginLeft: '2px' }} />
                 </IconButton>
             </div>
+            )}
         </div>
     )
 }

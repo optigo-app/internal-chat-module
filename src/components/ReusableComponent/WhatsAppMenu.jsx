@@ -7,7 +7,19 @@ import {
   Divider,
 } from "@mui/material";
 
-const WhatsAppMenu = ({ anchorEl, open, onClose, items = [], onAction, context }) => {
+const WhatsAppMenu = ({
+  anchorEl,
+  open,
+  onClose,
+  items = [],
+  onAction,
+  context,
+  anchorReference = "anchorEl",
+  anchorPosition,
+  transformOrigin = { horizontal: "right", vertical: "top" },
+  anchorOrigin = { horizontal: "right", vertical: "bottom" },
+  sx = {}
+}) => {
   const handleClick = (action) => {
     onClose?.();
     onAction?.(action, context);
@@ -18,6 +30,8 @@ const WhatsAppMenu = ({ anchorEl, open, onClose, items = [], onAction, context }
       anchorEl={anchorEl}
       open={open}
       onClose={onClose}
+      anchorReference={anchorReference}
+      anchorPosition={anchorPosition}
       onClick={(e) => e.stopPropagation()}
       PaperProps={{
         elevation: 0,
@@ -28,10 +42,11 @@ const WhatsAppMenu = ({ anchorEl, open, onClose, items = [], onAction, context }
           boxShadow:
             "0px 6px 18px rgba(0,0,0,0.12), 0px 3px 6px rgba(0,0,0,0.08)",
           backgroundColor: "background.paper",
+          ...sx
         },
       }}
-      transformOrigin={{ horizontal: "right", vertical: "top" }}
-      anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
+      transformOrigin={transformOrigin}
+      anchorOrigin={anchorOrigin}
     >
       {items.map((item, index) =>
         item.divider ? (
@@ -43,6 +58,7 @@ const WhatsAppMenu = ({ anchorEl, open, onClose, items = [], onAction, context }
             sx={{
               py: 1.1,
               px: 2,
+              mb: 0.5,
               borderRadius: 1.5,
               transition: "all 0.2s ease",
               color: item.danger ? "error.main" : "text.primary",
@@ -55,7 +71,7 @@ const WhatsAppMenu = ({ anchorEl, open, onClose, items = [], onAction, context }
             }}
           >
             {item.icon && (
-              <ListItemIcon sx={{ minWidth: '30px' }}>
+              <ListItemIcon sx={{ minWidth: '30px !important' }}>
                 {item.icon}
               </ListItemIcon>
             )}

@@ -224,16 +224,27 @@ export const groupMessagesByDateHelper = (messages) => {
         let date;
 
         if (msg.Date) {
-            date = msg.Date;
+            // Normalize the date format to YYYY-MM-DD
+            try {
+                const parsedDate = new Date(msg.Date);
+                if (!isNaN(parsedDate.getTime())) {
+                    date = parsedDate.toISOString().split('T')[0];
+                } else {
+                    date = msg.Date;
+                }
+            } catch {
+                date = msg.Date;
+            }
         } else if (msg.DateTime) {
             try {
-                // Use GMT so both sides are consistent
-                date = new Date(msg.DateTime).toLocaleDateString('en-GB', { timeZone: 'GMT' });
+                // Extract date in YYYY-MM-DD format
+                const parsedDate = new Date(msg.DateTime);
+                date = parsedDate.toISOString().split('T')[0];
             } catch {
-                date = new Date().toLocaleDateString('en-GB', { timeZone: 'GMT' });
+                date = new Date().toISOString().split('T')[0];
             }
         } else {
-            date = new Date().toLocaleDateString('en-GB', { timeZone: 'GMT' });
+            date = new Date().toISOString().split('T')[0];
         }
 
         if (!grouped[date]) {

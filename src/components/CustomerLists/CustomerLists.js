@@ -39,6 +39,7 @@ import AddConversation from '../AddConversation/AddConversation';
 import CreateGroup from '../AddConversation/CreateGroup';
 import useOnlineStatus from '../../utils/internetCheck';
 import useFaviconBadge from '../../hooks/useFaviconBadge';
+import { useFavorite } from '../../contexts/FavoriteContext';
 
 const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, selectedStatus = 'All', selectedTag = 'All', isConversationRead = false, viewConversationRead = false, onConversationList = () => { } }) => {
     const isOnline = useOnlineStatus();
@@ -64,6 +65,9 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const clickTimeoutRef = useRef(null);
     const pendingSelectConversationIdRef = useRef(null);
     const { auth, isSyncing } = useContext(LoginContext);
+    
+    // Get Context favorite state
+    const { favoriteState } = useFavorite();
 
     const getMemberTimeValue = useCallback((member) => {
         const raw = member?.lastMessageTimeValue || member?.LastMessageDate || member?.LastUpdatedDate || member?.lastMessageTime || 0;
@@ -530,7 +534,8 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 return haystack.includes(searchTerm.toLowerCase());
             })
             ?.filter((member) => {
-                const isFavorite = member.IsStar === 1;
+                // Check Context state first, fallback to member.IsStar
+                const isFavorite = (favoriteState[member.ConversationId]?.isStar ?? member.IsStar) === 1;
                 switch (tabValue) {
                     case 2: return isFavorite && tabValue === 2;
                     default: return true;
@@ -539,7 +544,8 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             ?.filter((member) => {
                 if (!selectedStatus || selectedStatus === 'All') return true;
                 const statusKey = selectedStatus.toLowerCase();
-                const isFavorite = member.IsStar === 1;
+                // Check Context state first, fallback to member.IsStar
+                const isFavorite = (favoriteState[member.ConversationId]?.isStar ?? member.IsStar) === 1;
                 return member.ticketStatus === statusKey || (isFavorite && statusKey === 'favorite');
             })
             ?.filter((member) => {
@@ -965,11 +971,11 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                                                             </IconButton>
                                                                         </Tooltip>
                                                                     }
-                                                                    {member?.IsStar === 1 &&
-                                                                        <Tooltip title={member?.IsStar === 1 ? "Unfavorite" : "favorite"} arrow>
+                                                                    {((favoriteState[member.ConversationId]?.isStar ?? member?.IsStar) === 1) &&
+                                                                        <Tooltip title="Unfavorite" arrow>
                                                                             <IconButton
                                                                                 size="small"
-                                                                                className={`action-btn ${member?.IsStar === 1 ? 'is-on' : ''}`}
+                                                                                className="action-btn is-on"
                                                                             >
                                                                                 <Star size={17} />
                                                                             </IconButton>

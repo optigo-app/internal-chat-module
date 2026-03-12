@@ -518,8 +518,6 @@
                                 opacity: 0.4;
                             }
 
-                            animation: addCustomerPulse 2.5s infinite;
-
                             &::after {
                                 content: '';
                                 position: absolute;
@@ -607,21 +605,6 @@
     100% {
         opacity: 1;
         transform: scaleY(1);
-    }
-}
-
-// Add Customer Button Pulse Animation - Blue Theme
-@keyframes addCustomerPulse {
-    0% {
-        box-shadow: 0 0 0 0 rgba($primary-main, 0.45);
-    }
-
-    70% {
-        box-shadow: 0 0 0 12px rgba($primary-main, 0);
-    }
-
-    100% {
-        box-shadow: 0 0 0 0 rgba($primary-main, 0);
     }
 }
 

@@ -20,12 +20,32 @@ import { removeReactionApi } from '../../API/SendMessage/removeReactionApi';
 import { emitSendReaction } from '../../socket';
 import useOnlineStatus from '../../utils/internetCheck';
 import OfflineOverlay from './OfflineOverlay';
+import AddMemberDialog from '../ReusableComponent/AddMemberDialog';
+import ConfirmationDialog from '../ReusableComponent/ConfirmationDialog';
+import WhatsAppMenu from '../ReusableComponent/WhatsAppMenu';
+import { addGroupParticipantApi } from '../../API/Groups/AddGroupParticipantApi';
+import { removeMemberApi } from '../../API/Groups/RemoveMemberApi';
+import { fetchGroupDetails } from '../../API/Groups/FetchGroupDetails';
+import { updateConversationApi } from '../../API/SendMessage/updateConversationApi';
+import { useFavorite } from '../../contexts/FavoriteContext';
+import { useRemoveInGroup } from '../../contexts/RemoveInGroupContext';
+import {
+    EllipsisVertical,
+    Info,
+    CheckSquare,
+    BellOff,
+    Heart,
+    X,
+    Trash2,
+    LogOut
+} from 'lucide-react';
 
 const Conversation = ({ selectedCustomer, onConversationRead, onViewConversationRead, onCustomerSelect }) => {
     const isOnline = useOnlineStatus();
 
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [contextMenu, setContextMenu] = useState(null);
+    const [headerMenuAnchorEl, setHeaderMenuAnchorEl] = useState(null);
     const containerRef = useRef(null);
     const mediaPreviewScrollStateRef = useRef(null);
     const prevMediaFilesLenRef = useRef(0);
@@ -43,12 +63,37 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const { auth } = useContext(LoginContext);
     const [isSwitchingConversation, setIsSwitchingConversation] = useState(false);
     const reactionRequestStateRef = useRef(new Map());
+    const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
+    const [confirmationModal, setConfirmationModal] = useState({
+        isOpen: false,
+        actionType: null // 'exitGroup' | 'adminCannotLeave'
+    });
     const messagesRef = useRef(null);
+
+    // Use Context for global favorite state management
+    const { favoriteState, updateFavoriteStatus } = useFavorite();
+    
+    // Use Context for RemoveInGroup state management
+    const { updateRemoveInGroupStatus, isRemovedFromGroup } = useRemoveInGroup();
+
+    // Get favorite status from Context state or fallback to selectedCustomer prop
+    const isFavorite = favoriteState[selectedCustomer?.ConversationId]?.isStar ?? (selectedCustomer?.IsStar === 1);
+    
+    // Get removed from group status from Context state or fallback to selectedCustomer prop
+    const isRemovedFromCurrentGroup = isRemovedFromGroup(selectedCustomer?.ConversationId) || (selectedCustomer?.RemoveInGroup === 1);
+
+    // Update RemoveInGroup context when selectedCustomer data changes
+    useEffect(() => {
+        if (selectedCustomer?.ConversationId && selectedCustomer?.RemoveInGroup !== undefined) {
+            updateRemoveInGroupStatus(selectedCustomer.ConversationId, selectedCustomer.RemoveInGroup === 1);
+        }
+    }, [selectedCustomer?.ConversationId, selectedCustomer?.RemoveInGroup, updateRemoveInGroupStatus]);
+
     const isNarrowScreen = useMediaQuery('(max-width: 992px)');
     const isTopPanelScreen = useMediaQuery('(max-width: 1620px)');
     const isCompactDockedPanel = useMediaQuery('(max-width: 1200px)');
     const isDetailsPanelDocked = drawerOpen === true && !isNarrowScreen;
-    const dockedPanelWidth = isCompactDockedPanel ? 380 : 420;
+    const dockedPanelWidth = isCompactDockedPanel ? 400 : 450;
     const scrollToBottomRightOffset = isDetailsPanelDocked ? dockedPanelWidth + 30 : 30;
     const showFullDetails = drawerOpen === true && !isNarrowScreen && isTopPanelScreen;
 
@@ -100,6 +145,28 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         refresh,
     } = useConversation(selectedCustomer, onConversationRead, onViewConversationRead);
 
+    const handleAddMembersSubmit = async (selectedIds) => {
+        if (!selectedIds || selectedIds.length === 0) return;
+
+        try {
+            const response = await addGroupParticipantApi(auth, {
+                conversationId: selectedCustomer.ConversationId,
+                selectedMembers: selectedIds
+            });
+
+            if (response?.Status === "200") {
+                toast.success('Members added successfully');
+                setIsAddMemberDialogOpen(false);
+                // Optionally refresh if there's a way to notify the child components or local state
+                if (refresh) refresh();
+            } else {
+                toast.error(response?.Message || 'Failed to add members');
+            }
+        } catch (error) {
+            toast.error('Error adding members');
+        }
+    };
+
     useEffect(() => {
         messagesRef.current = messages;
     }, [messages]);
@@ -118,14 +185,10 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
 
     const handleMenuClick = useCallback((event, message) => {
         event.stopPropagation();
-        // message-specific menu is handled via messageContextMenu in handleContextMenu
     }, []);
 
     const handleMessageEmojiClick = useCallback(async (emojiObject, message) => {
-        console.log("TCL: handleMessageEmojiClick -> message", message, selectedCustomer)
         try {
-            // if (!selectedCustomer?.CustomerId && selectedCustomer?.CustomerId !== 0) return;
-
             const emoji = emojiObject?.emoji || emojiObject;
             const unified = emojiObject?.unified;
 
@@ -348,11 +411,10 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         e.stopPropagation();
         if (fileInputRef?.current) {
             fileInputRef.current.accept = acceptType;
-            fileInputRef.current.value = ''; // Reset the input to allow selecting the same file again
+            fileInputRef.current.value = '';
             fileInputRef.current.oninput = (changeEvent) => {
                 if (changeEvent.target.files.length > 0) {
                     captureMessageScrollState();
-                    // File was selected, handle it in the change handler
                     handleFileChange(changeEvent, toast);
                 }
             };
@@ -383,12 +445,11 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         }
     }, []);
 
-    // Scroll to bottom when media items load, but only if we were already near the bottom
     useEffect(() => {
         if (!containerRef.current || loading || isSwitchingConversation) return;
         const container = containerRef.current;
         const { scrollTop, scrollHeight, clientHeight } = container;
-        const isNearBottom = scrollHeight - clientHeight - scrollTop < 300; // Increased threshold for media loads
+        const isNearBottom = scrollHeight - clientHeight - scrollTop < 300;
 
         if (isNearBottom) {
             // Need a slight delay to ensure DOM dimensions are updated after image/video render
@@ -508,11 +569,156 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         setContextMenu(null);
     }, []);
 
-    const handleMenuAction = useCallback((action) => {
-        if (action === "Close") {
-            onCustomerSelect(null);
+    const handleToggleFavorite = useCallback(async () => {
+        const newIsStar = isFavorite ? 0 : 1;
+
+        // Optimistically update Context state
+        updateFavoriteStatus(selectedCustomer?.ConversationId, newIsStar);
+
+        try {
+            const response = await updateConversationApi(auth, {
+                page: 1,
+                pageSize: 50,
+                conversationId: selectedCustomer?.ConversationId,
+                isPin: selectedCustomer?.IsPin || 0,
+                isStar: newIsStar,
+                isArchived: selectedCustomer?.IsArchived || 0,
+            });
+            if (response?.Status === "200" || response?.success === true) {
+                toast.success(newIsStar ? "Added to favorites" : "Removed from favorites");
+                if (selectedCustomer) {
+                    selectedCustomer.IsStar = newIsStar;
+                }
+                if (refresh) refresh();
+            } else {
+                // Revert on failure
+                updateFavoriteStatus(selectedCustomer?.ConversationId, isFavorite ? 1 : 0);
+                toast.error("Failed to update favorite status");
+            }
+        } catch (error) {
+            // Revert on error
+            updateFavoriteStatus(selectedCustomer?.ConversationId, isFavorite ? 1 : 0);
+            toast.error("Error updating favorite status");
         }
-    }, [onCustomerSelect]);
+    }, [selectedCustomer, auth, isFavorite, updateFavoriteStatus, refresh]);
+
+    const checkAdminStatusAndShowConfirmation = useCallback(async () => {
+        try {
+            const groupData = await fetchGroupDetails(selectedCustomer.ConversationId, auth);
+
+            if (groupData && groupData.members) {
+                const currentUserId = auth?.id || auth?.userId;
+                const currentUser = groupData.members.find(m => m.UserId === currentUserId);
+                const isCurrentUserAdmin = currentUser?.IsGroupAdmin === 1;
+                const adminCount = groupData.members.filter(m => m.IsGroupAdmin === 1).length;
+
+                if (isCurrentUserAdmin && adminCount === 1) {
+                    setConfirmationModal({
+                        isOpen: true,
+                        actionType: 'adminCannotLeave'
+                    });
+                } else {
+                    setConfirmationModal({
+                        isOpen: true,
+                        actionType: 'exitGroup'
+                    });
+                }
+            } else {
+                setConfirmationModal({
+                    isOpen: true,
+                    actionType: 'exitGroup'
+                });
+            }
+        } catch (error) {
+            console.error('Error checking admin status:', error);
+            setConfirmationModal({
+                isOpen: true,
+                actionType: 'exitGroup'
+            });
+        }
+    }, [selectedCustomer, auth]);
+
+    const handleMenuAction = useCallback(async (action) => {
+        setHeaderMenuAnchorEl(null);
+        if (action === 'groupInfo') {
+            setDrawerOpen(true);
+        } else if (action === 'close') {
+            onCustomerSelect(null);
+        } else if (action === 'mute') {
+            toast('Mute notifications — coming soon!');
+        } else if (action === 'favourite') {
+            await handleToggleFavorite();
+        } else if (action === 'selectMessage') {
+            toast('Select message — coming soon!');
+        } else if (action === 'clearChat') {
+            toast('Clear chat — coming soon!');
+        } else if (action === 'exitGroup') {
+            await checkAdminStatusAndShowConfirmation();
+        } else if (action === 'deleteGroup') {
+            // Show confirmation for deleting group conversation
+            setConfirmationModal({ 
+                isOpen: true, 
+                actionType: 'deleteGroup' 
+            });
+        }
+    }, [onCustomerSelect, handleToggleFavorite, checkAdminStatusAndShowConfirmation]);
+
+    const handleConfirmExitGroup = useCallback(async () => {
+        try {
+            const currentUserId = auth?.id || auth?.userId;
+            const response = await removeMemberApi(auth, {
+                conversationId: selectedCustomer.ConversationId,
+                memberId: currentUserId
+            });
+
+            if (response?.Status === "200") {
+                toast.success('You have left the group');
+                setConfirmationModal({ isOpen: false, actionType: null });
+                onCustomerSelect(null);
+                refresh();
+            } else {
+                setConfirmationModal({ isOpen: false, actionType: null });
+                toast.error(response?.Message || 'Failed to exit group');
+            }
+        } catch (error) {
+            console.error('Error exiting group:', error);
+            setConfirmationModal({ isOpen: false, actionType: null });
+            toast.error('Error exiting group');
+        }
+    }, [selectedCustomer, auth, onCustomerSelect, refresh]);
+
+    const handleConfirmDeleteGroup = useCallback(async () => {
+        try {
+            // For now, just close the conversation and show success message
+            // In the future, this could call a delete conversation API
+            toast.success('Group conversation deleted');
+            setConfirmationModal({ isOpen: false, actionType: null });
+            onCustomerSelect(null);
+            refresh();
+        } catch (error) {
+            console.error('Error deleting group conversation:', error);
+            setConfirmationModal({ isOpen: false, actionType: null });
+            toast.error('Error deleting group conversation');
+        }
+    }, [onCustomerSelect, refresh]);
+
+    const headerMenuItems = [
+        { label: 'Group Info', action: 'groupInfo', icon: <Info size={16} /> },
+        { label: 'Select message', action: 'selectMessage', icon: <CheckSquare size={16} /> },
+        { label: 'Mute notification', action: 'mute', icon: <BellOff size={16} /> },
+        { label: isFavorite ? 'Remove from favourite' : 'Add to favourite', action: 'favourite', icon: <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} /> },
+        { label: 'Close chat', action: 'close', icon: <X size={16} /> },
+        { divider: true },
+        { label: 'Clear chat', action: 'clearChat', icon: <Trash2 size={16} />, danger: true },
+        ...(selectedCustomer?.IsGroup === 1
+            ? [{ 
+                label: isRemovedFromCurrentGroup ? 'Delete group' : 'Exit group', 
+                action: isRemovedFromCurrentGroup ? 'deleteGroup' : 'exitGroup', 
+                icon: <LogOut size={16} />, 
+                danger: true 
+            }]
+            : []),
+    ];
 
     const toggleEmojiPicker = useCallback(() => {
         setShowPicker(!showPicker);
@@ -643,28 +849,42 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                     )}
                                 </div>
                                 <div className="customer-info">
-                                    <Typography variant="subtitle1" className="customer-name">
+                                    <Typography variant="subtitle1" className="customer-name" onClick={() => setDrawerOpen(true)} style={{ cursor: 'pointer' }}>
                                         {getCustomerDisplayName(selectedCustomer)}
                                     </Typography>
-                                    {displayEmail ? (
-                                        <Typography variant="body2" className="customer-email">
-                                            {displayEmail}
-                                        </Typography>
-                                    ) : null}
+                                    {selectedCustomer?.IsGroup === 1 ? (
+                                        selectedCustomer?.GroupDesc ? (
+                                            <Typography variant="body2" className="customer-email">
+                                                {selectedCustomer.GroupDesc}
+                                            </Typography>
+                                        ) : null
+                                    ) : (
+                                        displayEmail ? (
+                                            <Typography variant="body2" className="customer-email">
+                                                {displayEmail}
+                                            </Typography>
+                                        ) : null
+                                    )}
                                 </div>
                             </div>
                             <div className="header-right">
-                                <Tooltip title="Refresh conversation">
+                                <Tooltip title="Refresh">
                                     <IconButton
                                         onClick={refresh}
                                         size="small"
                                         disabled={loading}
-                                        sx={{
-                                            color: '#6b7280',
-                                            '&:hover': { color: '#374151', backgroundColor: 'rgba(0,0,0,0.04)' }
-                                        }}
+                                        sx={{ color: '#6b7280', '&:hover': { color: '#374151', backgroundColor: 'rgba(0,0,0,0.04)' } }}
                                     >
                                         <RefreshIcon fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
+                                <Tooltip title="More options">
+                                    <IconButton
+                                        size="small"
+                                        onClick={(e) => setHeaderMenuAnchorEl(e.currentTarget)}
+                                        sx={{ color: '#6b7280', '&:hover': { color: '#374151', backgroundColor: 'rgba(0,0,0,0.04)' } }}
+                                    >
+                                        <EllipsisVertical size={20} />
                                     </IconButton>
                                 </Tooltip>
                             </div>
@@ -735,12 +955,14 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                 imageParams={imageParams}
                                 videoParams={videoParams}
                                 docsParams={docsParams}
-                                handleFileChange={handleFileChangeCallback}
+                                handleFileChange={handleFileChange}
                                 inputValue={inputValue}
                                 setInputValue={setInputValue}
                                 handleKeyPress={handleKeyPress}
                                 handleSendMessage={handleSendMessageCallback}
                                 mediaFiles={mediaFiles}
+                                isRemovedFromGroup={isRemovedFromCurrentGroup}
+                                selectedCustomer={selectedCustomer}
                             />
                         </>
                     )}
@@ -801,6 +1023,54 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 onSend={handleSendForward}
             />
 
+            <WhatsAppMenu
+                anchorEl={headerMenuAnchorEl}
+                open={Boolean(headerMenuAnchorEl)}
+                onClose={() => setHeaderMenuAnchorEl(null)}
+                onAction={handleMenuAction}
+                items={headerMenuItems}
+                sx={{ minWidth: '220px', px: 1 }}
+            />
+
+            <AddMemberDialog
+                open={isAddMemberDialogOpen}
+                onClose={() => setIsAddMemberDialogOpen(false)}
+                onSubmit={handleAddMembersSubmit}
+            />
+
+            <ConfirmationDialog
+                isOpen={confirmationModal.isOpen}
+                onClose={() => setConfirmationModal({ isOpen: false, actionType: null })}
+                onConfirm={confirmationModal.actionType === 'adminCannotLeave'
+                    ? () => setConfirmationModal({ isOpen: false, actionType: null })
+                    : confirmationModal.actionType === 'deleteGroup'
+                        ? handleConfirmDeleteGroup
+                        : handleConfirmExitGroup
+                }
+                title={
+                    confirmationModal.actionType === 'adminCannotLeave'
+                        ? 'Cannot Leave Group'
+                        : confirmationModal.actionType === 'deleteGroup'
+                            ? 'Delete Group?'
+                            : 'Exit Group?'
+                }
+                description={
+                    confirmationModal.actionType === 'adminCannotLeave'
+                        ? 'You cannot leave the group because you are the only administrator. Please assign another admin before leaving.'
+                        : confirmationModal.actionType === 'deleteGroup'
+                            ? 'Are you sure you want to delete this group conversation? This will remove the conversation from your chat list.'
+                            : 'Are you sure you want to exit this group?'
+                }
+                confirmText={
+                    confirmationModal.actionType === 'adminCannotLeave'
+                        ? 'OK'
+                        : confirmationModal.actionType === 'deleteGroup'
+                            ? 'Delete'
+                            : 'Exit'
+                }
+                variant={['exitGroup', 'deleteGroup'].includes(confirmationModal.actionType) ? 'danger' : 'primary'}
+                showCancel={confirmationModal.actionType !== 'adminCannotLeave'}
+            />
         </Box>
     );
 };

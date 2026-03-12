@@ -1,8 +1,8 @@
 import './App.css';
-import { useEffect, useState, useContext } from 'react';
+import { useEffect, useState, useContext, useRef, useCallback } from 'react';
 import { useNavigate, Routes, Route, useLocation, matchPath, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
-import toast, { Toaster } from 'react-hot-toast';
+import { Toaster } from 'react-hot-toast';
 import LoginPage1 from './components/LoginPage/LoginPage1';
 import Home from './components/Home/Home';
 import Customers from './components/Customers/Customers';
@@ -19,10 +19,8 @@ import { registerSocketId } from './utils/socketHelper';
 import { notify } from './utils/notificationTemplates';
 import { unlockAudio } from './utils/sound';
 import LoginExists from './components/LoginExists/LoginExists';
-import Changelog from './components/Changelog/Changelog';
 import Lottie from 'lottie-react';
 import loader from './assets/lotties/loader.json';
-import ChatHeader from './TestPage/ChatHeader';
 import NotificationPermissionModal from './components/_ui/NotificationPermissionModal';
 
 const PagenotFound = () => <div>404 - Page Not Found</div>;
@@ -118,6 +116,44 @@ function App() {
   const [socketStatus, setSocketStatus] = useState('disconnected');
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
+  // Store latest auth values in refs to avoid reconnecting socket on every auth change
+  const authRef = useRef(auth);
+  const navigateRef = useRef(navigate);
+
+  // Update refs when values change (doesn't trigger useEffect)
+  useEffect(() => {
+    authRef.current = auth;
+  }, [auth]);
+
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
+
+  // Stable callback that uses latest auth values without causing re-renders
+  const emitStoreSocketData = useCallback(async () => {
+    try {
+      const currentAuth = authRef.current;
+      const data = {
+        userId: currentAuth?.id ?? currentAuth?.userId,
+        ufcc: currentAuth?.ufcc
+      };
+      if (!data.userId || !data.ufcc) return;
+      await registerSocketId(data);
+      console.log('📡 Player ID saved successfully');
+    } catch (err) {
+      console.error('❌ Failed to save Player ID:', err);
+    }
+  }, []);
+
+  // Stable callback for session logout
+  const handleSessionLogout = useCallback(() => {
+    console.log('🔒 Session logout received');
+    sessionStorage.clear();
+    disconnectSocket(true);
+    navigateRef.current('/login');
+    notify({}, 'SESSION_LOGOUT');
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
     let socketCleanup = null;
@@ -125,12 +161,9 @@ function App() {
     const checkAndInitializeSocket = async () => {
       let token = auth?.token;
       let userId = auth?.userId;
-
-      // Fallback to sessionStorage if no token in context
       if (!token || !userId) {
         const isLoggedIn = sessionStorage.getItem('isLoggedIn');
         const userData = sessionStorage.getItem('userData');
-
         if (isLoggedIn && userData) {
           try {
             const parsedData = JSON.parse(userData);
@@ -141,10 +174,9 @@ function App() {
             return;
           }
         }
-
         if (!token || !userId) {
           console.log('⚠️ No auth token or userId available');
-          return <div>Loading...</div>;
+          return;
         }
       }
 
@@ -156,21 +188,6 @@ function App() {
           console.error('❌ Failed to initialize socket');
           return;
         }
-
-        const emitStoreSocketData = async () => {
-          if (!isMounted) return;
-          try {
-            const data = {
-              userId: auth?.id ?? auth?.userId ?? userId,
-              ufcc: auth?.ufcc
-            };
-            if (!data.userId || !data.ufcc) return;
-            await registerSocketId(data);
-            console.log('📡 Player ID saved successfully');
-          } catch (err) {
-            console.error('❌ Failed to save Player ID:', err);
-          }
-        };
 
         /** 🔗 On successful connection (also fires after reconnect) */
         const onConnect = async () => {
@@ -204,24 +221,6 @@ function App() {
           setSocketStatus('disconnected');
         };
 
-        /** 🔐 Handle session logout */
-        const onSessionLogout = () => {
-          if (!isMounted) return;
-          console.log('🔒 Session logout received');
-
-          // Clear session data
-          sessionStorage.clear();
-
-          // Disconnect socket
-          disconnectSocket(true);
-
-          // Redirect to login page
-          navigate('/login');
-
-          // Show a message to the user
-          notify({}, 'SESSION_LOGOUT');
-        };
-
         /** ❌ On error */
         const onConnectError = (err) => {
           if (!isMounted) return;
@@ -232,7 +231,7 @@ function App() {
 
         socket.on('connect', onConnect);
         socket.on('disconnect', onDisconnect);
-        socket.on('sessionLogout', onSessionLogout);
+        socket.on('sessionLogout', handleSessionLogout);
         socket.on('connect_error', onConnectError);
 
         // Reload case: socket may already be connected (restoreConnection ran before App mounted)
@@ -252,7 +251,7 @@ function App() {
           clearInterval(interval);
           socket.off('connect', onConnect);
           socket.off('disconnect', onDisconnect);
-          socket.off('sessionLogout', onSessionLogout);
+          socket.off('sessionLogout', handleSessionLogout);
           socket.off('connect_error', onConnectError);
         };
 
@@ -271,7 +270,8 @@ function App() {
         socketCleanup();
       }
     };
-  }, [auth?.token, auth?.id, auth?.userId, auth?.ufcc, navigate]);
+    // Only reconnect when token changes (login/logout), not on every auth property change
+  }, [auth?.token, emitStoreSocketData, handleSessionLogout]);
 
   useEffect(() => {
     const checkSession = () => {
@@ -339,7 +339,6 @@ function App() {
         <Routes>
           <Route path="/login" element={<RedirectIfAuthenticated><LoginPage1 /></RedirectIfAuthenticated>} />
           <Route path="/session-check" element={<LoginExists />} />
-          <Route path="/test" element={<ChatHeader chatId="123" />} />
           <Route
             path="*"
             element={
@@ -374,7 +373,6 @@ function App() {
                       path="/"
                       element={<Home selectedStatus={selectedStatus} selectedTag={selectedTag} isConnected={isConnected} socketStatus={socketStatus} />}
                     />
-                    <Route path="/changelog" element={<Changelog />} />
                     <Route path="/add-conversation" element={<Customers />} />
                     <Route path="/notification" element={<Customers />} />
                     <Route path="/archieve" element={<Customers />} />

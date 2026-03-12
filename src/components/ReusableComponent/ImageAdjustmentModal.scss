@@ -1,0 +1,117 @@
+@use "../../global.scss" as *;
+
+.image-adjustment-container {
+    position: relative;
+    background: #f8f9fa;
+    
+    &::-webkit-scrollbar {
+        display: none;
+    }
+    
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    
+    img {
+        display: block;
+        max-width: none;
+        max-height: none;
+        object-fit: contain;
+    }
+}
+
+// Prevent text selection during drag
+.image-adjustment-container * {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+// Backdrop animation
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+// Custom scrollbar for the modal if needed
+.MuiDialog-paper {
+    &::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    &::-webkit-scrollbar-track {
+        background: rgba(90, 90, 90, 0.1);
+        border-radius: 3px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+        background: rgba(115, 103, 240, 0.3);
+        border-radius: 3px;
+        
+        &:hover {
+            background: rgba(115, 103, 240, 0.5);
+        }
+    }
+}
+
+// Apply theme button styles
+.image-adjustment-modal {
+    .MuiButton-contained {
+        background: $button-Bgcolor;
+        color: $button-color;
+        border-color: $button-Bordercolor;
+        font-family: $font-family;
+        text-transform: capitalize;
+        border-radius: 16px;
+
+        &:hover {
+            background-color: $button-color-hover;
+            border-color: $button-Bordercolor;
+        }
+    }
+
+    .MuiButton-outlined {
+        background: #ebebed;
+        color: $secondaryColor;
+        border-color: #ebebed;
+        font-family: $font-family;
+        text-transform: capitalize;
+        border-radius: 16px;
+
+        &:hover {
+            background-color: $button-color-hover;
+            border-color: $button-Bordercolor;
+            color: $button-color;
+        }
+    }
+
+    .MuiIconButton-root {
+        transition: all 0.2s ease;
+        
+        &:hover {
+            transform: scale(1.05);
+        }
+    }
+
+    // Info button tooltip styling
+    .MuiTooltip-tooltip {
+        background-color: $titleColor !important;
+        color: #fff !important;
+        font-family: $font-family !important;
+        font-size: 12px !important;
+        border-radius: 8px !important;
+        padding: 12px !important;
+        box-shadow: $box-shadow-value !important;
+    }
+
+    .MuiTooltip-arrow {
+        color: $titleColor !important;
+    }
+
+    // Backdrop styling to match ConfirmationDialog
+    .MuiBackdrop-root {
+        background-color: rgba(0, 0, 0, 0.6) !important;
+        backdrop-filter: blur(4px) !important;
+        animation: fadeIn 0.25s ease-out !important;
+    }
+}

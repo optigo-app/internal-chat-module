@@ -192,7 +192,7 @@ const MessageArea = ({
                     overflowY: 'auto',
                     overflowX: 'hidden',
                     position: 'relative',
-                    backgroundImage: 'linear-gradient(rgba(249, 250, 251, 0.78), rgba(249, 250, 251, 0.78)), url(/bg-3.jpg)',
+                    backgroundImage: 'linear-gradient(rgba(249, 250, 251, 0.80), rgba(249, 250, 251, 0.80)), url(/icons/bg-3.jpg)',
                     backgroundSize: 'auto, contain',
                     backgroundPosition: 'center, center',
                     backgroundRepeat: 'repeat, repeat',

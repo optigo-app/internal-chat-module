@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 
-// 🌈 Modern styled menu container
+// Modern styled menu container
 const StyledMenu = styled(Menu)(({ theme }) => ({
   "& .MuiPaper-root": {
     borderRadius: "12px",
@@ -83,10 +83,7 @@ const MessageContextMenu = ({
   };
 
   const handleForward = (e) => {
-    
     e.stopPropagation();
-    console.log("Forwm:", message);
-    console.log("Message type:", message?.Type);
     onForward?.(message, e);
     onClose();
   };

@@ -16,7 +16,7 @@ export const fetchMediaLists = async (page = 1, pageSize = 6, conversationId, us
                 currentPage: page,
                 hasMore: response?.Data?.rd?.length === pageSize
             };
-        } else {
+        } else {                 
             return {
                 data: [],
                 total: 0,

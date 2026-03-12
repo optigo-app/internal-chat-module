@@ -372,7 +372,14 @@ const MessageContent = ({
 
                             const computedSender = original?.Direction === 1
                                 ? 'You'
-                                : (original?.SenderInfo || original?.Sender || (msg.SenderInfo != '' ? msg.SenderInfo : msg.Sender));
+                                : (() => {
+                                    // Use FirstName and LastName from original message if available
+                                    if (original?.FirstName || original?.LastName) {
+                                        return `${original.FirstName || ''} ${original.LastName || ''}`.trim();
+                                    }
+                                    // Fallback to existing logic
+                                    return original?.SenderInfo || original?.Sender || (msg.SenderInfo != '' ? msg.SenderInfo : msg.Sender);
+                                })();
 
                             const specificMedia = (msg.ReplyToAttachmentId && original?.mediaItems)
                                 ? original.mediaItems.find(item =>
@@ -1184,9 +1191,9 @@ const MessageContent = ({
                                     onClick={(e) => e.stopPropagation()}
                                     sx={{
                                         color: 'text.secondary',
-                                        '&:hover': { 
-                                            bgcolor: 'action.hover', 
-                                            color: 'text.primary' 
+                                        '&:hover': {
+                                            bgcolor: 'action.hover',
+                                            color: 'text.primary'
                                         }
                                     }}
                                     title="Download"
