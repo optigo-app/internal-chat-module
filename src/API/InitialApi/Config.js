@@ -1,4 +1,4 @@
-const isLocal = ["localhost", "nzen", 'tecochat.web', 'web'].includes(window.location.hostname);
+const isLocal = ["localhost", "nzen", 'tecochat.web', 'web','5svsmvp4-4000.inc1.devtunnels.ms'].includes(window.location.hostname);
 
 // Base URLs
 const API_BASE_URL = isLocal

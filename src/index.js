@@ -10,6 +10,7 @@ import theme from './theme';
 import { LoginData } from './context/LoginData';
 import { FavoriteProvider } from './contexts/FavoriteContext';
 import { RemoveInGroupProvider } from './contexts/RemoveInGroupContext';
+import { GroupSocketProvider } from './contexts/GroupSocketContext';
 
 import { HelmetProvider } from 'react-helmet-async';
 
@@ -22,7 +23,9 @@ root.render(
         <LoginData>
           <FavoriteProvider>
             <RemoveInGroupProvider>
-              <App />
+              <GroupSocketProvider>
+                <App />
+              </GroupSocketProvider>
             </RemoveInGroupProvider>
           </FavoriteProvider>
         </LoginData>

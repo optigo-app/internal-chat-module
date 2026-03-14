@@ -65,7 +65,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const clickTimeoutRef = useRef(null);
     const pendingSelectConversationIdRef = useRef(null);
     const { auth, isSyncing } = useContext(LoginContext);
-    
+
     // Get Context favorite state
     const { favoriteState } = useFavorite();
 
@@ -458,6 +458,95 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             }
         };
     }, [auth?.token, auth?.userId]);
+
+    // Group socket event handlers for notifications
+    useEffect(() => {
+        if (!auth?.token || !auth?.userId) return;
+
+        const { 
+            addGroupEventHandler, 
+            addGroupMemberHandler, 
+            addGroupPermissionHandler 
+        } = require('../../socket');
+
+        const currentUserId = auth?.id || auth?.userId;
+
+        // Handle group events (created, updated, deleted)
+        const handleGroupEvent = (data) => {
+            if (!data || !data.conversationId) return;
+
+            // Map event types to notification templates
+            const eventNotificationMap = {
+                'group_created': 'GROUP_CREATED',
+                'group_updated': 'GROUP_UPDATED',
+            };
+            
+            const notificationTemplate = eventNotificationMap[data.eventType];
+            
+            // Show browser notification if not in the conversation
+            if (notificationTemplate && selectedCustomer?.ConversationId !== data.conversationId) {
+                notify(data, notificationTemplate, auth);
+            }
+
+            // Refresh conversation list to show updated group info
+            loadMembers(1, true, searchTerm);
+        };
+
+        // Handle member events (added, removed, promoted, demoted)
+        const handleMemberEvent = (data) => {
+            if (!data || !data.conversationId) return;
+
+            const isCurrentUserRemoved = data.eventType === 'member_removed' && 
+                Number(data.removedMemberId) === Number(currentUserId);
+
+            // Map event types to notification templates
+            const eventNotificationMap = {
+                'member_added': 'MEMBER_ADDED',
+                'member_removed': isCurrentUserRemoved ? 'YOU_WERE_REMOVED' : 'MEMBER_REMOVED',
+                'member_promoted': 'MEMBER_PROMOTED',
+                'member_demoted': 'MEMBER_DEMOTED'
+            };
+            
+            const notificationTemplate = eventNotificationMap[data.eventType];
+            
+            // Show browser notification if not in the conversation
+            if (notificationTemplate && selectedCustomer?.ConversationId !== data.conversationId) {
+                notify(data, notificationTemplate, auth);
+            }
+
+            // Refresh conversation list
+            loadMembers(1, true, searchTerm);
+        };
+
+        // Handle permission events
+        const handlePermissionEvent = (data) => {
+            if (!data || !data.conversationId) return;
+
+            // Show browser notification if not in the conversation
+            if (selectedCustomer?.ConversationId !== data.conversationId) {
+                notify(data, 'PERMISSION_CHANGED', auth);
+            }
+
+            // Refresh conversation list
+            loadMembers(1, true, searchTerm);
+        };
+
+        const removeGroupEventHandler = addGroupEventHandler(handleGroupEvent);
+        const removeGroupMemberHandler = addGroupMemberHandler(handleMemberEvent);
+        const removeGroupPermissionHandler = addGroupPermissionHandler(handlePermissionEvent);
+
+        return () => {
+            if (typeof removeGroupEventHandler === 'function') {
+                removeGroupEventHandler();
+            }
+            if (typeof removeGroupMemberHandler === 'function') {
+                removeGroupMemberHandler();
+            }
+            if (typeof removeGroupPermissionHandler === 'function') {
+                removeGroupPermissionHandler();
+            }
+        };
+    }, [auth?.token, auth?.userId, auth, selectedCustomer?.ConversationId, loadMembers, searchTerm]);
 
     const debouncedSearch = useCallback((value) => {
         if (searchTimeoutRef.current) {

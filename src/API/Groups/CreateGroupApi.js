@@ -1,4 +1,5 @@
 import { CommonAPI, buildCommonBody } from "../InitialApi/CommonApi";
+import { emitGroupCreated } from "../../socket";
 
 /**
  * API to create a new group.
@@ -54,6 +55,37 @@ export const createGroupApi = async (auth, {
 
         const body = buildCommonBody("CreateGroup", auth, payload, fLabel);
         const response = await CommonAPI(body);
+        
+        // Emit socket event if group created successfully
+        if (response?.Status === "200" && response?.rd?.ConversationId) {
+            const memberIds = Array.isArray(groupMembers) 
+                ? groupMembers.map(m => m.UserId || m.userId || m.id)
+                : [];
+            
+            emitGroupCreated({
+                ufcc: auth?.ufcc,
+                eventType: 'group_created',
+                conversationId: response.rd.ConversationId,
+                ReceiverId: memberIds, // Array of all member IDs
+                groupName: groupName,
+                groupDesc: groupDesc,
+                groupProfile: groupProfile,
+                createdBy: {
+                    userId: auth?.id || auth?.userId,
+                    name: auth?.username || auth?.name,
+                    email: auth?.email
+                },
+                members: groupMembers,
+                permissions: {
+                    editGroupSettings: editGroupSettings ? 1 : 0,
+                    sendMessages: sendMessages ? 1 : 0,
+                    addOtherMembers: addOtherMembers ? 1 : 0,
+                    approveNewMembers: approveNewMembers ? 1 : 0
+                },
+                timestamp: new Date().toISOString()
+            });
+        }
+        
         return response;
     } catch (error) {
         console.error("createGroupApi Error:", error);

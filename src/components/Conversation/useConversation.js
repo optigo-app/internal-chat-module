@@ -4,6 +4,8 @@ import { sendDocumentMessage, sendImageMessage, sendTextMessage, sendVideoMessag
 import { normalizeServerMessages as normalizeServerMessagesHelper, groupMessagesByDateHelper, saveConversationToCache } from './conversationUtils';
 
 import { addMessageReactionHandler, addInternalMessageHandler, emitInternalMessageSend, addInternalStatusHandler, emitInternalMessageRead } from '../../socket';
+import { buildGroupMessagePayload } from '../../utils/groupSocketHelpers';
+import { fetchGroupDetails } from '../../API/Groups/FetchGroupDetails';
 import { readMessageApi } from '../../API/SendMessage/ReadMessageApi';
 import { uploadMediaAPi } from '../../API/FileUpload/uploadHelpers';
 import { toast } from 'react-hot-toast';
@@ -765,7 +767,28 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             const res = await sendFn(auth, { senderId: auth?.id, receiverId, conversationId, caption, attachments });
             const sentIdString = res?.Data?.rd?.[0]?.MessageId;
             const sentIds = sentIdString ? String(sentIdString).split(',').map(id => id.trim()) : [];
-            const ReceiverId = selectedCustomer?.ReceiverId;
+
+            // Determine ReceiverId based on group or 1-to-1
+            const isGroup = selectedCustomer?.IsGroup === 1;
+            let ReceiverId;
+
+            if (isGroup) {
+                // For groups, ReceiverId is an array of all member IDs
+                try {
+                    const groupData = await fetchGroupDetails(selectedCustomer.ConversationId, auth);
+                    if (groupData && groupData.members) {
+                        ReceiverId = groupData.members.map(m => m.UserId);
+                    } else {
+                        ReceiverId = [selectedCustomer?.ReceiverId];
+                    }
+                } catch (error) {
+                    console.error('Error fetching group members for media:', error);
+                    ReceiverId = [selectedCustomer?.ReceiverId];
+                }
+            } else {
+                // For 1-to-1, ReceiverId is a single value
+                ReceiverId = selectedCustomer?.ReceiverId;
+            }
 
             if (type === 'document' && sentIds.length > 1 && sentIds.length === safeFiles.length) {
                 // Multiple documents → individual messages
@@ -794,10 +817,11 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                     }));
 
                     if (ReceiverId) {
-                        if (Number(ReceiverId) === Number(auth?.id)) {
+                        if (!isGroup && Number(ReceiverId) === Number(auth?.id)) {
                             console.warn('⚠️ Warning: Sending media to SELF (ReceiverId === SenderId).');
                         }
-                        emitInternalMessageSend({
+
+                        const mediaPayload = {
                             ufcc: auth?.ufcc, ReceiverId, Id: messageId, MessageId: messageId,
                             SenderId: auth?.id, Direction: 2, Status: 1, MessageStatus: 1,
                             MessageType: type, Message: caption, Time: time, Date: date, DateTime: dateTime,
@@ -806,7 +830,18 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                             ConversationId: selectedCustomer?.ConversationId || tempConversationId,
                             SenderName: auth?.username || auth?.userId || auth?.name,
                             RecieverName: auth?.username || auth?.userId || auth?.name,
-                        });
+                        };
+
+                        // Add group-specific fields if it's a group
+                        if (isGroup) {
+                            mediaPayload.IsGroup = 1;
+                            mediaPayload.FirstName = auth?.firstName;
+                            mediaPayload.LastName = auth?.lastName;
+                            mediaPayload.SenderEmail = auth?.email;
+                            mediaPayload.SenderProfilePicture = auth?.profilePicture;
+                        }
+
+                        emitInternalMessageSend(mediaPayload);
                     }
                 });
             } else {
@@ -814,10 +849,11 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                 const sentId = sentIds[0] || sentIdString;
 
                 if (ReceiverId) {
-                    if (Number(ReceiverId) === Number(auth?.id)) {
+                    if (!isGroup && Number(ReceiverId) === Number(auth?.id)) {
                         console.warn('⚠️ Warning: Sending media to SELF (ReceiverId === SenderId).');
                     }
-                    emitInternalMessageSend({
+
+                    const mediaPayload = {
                         ufcc: auth?.ufcc, ReceiverId, Id: sentId || tempId, MessageId: sentId,
                         SenderId: auth?.id, Direction: 2, Status: 1, MessageStatus: 1,
                         MessageType: type, Message: caption, Time: time, Date: date, DateTime: dateTime,
@@ -826,7 +862,18 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                         ConversationId: selectedCustomer?.ConversationId || tempConversationId,
                         SenderName: auth?.username || auth?.userId || auth?.name,
                         RecieverName: auth?.username || auth?.userId || auth?.name,
-                    });
+                    };
+
+                    // Add group-specific fields if it's a group
+                    if (isGroup) {
+                        mediaPayload.IsGroup = 1;
+                        mediaPayload.FirstName = auth?.firstName;
+                        mediaPayload.LastName = auth?.lastName;
+                        mediaPayload.SenderEmail = auth?.email;
+                        mediaPayload.SenderProfilePicture = auth?.profilePicture;
+                    }
+
+                    emitInternalMessageSend(mediaPayload);
                 }
 
                 setMessages(prev => ({
@@ -958,26 +1005,69 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             const conversationId = resp?.Data?.rd?.[0]?.ConversationId || selectedCustomer?.ConversationId;
 
             if (sentId) {
-                const ReceiverId = selectedCustomer?.ReceiverId || selectedCustomer?.UserId;
-                if (ReceiverId) {
-                    if (Number(ReceiverId) === Number(auth?.id)) {
+                const isGroup = selectedCustomer?.IsGroup === 1;
+                let receiverIdValue;
+
+                if (isGroup) {
+                    // For groups, ReceiverId is an array of all member IDs
+                    try {
+                        const groupData = await fetchGroupDetails(selectedCustomer.ConversationId, auth);
+                        if (groupData && groupData.members) {
+                            receiverIdValue = groupData.members.map(m => m.UserId);
+                        } else {
+                            receiverIdValue = [selectedCustomer?.ReceiverId || selectedCustomer?.UserId];
+                        }
+                    } catch (error) {
+                        console.error('Error fetching group members for message:', error);
+                        receiverIdValue = [selectedCustomer?.ReceiverId || selectedCustomer?.UserId];
+                    }
+                } else {
+                    // For 1-to-1, ReceiverId is a single value
+                    receiverIdValue = selectedCustomer?.ReceiverId || selectedCustomer?.UserId;
+                }
+
+                if (receiverIdValue) {
+                    if (!isGroup && Number(receiverIdValue) === Number(auth?.id)) {
                         console.warn('⚠️ Warning: Sending message to SELF (ReceiverId === SenderId).');
                     }
-                    emitInternalMessageSend({
-                        ufcc: auth?.ufcc, ReceiverId, Id: auth.SocketId, MessageId: sentId,
-                        SenderId: auth?.id, Direction: 1, Status: 1, MessageStatus: 1,
-                        MessageType: 'text', Message: caption, Time: time, Date: date, DateTime: dateTime,
+
+                    let messagePayload = {
+                        ufcc: auth?.ufcc,
+                        ReceiverId: receiverIdValue, // Array for groups, single value for 1-to-1
+                        Id: auth.SocketId,
+                        MessageId: sentId,
+                        SenderId: auth?.id,
+                        Direction: 0,
+                        Status: 1,
+                        MessageStatus: 1,
+                        MessageType: 'text',
+                        Message: caption,
+                        Time: time,
+                        Date: date,
+                        DateTime: dateTime,
                         ConversationId: conversationId || tempConversationId,
                         ...(!selectedCustomer?.ReceiverId ? { ConversationName: auth?.username || auth?.userId } : {}),
                         SenderName: auth?.username || auth?.userId || auth?.name,
                         RecieverName: auth?.username || auth?.userId || auth?.name,
                         ...(replySnapshot && replyToMessageId ? {
-                            ContextType: 2, ContextId: replyToMessageId,
+                            ContextType: 2,
+                            ContextId: replyToMessageId,
                             ReplyContextMsg: replySnapshot?.text || 'Media',
                             SenderInfo: replySnapshot?.sender || '',
                             Sender: replySnapshot?.sender || '',
                         } : {}),
-                    });
+                    };
+
+                    // Add group-specific fields if it's a group
+                    if (isGroup) {
+                        messagePayload.IsGroup = 1;
+                        messagePayload.FirstName = auth?.firstName;
+                        messagePayload.LastName = auth?.lastName;
+                        messagePayload.SenderEmail = auth?.email;
+                        messagePayload.SenderProfilePicture = auth?.profilePicture;
+                    }
+
+                    emitInternalMessageSend(messagePayload);
                 }
 
                 setMessages(prev => ({

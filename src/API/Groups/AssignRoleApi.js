@@ -1,4 +1,6 @@
 import { CommonAPI, buildCommonBody } from "../InitialApi/CommonApi";
+import { emitMemberPromoted, emitMemberDemoted } from "../../socket";
+import { getGroupMemberIds } from "../../utils/groupSocketHelpers";
 
 /**
  * API to assign or remove admin role for a group member.
@@ -7,9 +9,11 @@ import { CommonAPI, buildCommonBody } from "../InitialApi/CommonApi";
  * @param {Object} params - Parameters for the API.
  * @param {number} params.conversationId - The ID of the conversation (group).
  * @param {number} params.memberId - The ID of the member whose role is being changed.
+ * @param {number} [params.currentIsAdmin] - Current admin status (0 or 1) to determine promotion/demotion.
+ * @param {Object} [params.targetMemberData] - Optional data about the target member.
  * @returns {Promise<Object|null>} The API response.
  */
-export const assignRoleApi = async (auth, { conversationId, memberId }) => {
+export const assignRoleApi = async (auth, { conversationId, memberId, currentIsAdmin = 0, targetMemberData = null }) => {
     try {
         const payload = {
             UserId: Number(auth?.id ?? auth?.userId),
@@ -19,6 +23,38 @@ export const assignRoleApi = async (auth, { conversationId, memberId }) => {
 
         const body = buildCommonBody("AssignRole", auth, payload, "Group ( AssignRole )");
         const response = await CommonAPI(body);
+        
+        // Emit socket event if role changed successfully
+        if (response?.Status === "200") {
+            const allMemberIds = await getGroupMemberIds(conversationId, auth);
+            const isPromotion = currentIsAdmin === 0; // If was not admin, now promoted
+            
+            const eventData = {
+                ufcc: auth?.ufcc,
+                eventType: isPromotion ? 'member_promoted' : 'member_demoted',
+                conversationId: Number(conversationId),
+                ReceiverId: allMemberIds, // Array of all member IDs
+                changedBy: {
+                    userId: auth?.id || auth?.userId,
+                    name: auth?.username || auth?.name,
+                    email: auth?.email
+                },
+                targetMember: targetMemberData || {
+                    userId: memberId,
+                    name: 'Member'
+                },
+                targetMemberId: Number(memberId),
+                newRole: isPromotion ? 'admin' : 'member',
+                isGroupAdmin: isPromotion ? 1 : 0,
+                timestamp: new Date().toISOString()
+            };
+            
+            if (isPromotion) {
+                emitMemberPromoted(eventData);
+            } else {
+                emitMemberDemoted(eventData);
+            }
+        }
 
         return response;
     } catch (error) {

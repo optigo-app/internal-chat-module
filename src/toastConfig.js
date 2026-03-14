@@ -1,5 +1,5 @@
 export const toastConfig = {
-    position: "top-right",
+    position: "bottom-left",
     toastOptions: {
         duration: 3500,
         style: {

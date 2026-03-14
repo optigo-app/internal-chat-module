@@ -194,22 +194,6 @@ $sp-10: 40px;
     align-items: center;
     position: relative;
 
-    // Subtle top accent stripe for group profile
-    &.group-profile {
-        padding-top: $sp-6;
-
-        &::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 72px;
-            background: linear-gradient(135deg, rgba($accent, 0.06) 0%, rgba($accent, 0.02) 100%);
-            pointer-events: none;
-        }
-    }
-
     .avatar-container {
         position: relative;
         margin-bottom: $sp-5;

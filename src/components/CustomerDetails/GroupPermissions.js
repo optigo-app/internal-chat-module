@@ -5,11 +5,11 @@ import {
     Divider
 } from '@mui/material';
 import {
-    Edit as EditIcon,
-    Chat as ChatIcon,
-    PersonAdd as PersonAddIcon,
-    ManageAccounts as ManageAccountsIcon,
-} from '@mui/icons-material';
+    Edit,
+    MessageSquare,
+    UserPlus,
+    UserCheck
+} from 'lucide-react';
 
 const IOSSwitch = styled((props) => (
     <Switch focusVisibleClassName=".Mui-focusVisible" disableRipple {...props} />
@@ -69,7 +69,7 @@ const GroupPermissions = ({ permissions, onPermissionChange, onBack }) => {
                     </Typography>
 
                     <div className="permission_item" style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-                        <EditIcon sx={{ color: '#667781', fontSize: '22px' }} />
+                        <Edit size={22} color="#667781" />
                         <div className="item_text" style={{ flex: 1 }}>
                             <Typography variant="body1" sx={{ fontSize: '16px', color: '#111b21' }}>Edit group settings</Typography>
                             <Typography variant="caption" sx={{ color: '#667781', fontSize: '13px', display: 'block', mt: 0.5 }}>
@@ -83,7 +83,7 @@ const GroupPermissions = ({ permissions, onPermissionChange, onBack }) => {
                     </div>
 
                     <div className="permission_item" style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'center' }}>
-                        <ChatIcon sx={{ color: '#667781', fontSize: '22px' }} />
+                        <MessageSquare size={22} color="#667781" />
                         <div className="item_text" style={{ flex: 1 }}>
                             <Typography variant="body1" sx={{ fontSize: '16px', color: '#111b21' }}>Send new messages</Typography>
                         </div>
@@ -94,7 +94,7 @@ const GroupPermissions = ({ permissions, onPermissionChange, onBack }) => {
                     </div>
 
                     <div className="permission_item" style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'center' }}>
-                        <PersonAddIcon sx={{ color: '#667781', fontSize: '22px' }} />
+                        <UserPlus size={22} color="#667781" />
                         <div className="item_text" style={{ flex: 1 }}>
                             <Typography variant="body1" sx={{ fontSize: '16px', color: '#111b21' }}>Add other members</Typography>
                         </div>
@@ -114,7 +114,7 @@ const GroupPermissions = ({ permissions, onPermissionChange, onBack }) => {
                     </Typography>
 
                     <div className="permission_item" style={{ display: 'flex', gap: '15px' }}>
-                        <ManageAccountsIcon sx={{ color: '#667781', fontSize: '22px' }} />
+                        <UserCheck size={22} color="#667781" />
                         <div className="item_text" style={{ flex: 1 }}>
                             <Typography variant="body1" sx={{ fontSize: '16px', color: '#111b21' }}>Approve new members</Typography>
                             <Typography variant="caption" sx={{ color: '#667781', fontSize: '13px', display: 'block', mt: 0.5 }}>

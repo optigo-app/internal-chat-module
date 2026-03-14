@@ -27,8 +27,11 @@ import { addGroupParticipantApi } from '../../API/Groups/AddGroupParticipantApi'
 import { removeMemberApi } from '../../API/Groups/RemoveMemberApi';
 import { fetchGroupDetails } from '../../API/Groups/FetchGroupDetails';
 import { updateConversationApi } from '../../API/SendMessage/updateConversationApi';
+import { clearChatApi } from '../../API/ClearChat/ClearChatApi';
 import { useFavorite } from '../../contexts/FavoriteContext';
 import { useRemoveInGroup } from '../../contexts/RemoveInGroupContext';
+import { useGroupSocket } from '../../contexts/GroupSocketContext';
+import { notify } from '../../utils/notificationTemplates';
 import {
     EllipsisVertical,
     Info,
@@ -37,7 +40,8 @@ import {
     Heart,
     X,
     Trash2,
-    LogOut
+    LogOut,
+    Star
 } from 'lucide-react';
 
 const Conversation = ({ selectedCustomer, onConversationRead, onViewConversationRead, onCustomerSelect }) => {
@@ -72,13 +76,16 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
 
     // Use Context for global favorite state management
     const { favoriteState, updateFavoriteStatus } = useFavorite();
-    
+
     // Use Context for RemoveInGroup state management
     const { updateRemoveInGroupStatus, isRemovedFromGroup } = useRemoveInGroup();
 
+    // Use Context for group socket management
+    const { registerListener, unregisterListener } = useGroupSocket();
+
     // Get favorite status from Context state or fallback to selectedCustomer prop
     const isFavorite = favoriteState[selectedCustomer?.ConversationId]?.isStar ?? (selectedCustomer?.IsStar === 1);
-    
+
     // Get removed from group status from Context state or fallback to selectedCustomer prop
     const isRemovedFromCurrentGroup = isRemovedFromGroup(selectedCustomer?.ConversationId) || (selectedCustomer?.RemoveInGroup === 1);
 
@@ -144,6 +151,126 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         processFiles,
         refresh,
     } = useConversation(selectedCustomer, onConversationRead, onViewConversationRead);
+
+    // Group socket event listeners with callback-based approach (no state updates in context)
+    useEffect(() => {
+        if (!selectedCustomer?.IsGroup || !selectedCustomer?.ConversationId) return;
+
+        const conversationId = selectedCustomer.ConversationId;
+        const currentUserId = auth?.id || auth?.userId;
+
+        // Define callbacks for socket events
+        const callbacks = {
+            onGroupEvent: (data) => {
+                if (data.conversationId !== conversationId) return;
+                
+                // Map event types to notification templates
+                const eventNotificationMap = {
+                    'group_created': 'GROUP_CREATED',
+                    'group_updated': 'GROUP_UPDATED',
+                };
+                
+                const notificationTemplate = eventNotificationMap[data.eventType];
+                
+                // Show browser notification
+                if (notificationTemplate) {
+                    notify(data, notificationTemplate, auth);
+                }
+                
+                // Show toast notification
+                const eventMessages = {
+                    'group_created': 'Group created',
+                    'group_updated': 'Group updated',
+                    'group_deleted': 'Group deleted',
+                    'group_info_request': 'Group info requested'
+                };
+                
+                const message = eventMessages[data.eventType] || 'Group event';
+                toast(message);
+
+                // Refresh conversation
+                if (refresh) {
+                    setTimeout(() => refresh(), 500);
+                }
+            },
+            onMemberEvent: (data) => {
+                if (data.conversationId !== conversationId) return;
+
+                // Check if current user was removed
+                const isCurrentUserRemoved = data.eventType === 'member_removed' && 
+                    Number(data.removedMemberId) === Number(currentUserId);
+
+                // Map event types to notification templates
+                const eventNotificationMap = {
+                    'member_added': 'MEMBER_ADDED',
+                    'member_removed': isCurrentUserRemoved ? 'YOU_WERE_REMOVED' : 'MEMBER_REMOVED',
+                    'member_promoted': 'MEMBER_PROMOTED',
+                    'member_demoted': 'MEMBER_DEMOTED'
+                };
+                
+                const notificationTemplate = eventNotificationMap[data.eventType];
+                
+                // Show browser notification
+                if (notificationTemplate) {
+                    notify(data, notificationTemplate, auth);
+                }
+
+                // Show toast notification
+                const eventMessages = {
+                    'member_added': `${data.memberName || 'Member'} added to group`,
+                    'member_removed': `${data.memberName || 'Member'} removed from group`,
+                    'member_promoted': `${data.memberName || 'Member'} promoted to admin`,
+                    'member_demoted': `${data.memberName || 'Member'} demoted from admin`
+                };
+                
+                const message = eventMessages[data.eventType] || 'Member event';
+
+                if (isCurrentUserRemoved) {
+                    updateRemoveInGroupStatus(conversationId, true);
+                    toast.error('You were removed from this group');
+                } else {
+                    toast(message);
+                }
+
+                // Refresh conversation
+                if (refresh) {
+                    setTimeout(() => refresh(), 500);
+                }
+            },
+            onPermissionEvent: (data) => {
+                if (data.conversationId !== conversationId) return;
+
+                // Show browser notification
+                notify(data, 'PERMISSION_CHANGED', auth);
+
+                // Show toast notification
+                toast('Group permissions updated');
+
+                // Refresh conversation
+                if (refresh) {
+                    setTimeout(() => refresh(), 500);
+                }
+            }
+        };
+
+        // Register callbacks
+        registerListener(conversationId, callbacks);
+
+        return () => {
+            // Unregister when unmounting or conversation changes
+            unregisterListener(conversationId);
+        };
+    }, [
+        selectedCustomer?.ConversationId, 
+        selectedCustomer?.IsGroup,
+        auth?.id,
+        auth?.userId,
+        auth,
+        refresh,
+        updateRemoveInGroupStatus,
+        registerListener,
+        unregisterListener
+    ]);
 
     const handleAddMembersSubmit = async (selectedIds) => {
         if (!selectedIds || selectedIds.length === 0) return;
@@ -261,22 +388,52 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
 
                 await addReactionApi(auth, { messageId: messageIdToUse, emoji: apiEmoji });
 
-                const receiverId = selectedCustomer?.ReceiverId;
                 const senderId = auth?.id ?? auth?.userId;
-                if (receiverId && senderId && auth?.ufcc) {
+                const isGroup = selectedCustomer?.IsGroup === 1;
+                let receiverIdValue;
+                
+                if (isGroup) {
+                    // For groups, ReceiverId is an array of all member IDs
+                    try {
+                        const groupData = await fetchGroupDetails(selectedCustomer.ConversationId, auth);
+                        if (groupData && groupData.members) {
+                            receiverIdValue = groupData.members.map(m => m.UserId);
+                        } else {
+                            receiverIdValue = [selectedCustomer?.ReceiverId];
+                        }
+                    } catch (error) {
+                        console.error('Error fetching group members for reaction:', error);
+                        receiverIdValue = [selectedCustomer?.ReceiverId];
+                    }
+                } else {
+                    // For 1-to-1, ReceiverId is a single value
+                    receiverIdValue = selectedCustomer?.ReceiverId;
+                }
+                
+                if (receiverIdValue && senderId && auth?.ufcc) {
                     const socketReactionEmojis = reactionPayload === ""
                         ? JSON.stringify([{ Reaction: "", Direction: 0 }])
                         : JSON.stringify([{ Reaction: nextEmoji, Unified: nextUnified, Direction: 0 }]);
 
-                    emitSendReaction({
+                    const reactionPayloadData = {
                         ufcc: auth?.ufcc,
                         userId: senderId,
                         SenderId: senderId,
-                        ReceiverId: receiverId,
+                        ReceiverId: receiverIdValue, // Array for groups, single value for 1-to-1
                         ConversationId: selectedCustomer?.ConversationId,
                         MessageId: messageIdToUse,
                         ReactionEmojis: socketReactionEmojis,
-                    });
+                    };
+
+                    // Add group-specific fields if it's a group
+                    if (isGroup) {
+                        reactionPayloadData.IsGroup = 1;
+                        reactionPayloadData.UserName = auth?.username || auth?.name;
+                        reactionPayloadData.FirstName = auth?.firstName;
+                        reactionPayloadData.LastName = auth?.lastName;
+                    }
+
+                    emitSendReaction(reactionPayloadData);
                 }
 
                 setMessages(prev => {
@@ -651,14 +808,18 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         } else if (action === 'selectMessage') {
             toast('Select message — coming soon!');
         } else if (action === 'clearChat') {
-            toast('Clear chat — coming soon!');
+            // Show confirmation for clear chat
+            setConfirmationModal({
+                isOpen: true,
+                actionType: 'clearChat'
+            });
         } else if (action === 'exitGroup') {
             await checkAdminStatusAndShowConfirmation();
         } else if (action === 'deleteGroup') {
             // Show confirmation for deleting group conversation
-            setConfirmationModal({ 
-                isOpen: true, 
-                actionType: 'deleteGroup' 
+            setConfirmationModal({
+                isOpen: true,
+                actionType: 'deleteGroup'
             });
         }
     }, [onCustomerSelect, handleToggleFavorite, checkAdminStatusAndShowConfirmation]);
@@ -702,20 +863,47 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         }
     }, [onCustomerSelect, refresh]);
 
+    const handleConfirmClearChat = useCallback(async () => {
+        try {
+            const response = await clearChatApi(auth, {
+                conversationId: selectedCustomer.ConversationId,
+                userId: auth?.id || auth?.userId
+            });
+
+            if (response?.Status === "200" || response?.success === true) {
+                toast.success('Chat cleared successfully');
+                setConfirmationModal({ isOpen: false, actionType: null });
+                // Refresh the conversation to show cleared state
+                if (refresh) refresh();
+            } else {
+                setConfirmationModal({ isOpen: false, actionType: null });
+                toast.error(response?.Message || 'Failed to clear chat');
+            }
+        } catch (error) {
+            console.error('Error clearing chat:', error);
+            setConfirmationModal({ isOpen: false, actionType: null });
+            toast.error('Error clearing chat');
+        }
+    }, [selectedCustomer, auth, refresh]);
+
     const headerMenuItems = [
-        { label: 'Group Info', action: 'groupInfo', icon: <Info size={16} /> },
-        { label: 'Select message', action: 'selectMessage', icon: <CheckSquare size={16} /> },
-        { label: 'Mute notification', action: 'mute', icon: <BellOff size={16} /> },
-        { label: isFavorite ? 'Remove from favourite' : 'Add to favourite', action: 'favourite', icon: <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} /> },
-        { label: 'Close chat', action: 'close', icon: <X size={16} /> },
+        {
+            label: selectedCustomer?.IsGroup === 1 ? 'Group Info' : 'Contact Info',
+            action: 'groupInfo',
+            icon: <Info size={18} />
+        },
+        { label: 'Select message', action: 'selectMessage', icon: <CheckSquare size={18} /> },
+        { label: 'Mute notification', action: 'mute', icon: <BellOff size={18} /> },
+        { label: isFavorite ? 'Remove from favourite' : 'Add to favourite', action: 'favourite', icon: <Star size={18} fill={isFavorite ? '#FFD700' : 'none'} color={isFavorite ? '#FFD700' : 'currentColor'} /> },
+        { label: 'Close chat', action: 'close', icon: <X size={18} /> },
         { divider: true },
-        { label: 'Clear chat', action: 'clearChat', icon: <Trash2 size={16} />, danger: true },
+        { label: 'Clear chat', action: 'clearChat', icon: <Trash2 size={18} />, danger: true },
         ...(selectedCustomer?.IsGroup === 1
-            ? [{ 
-                label: isRemovedFromCurrentGroup ? 'Delete group' : 'Exit group', 
-                action: isRemovedFromCurrentGroup ? 'deleteGroup' : 'exitGroup', 
-                icon: <LogOut size={16} />, 
-                danger: true 
+            ? [{
+                label: isRemovedFromCurrentGroup ? 'Delete group' : 'Exit group',
+                action: isRemovedFromCurrentGroup ? 'deleteGroup' : 'exitGroup',
+                icon: <LogOut size={18} />,
+                danger: true
             }]
             : []),
     ];
@@ -769,10 +957,6 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const handleSendMessageCallback = useCallback((messageOverride) => {
         handleSendMessage(containerRef, scrollToBottom, messageOverride);
     }, [handleSendMessage, scrollToBottom]);
-
-    const handleFileChangeCallback = useCallback((e) => {
-        handleFileChange(e, toast);
-    }, [handleFileChange]);
 
     if (!isOnline) {
         return (
@@ -1045,30 +1229,38 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     ? () => setConfirmationModal({ isOpen: false, actionType: null })
                     : confirmationModal.actionType === 'deleteGroup'
                         ? handleConfirmDeleteGroup
-                        : handleConfirmExitGroup
+                        : confirmationModal.actionType === 'clearChat'
+                            ? handleConfirmClearChat
+                            : handleConfirmExitGroup
                 }
                 title={
                     confirmationModal.actionType === 'adminCannotLeave'
                         ? 'Cannot Leave Group'
                         : confirmationModal.actionType === 'deleteGroup'
                             ? 'Delete Group?'
-                            : 'Exit Group?'
+                            : confirmationModal.actionType === 'clearChat'
+                                ? 'Clear Chat?'
+                                : 'Exit Group?'
                 }
                 description={
                     confirmationModal.actionType === 'adminCannotLeave'
                         ? 'You cannot leave the group because you are the only administrator. Please assign another admin before leaving.'
                         : confirmationModal.actionType === 'deleteGroup'
                             ? 'Are you sure you want to delete this group conversation? This will remove the conversation from your chat list.'
-                            : 'Are you sure you want to exit this group?'
+                            : confirmationModal.actionType === 'clearChat'
+                                ? 'Are you sure you want to clear all messages in this chat?'
+                                : 'Are you sure you want to exit this group?'
                 }
                 confirmText={
                     confirmationModal.actionType === 'adminCannotLeave'
                         ? 'OK'
                         : confirmationModal.actionType === 'deleteGroup'
                             ? 'Delete'
-                            : 'Exit'
+                            : confirmationModal.actionType === 'clearChat'
+                                ? 'Clear'
+                                : 'Exit'
                 }
-                variant={['exitGroup', 'deleteGroup'].includes(confirmationModal.actionType) ? 'danger' : 'primary'}
+                variant={['exitGroup', 'deleteGroup', 'clearChat'].includes(confirmationModal.actionType) ? 'danger' : 'primary'}
                 showCancel={confirmationModal.actionType !== 'adminCannotLeave'}
             />
         </Box>

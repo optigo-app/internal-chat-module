@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client';
 
-const isLocal = ["localhost", "nzen", 'tecochat.web', 'web'].includes(window.location.hostname);
+const isLocal = ["localhost", "nzen", 'tecochat.web', 'web', '5svsmvp4-4000.inc1.devtunnels.ms'].includes(window.location.hostname);
 
 // Base URLs
 const API_SOCKETBASE_URL = isLocal ? "http://newnextjs.web" : "https://apilx.optigoapps.com";
@@ -18,6 +18,9 @@ let internalMessageHandlers = new Set();
 let internalStatusHandlers = new Set();
 let internalTypingHandlers = new Set();
 let sessionLogout = new Set();
+let groupEventHandlers = new Set();
+let groupMemberHandlers = new Set();
+let groupPermissionHandlers = new Set();
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
@@ -129,6 +132,48 @@ export function initializeSocket(token) {
         });
     });
 
+    // Group event handlers
+    const dispatchGroupEvent = (data) => {
+        groupEventHandlers.forEach((handler) => {
+            try {
+                handler(data);
+            } catch (error) {
+                console.error('❌ Error in group event handler:', error);
+            }
+        });
+    };
+
+    const dispatchGroupMemberEvent = (data) => {
+        groupMemberHandlers.forEach((handler) => {
+            try {
+                handler(data);
+            } catch (error) {
+                console.error('❌ Error in group member handler:', error);
+            }
+        });
+    };
+
+    const dispatchGroupPermissionEvent = (data) => {
+        groupPermissionHandlers.forEach((handler) => {
+            try {
+                handler(data);
+            } catch (error) {
+                console.error('❌ Error in group permission handler:', error);
+            }
+        });
+    };
+
+    // Register group socket listeners
+    socketInstance.on('internal:group_created', dispatchGroupEvent);
+    socketInstance.on('internal:group_updated', dispatchGroupEvent);
+    socketInstance.on('internal:group_deleted', dispatchGroupEvent);
+    socketInstance.on('internal:member_added', dispatchGroupMemberEvent);
+    socketInstance.on('internal:member_removed', dispatchGroupMemberEvent);
+    socketInstance.on('internal:member_promoted', dispatchGroupMemberEvent);
+    socketInstance.on('internal:member_demoted', dispatchGroupMemberEvent);
+    socketInstance.on('internal:permission_changed', dispatchGroupPermissionEvent);
+    socketInstance.on('internal:group_info_request', dispatchGroupEvent);
+
     return socketInstance;
 }
 
@@ -210,6 +255,36 @@ export const addInternalTypingHandler = (handler) => {
     };
 };
 
+/**
+ * Add group event handler (created, updated, deleted, info_request)
+ */
+export const addGroupEventHandler = (handler) => {
+    if (typeof handler === 'function') {
+        groupEventHandlers.add(handler);
+        return () => groupEventHandlers.delete(handler);
+    }
+};
+
+/**
+ * Add group member event handler (added, removed, promoted, demoted)
+ */
+export const addGroupMemberHandler = (handler) => {
+    if (typeof handler === 'function') {
+        groupMemberHandlers.add(handler);
+        return () => groupMemberHandlers.delete(handler);
+    }
+};
+
+/**
+ * Add group permission event handler
+ */
+export const addGroupPermissionHandler = (handler) => {
+    if (typeof handler === 'function') {
+        groupPermissionHandlers.add(handler);
+        return () => groupPermissionHandlers.delete(handler);
+    }
+};
+
 export const emitInternalMessageSend = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:msg_send', { ...payload, receiveEvent: "internal:msg_receive" });
@@ -245,6 +320,114 @@ export const emitInternalStoreSocketData = (payload) => {
 };
 
 /**
+ * Emit group created event
+ */
+export const emitGroupCreated = (payload) => {
+    if (!socketInstance) return false;
+    socketInstance.emit('internal:group_created', {
+        ...payload,
+        receiveEvent: 'internal:group_created'
+    });
+    return true;
+};
+
+/**
+ * Emit group updated event
+ */
+export const emitGroupUpdated = (payload) => {
+    if (!socketInstance) return false;
+    socketInstance.emit('internal:group_updated', {
+        ...payload,
+        receiveEvent: 'internal:group_updated'
+    });
+    return true;
+};
+
+/**
+ * Emit group deleted event
+ */
+export const emitGroupDeleted = (payload) => {
+    if (!socketInstance) return false;
+    socketInstance.emit('internal:group_deleted', {
+        ...payload,
+        receiveEvent: 'internal:group_deleted'
+    });
+    return true;
+};
+
+/**
+ * Emit member added event
+ */
+export const emitMemberAdded = (payload) => {
+    if (!socketInstance) return false;
+    socketInstance.emit('internal:member_added', {
+        ...payload,
+        receiveEvent: 'internal:member_added'
+    });
+    return true;
+};
+
+/**
+ * Emit member removed event
+ */
+export const emitMemberRemoved = (payload) => {
+    if (!socketInstance) return false;
+    socketInstance.emit('internal:member_removed', {
+        ...payload,
+        receiveEvent: 'internal:member_removed'
+    });
+    return true;
+};
+
+/**
+ * Emit member promoted event
+ */
+export const emitMemberPromoted = (payload) => {
+    if (!socketInstance) return false;
+    socketInstance.emit('internal:member_promoted', {
+        ...payload,
+        receiveEvent: 'internal:member_promoted'
+    });
+    return true;
+};
+
+/**
+ * Emit member demoted event
+ */
+export const emitMemberDemoted = (payload) => {
+    if (!socketInstance) return false;
+    socketInstance.emit('internal:member_demoted', {
+        ...payload,
+        receiveEvent: 'internal:member_demoted'
+    });
+    return true;
+};
+
+/**
+ * Emit permission changed event
+ */
+export const emitPermissionChanged = (payload) => {
+    if (!socketInstance) return false;
+    socketInstance.emit('internal:permission_changed', {
+        ...payload,
+        receiveEvent: 'internal:permission_changed'
+    });
+    return true;
+};
+
+/**
+ * Emit group info request event
+ */
+export const emitGroupInfoRequest = (payload) => {
+    if (!socketInstance) return false;
+    socketInstance.emit('internal:group_info_request', {
+        ...payload,
+        receiveEvent: 'internal:group_info_request'
+    });
+    return true;
+};
+
+/**
  * Disconnect socket
  */
 export const disconnectSocket = (permanent = false) => {
@@ -257,6 +440,9 @@ export const disconnectSocket = (permanent = false) => {
         internalMessageHandlers.clear();
         internalStatusHandlers.clear();
         internalTypingHandlers.clear();
+        groupEventHandlers.clear();
+        groupMemberHandlers.clear();
+        groupPermissionHandlers.clear();
 
         if (permanent) {
             sessionStorage.removeItem('socketState');

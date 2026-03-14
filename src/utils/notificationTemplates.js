@@ -56,6 +56,94 @@ export const NOTIFICATION_TEMPLATES = {
         icon: LOGO_ICON,
         badge: LOGO_ICON,
     }),
+
+    // Group Notifications
+    GROUP_CREATED: (data) => ({
+        title: `👥 New Group Created`,
+        body: `${capitalizeWords(data?.createdBy?.name || "Someone")} created "${data?.groupName || "a group"}"`,
+        icon: LOGO_ICON,
+        badge: LOGO_ICON,
+        tag: `group-${data?.conversationId}`,
+    }),
+
+    GROUP_UPDATED: (data) => {
+        const changes = [];
+        if (data?.changes?.groupName) changes.push('name');
+        if (data?.changes?.groupDesc) changes.push('description');
+        if (data?.changes?.groupProfile) changes.push('photo');
+        const changeText = changes.length > 0 ? changes.join(', ') : 'settings';
+
+        return {
+            title: `👥 Group Updated`,
+            body: `${capitalizeWords(data?.updatedBy?.name || "Someone")} updated group ${changeText}`,
+            icon: LOGO_ICON,
+            badge: LOGO_ICON,
+            tag: `group-${data?.conversationId}`,
+        };
+    },
+
+    MEMBER_ADDED: (data) => {
+        const count = data?.newMemberIds?.length || 1;
+        return {
+            title: `👥 Member Added`,
+            body: `${capitalizeWords(data?.addedBy?.name || "Someone")} added ${count} ${count === 1 ? 'member' : 'members'} to the group`,
+            icon: LOGO_ICON,
+            badge: LOGO_ICON,
+            tag: `group-${data?.conversationId}`,
+        };
+    },
+
+    MEMBER_REMOVED: (data) => {
+        const isSelfExit = data?.reason === 'left';
+        const memberName = capitalizeWords(data?.removedMember?.name || "Someone");
+
+        return {
+            title: `👥 Member ${isSelfExit ? 'Left' : 'Removed'}`,
+            body: isSelfExit
+                ? `${memberName} left the group`
+                : `${capitalizeWords(data?.removedBy?.name || "Someone")} removed ${memberName}`,
+            icon: LOGO_ICON,
+            badge: LOGO_ICON,
+            tag: `group-${data?.conversationId}`,
+        };
+    },
+
+    MEMBER_PROMOTED: (data) => ({
+        title: `👑 Admin Promoted`,
+        body: `${capitalizeWords(data?.targetMember?.name || "Someone")} is now a group admin`,
+        icon: LOGO_ICON,
+        badge: LOGO_ICON,
+        tag: `group-${data?.conversationId}`,
+    }),
+
+    MEMBER_DEMOTED: (data) => ({
+        title: `👤 Admin Demoted`,
+        body: `${capitalizeWords(data?.targetMember?.name || "Someone")} is no longer a group admin`,
+        icon: LOGO_ICON,
+        badge: LOGO_ICON,
+        tag: `group-${data?.conversationId}`,
+    }),
+
+    PERMISSION_CHANGED: (data) => {
+        const permName = data?.changedPermission?.name || 'settings';
+        const permValue = data?.changedPermission?.value ? 'enabled' : 'disabled';
+
+        return {
+            title: `⚙️ Group Permissions Updated`,
+            body: `${capitalizeWords(data?.changedBy?.name || "Admin")} ${permValue} ${permName}`,
+            icon: LOGO_ICON,
+            badge: LOGO_ICON,
+            tag: `group-${data?.conversationId}`,
+        };
+    },
+
+    YOU_WERE_REMOVED: (data) => ({
+        title: `❌ Removed from Group`,
+        body: `You were removed from the group by ${capitalizeWords(data?.removedBy?.name || "an admin")}`,
+        icon: LOGO_ICON,
+        badge: LOGO_ICON,
+        tag: `group-${data?.conversationId}`,
+    }),
 };
 
 export const notify = (data, templateId, user) => {
@@ -69,6 +157,9 @@ export const notify = (data, templateId, user) => {
     if (templateId === "MESSAGE_REACTION") typeGroup = "REACTION";
     if (templateId === "CONVERSATION_ASSIGNED") typeGroup = "ASSIGNMENT";
     if (templateId === "SESSION_LOGOUT") typeGroup = "AUTH";
+    if (templateId.startsWith("GROUP_") || templateId.startsWith("MEMBER_") || templateId.startsWith("PERMISSION_") || templateId === "YOU_WERE_REMOVED") {
+        typeGroup = "GROUP";
+    }
 
     showBrowserNotification({
         ...notificationOptions,

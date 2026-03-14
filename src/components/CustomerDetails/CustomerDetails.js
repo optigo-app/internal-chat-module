@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext, useCallback, useRef } from 'react';
 import { Typography, Avatar, IconButton, Tabs, Tab, TextField, Box, InputAdornment, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText, CircularProgress } from '@mui/material';
-import { X, User, Search, ChevronRight, Phone, Video, ArrowLeft, Settings, UserPlus, LogOut, Heart, Pencil, Camera, Check, ChevronDown, Shield, UserMinus, MessageCircle, Image as ImageIcon, CircleMinus, Upload } from 'lucide-react';
+import { X, User, Search, ChevronRight, ArrowLeft, Settings, UserPlus, LogOut, Heart, Pencil, Camera, Check, ChevronDown, Shield, UserMinus, MessageCircle, Image as ImageIcon, CircleMinus, Upload, Star } from 'lucide-react';
 import './CustomerDetails.scss';
 import { LoginContext } from '../../context/LoginData';
 import { fetchMediaLists } from '../../API/MediaLists/MediaLists';
@@ -11,6 +11,7 @@ import { addGroupParticipantApi } from '../../API/Groups/AddGroupParticipantApi'
 import { assignRoleApi } from '../../API/Groups/AssignRoleApi';
 import { removeMemberApi } from '../../API/Groups/RemoveMemberApi';
 import { updateConversationApi } from '../../API/SendMessage/updateConversationApi';
+import { clearChatApi } from '../../API/ClearChat/ClearChatApi';
 import toast from 'react-hot-toast';
 import MediaSection from './MediaSection';
 import DocumentsSection from './DocumentsSection';
@@ -33,6 +34,7 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
         videos: [],
         documents: []
     });
+    console.log(customer);
     const [groupPermissions, setGroupPermissions] = useState({
         editGroupSettings: true,
         sendMessages: true,
@@ -74,13 +76,13 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
 
     // Use Context for global favorite state management
     const { favoriteState, updateFavoriteStatus } = useFavorite();
-    
+
     // Use Context for RemoveInGroup state management
     const { updateRemoveInGroupStatus, isRemovedFromGroup } = useRemoveInGroup();
 
     // Get favorite status from Context state or fallback to customer prop
     const isFavorite = favoriteState[customer?.ConversationId]?.isStar ?? (customer?.IsStar === 1);
-    
+
     // Get removed from group status from Context state or fallback to customer prop
     const isRemovedFromCurrentGroup = isRemovedFromGroup(customer?.ConversationId) || (customer?.RemoveInGroup === 1);
 
@@ -344,13 +346,13 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
             setIsEditingName(false);
             return;
         }
-        
+
         // Validate name length
         if (editedName.length > 50) {
             toast.error('Group name cannot exceed 50 characters');
             return;
         }
-        
+
         try {
             // Send only the group name field, with empty description and profile
             const response = await editGroupApi(auth, {
@@ -376,13 +378,13 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
             setIsEditingDesc(false);
             return;
         }
-        
+
         // Validate description length
         if (editedDesc.length > 256) {
             toast.error('Group description cannot exceed 256 characters');
             return;
         }
-        
+
         try {
             // Send only the group description field, with empty name and profile
             const response = await editGroupApi(auth, {
@@ -409,7 +411,7 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
     };
 
     const startEditingDesc = () => {
-        setEditedDesc(customer?.IsGroup === 1 ? localGroupData.description : (customer?.About || ''));
+        setEditedDesc(localGroupData.description);
         setIsEditingDesc(true);
     };
 
@@ -482,24 +484,24 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
     const handleExitGroupClick = () => {
         if (isRemovedFromCurrentGroup) {
             // Show delete group confirmation when user is removed from group
-            setConfirmationModal({ 
-                isOpen: true, 
-                member: null, 
-                actionType: 'deleteGroup' 
+            setConfirmationModal({
+                isOpen: true,
+                member: null,
+                actionType: 'deleteGroup'
             });
         } else if (isOnlyAdmin()) {
             // Show warning dialog for only admin
-            setConfirmationModal({ 
-                isOpen: true, 
-                member: null, 
-                actionType: 'adminCannotLeave' 
+            setConfirmationModal({
+                isOpen: true,
+                member: null,
+                actionType: 'adminCannotLeave'
             });
         } else {
             // Normal exit confirmation
-            setConfirmationModal({ 
-                isOpen: true, 
-                member: null, 
-                actionType: 'exitGroup' 
+            setConfirmationModal({
+                isOpen: true,
+                member: null,
+                actionType: 'exitGroup'
             });
         }
     };
@@ -509,7 +511,24 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
         if (!actionType) return;
 
         if (actionType === 'clearChat') {
-            toast('Clear chat — coming soon!');
+            try {
+                const response = await clearChatApi(auth, {
+                    conversationId: customer.ConversationId,
+                    userId: auth?.id || auth?.userId
+                });
+
+                if (response?.Status === "200" || response?.success === true) {
+                    toast.success('Chat cleared successfully');
+                    setConfirmationModal({ isOpen: false, member: null, actionType: null });
+                    // Refresh the conversation to show cleared state
+                    window.dispatchEvent(new CustomEvent('REFRESH_CONVERSATION_LIST'));
+                } else {
+                    toast.error(response?.Message || 'Failed to clear chat');
+                }
+            } catch (error) {
+                console.error('Error clearing chat:', error);
+                toast.error('Error clearing chat');
+            }
             setConfirmationModal({ isOpen: false, member: null, actionType: null });
             return;
         }
@@ -867,7 +886,7 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
                                                 </Typography>
                                             ) : (
                                                 <Typography className="customer-phone">
-                                                    {customer?.Phone || customer?.MobileNo || ''}
+                                                    {customer?.DisplayEmail || ''}
                                                 </Typography>
                                             )}
                                         </div>
@@ -889,7 +908,10 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
                                                         <span>Add</span>
                                                     </div>
                                                 </Tooltip>
-                                                <div className="action-block-item" onClick={() => { setDirection('forward'); setCurrentViewState('search'); }}>
+                                                <div className="action-block-item" onClick={() => {
+                                                    setDirection('forward');
+                                                    setTimeout(() => setCurrentViewState('search'), 0);
+                                                }}>
                                                     <IconButton className="action-circle">
                                                         <Search size={20} />
                                                     </IconButton>
@@ -897,86 +919,77 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="action-buttons">
-                                                <div className="action-item">
-                                                    <IconButton className="action-btn-circle">
-                                                        <Video size={22} />
+                                            <div className="action-buttons group-block-actions">
+                                                <div className="action-block-item" onClick={() => {
+                                                    setDirection('forward');
+                                                    setTimeout(() => setCurrentViewState('search'), 0);
+                                                }}>
+                                                    <IconButton className="action-circle">
+                                                        <Search size={20} />
                                                     </IconButton>
-                                                    <Typography variant="caption">Video</Typography>
-                                                </div>
-                                                <div className="action-item">
-                                                    <IconButton className="action-btn-circle">
-                                                        <Phone size={22} />
-                                                    </IconButton>
-                                                    <Typography variant="caption">Voice</Typography>
-                                                </div>
-                                                <div className="action-item" onClick={() => { setDirection('forward'); setCurrentViewState('search'); }} style={{ cursor: 'pointer' }}>
-                                                    <IconButton className="action-btn-circle">
-                                                        <Search size={22} />
-                                                    </IconButton>
-                                                    <Typography variant="caption">Search</Typography>
+                                                    <span>Search</span>
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* About / Description Section */}
-                                        <div className="info-block desc-block">
-                                            <div className="desc-header">
-                                                <Typography className={`block-label ${customer?.IsGroup === 1 ? 'accent-label' : ''}`}>
-                                                    {customer?.IsGroup === 1 ? (localGroupData.description ? 'Group description' : 'Add group description') : 'About'}
-                                                </Typography>
-                                                {customer?.IsGroup === 1 && !isEditingDesc && isCurrentUserAdmin && (
-                                                    <IconButton size="small" className="edit-icon-btn" onClick={startEditingDesc}>
-                                                        <Pencil size={20} />
-                                                    </IconButton>
+                                        {/* Group Description Section (Groups only) */}
+                                        {customer?.IsGroup === 1 && (
+                                            <div className="info-block desc-block">
+                                                <div className="desc-header">
+                                                    <Typography className="block-label accent-label">
+                                                        {localGroupData.description ? 'Group description' : 'Add group description'}
+                                                    </Typography>
+                                                    {!isEditingDesc && isCurrentUserAdmin && (
+                                                        <IconButton size="small" className="edit-icon-btn" onClick={startEditingDesc}>
+                                                            <Pencil size={20} />
+                                                        </IconButton>
+                                                    )}
+                                                </div>
+
+                                                {isEditingDesc ? (
+                                                    <Box sx={{ mt: 1 }}>
+                                                        <TextField
+                                                            fullWidth
+                                                            multiline
+                                                            variant="standard"
+                                                            value={editedDesc}
+                                                            onChange={(e) => setEditedDesc(e.target.value.slice(0, 256))}
+                                                            autoFocus
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Escape') {
+                                                                    setEditedDesc(localGroupData.description);
+                                                                    setIsEditingDesc(false);
+                                                                }
+                                                            }}
+                                                            helperText={`${editedDesc.length}/256`}
+                                                            InputProps={{
+                                                                endAdornment: (
+                                                                    <InputAdornment position="end">
+                                                                        <IconButton size="small" onClick={() => {
+                                                                            setEditedDesc(localGroupData.description);
+                                                                            setIsEditingDesc(false);
+                                                                        }} sx={{ color: '#667781', mr: 0.5 }}>
+                                                                            <X size={18} />
+                                                                        </IconButton>
+                                                                        <IconButton size="small" onClick={handleSaveDesc} sx={{ color: 'primary.main' }}>
+                                                                            <Check size={20} />
+                                                                        </IconButton>
+                                                                    </InputAdornment>
+                                                                ),
+                                                            }}
+                                                        />
+                                                    </Box>
+                                                ) : (
+                                                    <Typography
+                                                        className="block-value"
+                                                        style={{ cursor: isCurrentUserAdmin ? 'pointer' : 'default' }}
+                                                        onClick={isCurrentUserAdmin ? startEditingDesc : undefined}
+                                                    >
+                                                        {localGroupData.description || ''}
+                                                    </Typography>
                                                 )}
                                             </div>
-
-                                            {isEditingDesc ? (
-                                                <Box sx={{ mt: 1 }}>
-                                                    <TextField
-                                                        fullWidth
-                                                        multiline
-                                                        variant="standard"
-                                                        value={editedDesc}
-                                                        onChange={(e) => setEditedDesc(e.target.value.slice(0, 256))}
-                                                        autoFocus
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Escape') {
-                                                                setEditedDesc(customer?.IsGroup === 1 ? localGroupData.description : (customer?.About || ''));
-                                                                setIsEditingDesc(false);
-                                                            }
-                                                        }}
-                                                        helperText={`${editedDesc.length}/256`}
-                                                        InputProps={{
-                                                            endAdornment: (
-                                                                <InputAdornment position="end">
-                                                                    <IconButton size="small" onClick={() => {
-                                                                        setEditedDesc(customer?.IsGroup === 1 ? localGroupData.description : (customer?.About || ''));
-                                                                        setIsEditingDesc(false);
-                                                                    }} sx={{ color: '#667781', mr: 0.5 }}>
-                                                                        <X size={18} />
-                                                                    </IconButton>
-                                                                    <IconButton size="small" onClick={handleSaveDesc} sx={{ color: 'primary.main' }}>
-                                                                        <Check size={20} />
-                                                                    </IconButton>
-                                                                </InputAdornment>
-                                                            ),
-                                                        }}
-                                                    />
-                                                </Box>
-                                            ) : (
-                                                <Typography
-                                                    className="block-value"
-                                                    style={{ cursor: (customer?.IsGroup === 1 && isCurrentUserAdmin) ? 'pointer' : 'default' }}
-                                                    onClick={(customer?.IsGroup === 1 && isCurrentUserAdmin) ? startEditingDesc : undefined}
-                                                >
-                                                    {customer?.IsGroup === 1
-                                                        ? (localGroupData.description || '')
-                                                        : (customer?.About || '')}
-                                                </Typography>
-                                            )}
-                                        </div>
+                                        )}
 
                                         {/* Media Preview Trigger — only shown when media exists */}
                                         {(mediaItems.images.length + mediaItems.videos.length + mediaItems.documents.length) > 0 && (
@@ -1089,12 +1102,15 @@ const CustomerDetails = ({ customer, onClose, open, variant = 'panel' }) => {
                                         <div className="settings-list">
                                             <div className="setting-item clickable-member" onClick={handleToggleFavorite} style={{ cursor: 'pointer' }}>
                                                 <div className="setting-left">
-                                                    <Heart size={20} fill={isFavorite ? 'currentColor' : 'none'} color={isFavorite ? 'inherit' : 'currentColor'} />
+                                                    <Star size={20} fill={isFavorite ? '#FFD700' : 'none'} color={isFavorite ? '#FFD700' : 'currentColor'} />
                                                     <span>{isFavorite ? 'Remove from favorites' : 'Add to favorites'}</span>
                                                 </div>
                                             </div>
                                             {customer?.IsGroup === 1 && isCurrentUserAdmin && (
-                                                <div className="setting-item no-border" onClick={() => { setDirection('forward'); setCurrentViewState('permissions'); }}>
+                                                <div className="setting-item no-border" onClick={() => {
+                                                    setDirection('forward');
+                                                    setTimeout(() => setCurrentViewState('permissions'), 0);
+                                                }}>
                                                     <div className="setting-left">
                                                         <Settings size={20} />
                                                         <span>Group permissions</span>

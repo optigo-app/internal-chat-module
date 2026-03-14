@@ -130,180 +130,180 @@ const ChatBox = ({
                 </div>
             ) : (
                 <div className="input-container">
-                <IconButton ref={attachButtonRef} size="small" className="attach-button" onClick={handleAttachClick}>
-                    <AttachFile />
-                </IconButton>
+                    <IconButton ref={attachButtonRef} size="small" className="attach-button" onClick={handleAttachClick}>
+                        <AttachFile />
+                    </IconButton>
 
-                <IconButton ref={emojiButtonRef} size="small" className="attach-button" onClick={toggleEmojiPicker}>
-                    <Smile />
-                </IconButton>
+                    <IconButton ref={emojiButtonRef} size="small" className="attach-button" onClick={toggleEmojiPicker}>
+                        <Smile />
+                    </IconButton>
 
-                {showPicker && (
-                    <Popper
-                        open={showPicker}
-                        anchorEl={emojiButtonRef.current}
-                        placement={emojiPickerPlacement}
-                        disablePortal={false}
-                        strategy="fixed"
-                        modifiers={[
-                            { name: 'offset', options: { offset: [0, 10] } },
-                            {
-                                name: 'flip',
-                                options: {
-                                    padding: 12,
-                                    fallbackPlacements: ['top-start', 'bottom-start', 'top-end', 'bottom-end'],
+                    {showPicker && (
+                        <Popper
+                            open={showPicker}
+                            anchorEl={emojiButtonRef.current}
+                            placement={emojiPickerPlacement}
+                            disablePortal={false}
+                            strategy="fixed"
+                            modifiers={[
+                                { name: 'offset', options: { offset: [0, 10] } },
+                                {
+                                    name: 'flip',
+                                    options: {
+                                        padding: 12,
+                                        fallbackPlacements: ['top-start', 'bottom-start', 'top-end', 'bottom-end'],
+                                    },
                                 },
-                            },
-                            { name: 'preventOverflow', options: { padding: 12, altAxis: true, boundary: 'viewport' } },
-                        ]}
-                        sx={{ zIndex: (theme) => theme.zIndex.modal + 30 }}
-                    >
-                        <Paper
-                            ref={emojiPickerRef}
-                            elevation={0}
-                            sx={{
-                                borderRadius: 2.5,
-                                overflow: 'hidden',
-                                boxShadow: '0px 12px 30px rgba(0,0,0,0.12)',
-                                maxWidth: 'min(350px, calc(100vw - 24px))',
-                                maxHeight: 'calc(100vh - 24px)',
-                            }}
-                            onClick={(e) => e.stopPropagation()}
+                                { name: 'preventOverflow', options: { padding: 12, altAxis: true, boundary: 'viewport' } },
+                            ]}
+                            sx={{ zIndex: (theme) => theme.zIndex.modal + 30 }}
                         >
-                            <Box sx={{ width: 350, maxWidth: '100%' }}>
-                                <EmojiPicker
-                                    onEmojiClick={onEmojiClick}
-                                    width="100%"
-                                    height={emojiPickerHeight}
-                                    searchDisabled={false}
-                                    skinTonesDisabled={true}
-                                    previewConfig={{ showPreview: true }}
-                                    emojiStyle="apple"
-                                />
-                            </Box>
-                        </Paper>
-                    </Popper>
-                )}
+                            <Paper
+                                ref={emojiPickerRef}
+                                elevation={0}
+                                sx={{
+                                    borderRadius: 2.5,
+                                    overflow: 'hidden',
+                                    boxShadow: '0px 12px 30px rgba(0,0,0,0.12)',
+                                    maxWidth: 'min(350px, calc(100vw - 24px))',
+                                    maxHeight: 'calc(100vh - 24px)',
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <Box sx={{ width: 350, maxWidth: '100%' }}>
+                                    <EmojiPicker
+                                        onEmojiClick={onEmojiClick}
+                                        width="100%"
+                                        height={emojiPickerHeight}
+                                        searchDisabled={false}
+                                        skinTonesDisabled={true}
+                                        previewConfig={{ showPreview: true }}
+                                        emojiStyle="apple"
+                                    />
+                                </Box>
+                            </Paper>
+                        </Popper>
+                    )}
 
-                <Menu
-                    anchorEl={attachButtonRef.current}
-                    open={Boolean(attachButtonRef.current) && Boolean(showMedia)}
-                    onClose={handleAttachClick}
-                    onClick={(e) => e.stopPropagation()}
-                    sx={{ zIndex: (theme) => theme.zIndex.modal + 20 }}
-                    PaperProps={{
-                        elevation: 0,
-                        sx: {
-                            minWidth: 200,
-                            borderRadius: 2,
-                            py: 0.5,
-                            mb: 1,
-                            boxShadow: "0px 6px 18px rgba(0,0,0,0.12), 0px 3px 6px rgba(0,0,0,0.08)",
-                        },
-                    }}
-                    transformOrigin={{ horizontal: 'left', vertical: 'bottom' }}
-                    anchorOrigin={{ horizontal: 'left', vertical: 'top' }}
-                >
-                    <MenuItem
-                        onClick={(e) => {
-                            handleAttachClick(e);
-                            openFilePicker(e, imageParams);
+                    <Menu
+                        anchorEl={attachButtonRef.current}
+                        open={Boolean(attachButtonRef.current) && Boolean(showMedia)}
+                        onClose={handleAttachClick}
+                        onClick={(e) => e.stopPropagation()}
+                        sx={{ zIndex: (theme) => theme.zIndex.modal + 20 }}
+                        PaperProps={{
+                            elevation: 0,
+                            sx: {
+                                minWidth: 200,
+                                borderRadius: 2,
+                                py: 0.5,
+                                mb: 1,
+                                boxShadow: "0px 6px 18px rgba(0,0,0,0.12), 0px 3px 6px rgba(0,0,0,0.08)",
+                            },
                         }}
-                        sx={{ py: 1.1, px: 2, borderRadius: 1.5 }}
+                        transformOrigin={{ horizontal: 'left', vertical: 'bottom' }}
+                        anchorOrigin={{ horizontal: 'left', vertical: 'top' }}
                     >
-                        <ListItemIcon sx={{ minWidth: '34px', color: '#0046FF' }}>
-                            <ImageIcon fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText primary="Photo" />
-                    </MenuItem>
+                        <MenuItem
+                            onClick={(e) => {
+                                handleAttachClick(e);
+                                openFilePicker(e, imageParams);
+                            }}
+                            sx={{ py: 1.1, px: 2, borderRadius: 1.5 }}
+                        >
+                            <ListItemIcon sx={{ minWidth: '34px', color: '#0046FF' }}>
+                                <ImageIcon fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText primary="Photo" />
+                        </MenuItem>
 
-                    <MenuItem
-                        onClick={(e) => {
-                            handleAttachClick(e);
-                            openFilePicker(e, videoParams);
+                        <MenuItem
+                            onClick={(e) => {
+                                handleAttachClick(e);
+                                openFilePicker(e, videoParams);
+                            }}
+                            sx={{ py: 1.1, px: 2, borderRadius: 1.5 }}
+                        >
+                            <ListItemIcon sx={{ minWidth: '34px', color: '#FF8040' }}>
+                                <VideoLibraryIcon fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText primary="Video" />
+                        </MenuItem>
+
+                        <MenuItem
+                            onClick={(e) => {
+                                handleAttachClick(e);
+                                openFilePicker(e, docsParams);
+                            }}
+                            sx={{ py: 1.1, px: 2, borderRadius: 1.5 }}
+                        >
+                            <ListItemIcon sx={{ minWidth: '34px', color: '#9929EA' }}>
+                                <InsertDriveFileIcon fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText primary="Document" />
+                        </MenuItem>
+                    </Menu>
+
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        style={{ display: 'none' }}
+                        onChange={handleFileChange}
+                        multiple
+                    />
+
+                    <TextField
+                        fullWidth
+                        inputRef={inputRef}
+                        multiline
+                        autoFocus={replyToMessage?.Id !== '' ? true : false}
+                        maxRows={4}
+                        value={tempQuery}
+                        onChange={(e) => setTempQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault()
+                                // Pass the current value directly to avoid async state issues
+                                if (tempQuery.trim() || (mediaFiles && mediaFiles.length > 0)) {
+                                    setInputValue(tempQuery)
+                                    // Call handleSendMessage directly with tempQuery
+                                    handleSendMessage(tempQuery)
+                                    setTempQuery('')
+                                }
+                            }
                         }}
-                        sx={{ py: 1.1, px: 2, borderRadius: 1.5 }}
-                    >
-                        <ListItemIcon sx={{ minWidth: '34px', color: '#FF8040' }}>
-                            <VideoLibraryIcon fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText primary="Video" />
-                    </MenuItem>
-
-                    <MenuItem
-                        onClick={(e) => {
-                            handleAttachClick(e);
-                            openFilePicker(e, docsParams);
+                        placeholder={
+                            mediaFiles?.length > 0
+                                ? 'Type a caption...'
+                                : 'Type a message...'
+                        }
+                        variant="outlined"
+                        size="small"
+                        className="message-input"
+                        sx={{
+                            '& .MuiOutlinedInput-root': {
+                                borderRadius: '24px',
+                                backgroundColor: '#f9fafb',
+                            },
                         }}
-                        sx={{ py: 1.1, px: 2, borderRadius: 1.5 }}
-                    >
-                        <ListItemIcon sx={{ minWidth: '34px', color: '#9929EA' }}>
-                            <InsertDriveFileIcon fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText primary="Document" />
-                    </MenuItem>
-                </Menu>
+                    />
 
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    style={{ display: 'none' }}
-                    onChange={handleFileChange}
-                    multiple
-                />
-
-                <TextField
-                    fullWidth
-                    inputRef={inputRef}
-                    multiline
-                    autoFocus={replyToMessage?.Id !== '' ? true : false}
-                    maxRows={4}
-                    value={tempQuery}
-                    onChange={(e) => setTempQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            // Pass the current value directly to avoid async state issues
+                    <IconButton
+                        onClick={() => {
                             if (tempQuery.trim() || (mediaFiles && mediaFiles.length > 0)) {
                                 setInputValue(tempQuery)
-                                // Call handleSendMessage directly with tempQuery
+                                // Pass tempQuery directly to handleSendMessage
                                 handleSendMessage(tempQuery)
                                 setTempQuery('')
                             }
-                        }
-                    }}
-                    placeholder={
-                        mediaFiles?.length > 0
-                            ? 'Type a caption...'
-                            : 'Type a message...'
-                    }
-                    variant="outlined"
-                    size="small"
-                    className="message-input"
-                    sx={{
-                        '& .MuiOutlinedInput-root': {
-                            borderRadius: '24px',
-                            backgroundColor: '#f9fafb',
-                        },
-                    }}
-                />
-
-                <IconButton
-                    onClick={() => {
-                        if (tempQuery.trim() || (mediaFiles && mediaFiles.length > 0)) {
-                            setInputValue(tempQuery)
-                            // Pass tempQuery directly to handleSendMessage
-                            handleSendMessage(tempQuery)
-                            setTempQuery('')
-                        }
-                    }}
-                    disabled={!tempQuery.trim() && (!mediaFiles || mediaFiles.length === 0)}
-                    className="send-button"
-                    color="primary"
-                >
-                    <SendHorizontal style={{ marginLeft: '2px' }} />
-                </IconButton>
-            </div>
+                        }}
+                        disabled={!tempQuery.trim() && (!mediaFiles || mediaFiles.length === 0)}
+                        className="send-button"
+                        color="primary"
+                    >
+                        <SendHorizontal style={{ marginLeft: '2px' }} />
+                    </IconButton>
+                </div>
             )}
         </div>
     )
