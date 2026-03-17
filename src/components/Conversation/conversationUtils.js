@@ -1,3 +1,4 @@
+import { formatTime12h } from "../../utils/DateFnc";
 
 // Map numeric MessageType from new API to string types used in UI
 export const mapTypeCodeToMessageType = (code) => {
@@ -95,8 +96,6 @@ export const normalizeServerMessages = (messagesArray, auth) => {
             })
             .filter(Boolean);
 
-        const isNewShape = msg.MessageId && msg.SenderId && (msg.SentAt || msg.LastUpdatedDate);
-
         const contextTypeRaw = msg?.ContextType;
         const parsedContextType = typeof contextTypeRaw === 'string'
             ? parseInt(contextTypeRaw, 10)
@@ -113,37 +112,31 @@ export const normalizeServerMessages = (messagesArray, auth) => {
         const hasTextBody = String(msg?.Message ?? '').trim().length > 0;
         const forceTextReply = isReplyMessage && hasTextBody;
 
-        if (!isNewShape) {
-            const resolvedType = forceTextReply
-                ? 'text'
-                : (() => {
-                    if (attachmentUrl) {
-                        if ((attachmentMime || '').startsWith('image/')) return 'image';
-                        if ((attachmentMime || '').startsWith('video/')) return 'video';
-                        return 'document';
-                    }
-                    return mapTypeCodeToMessageType(msg.MessageType);
-                })();
+        const resolvedMessageType = forceTextReply
+            ? 'text'
+            : (() => {
+                if (attachmentUrl) {
+                    if ((attachmentMime || '').startsWith('image/')) return 'image';
+                    if ((attachmentMime || '').startsWith('video/')) return 'video';
+                    return 'document';
+                }
+                return mapTypeCodeToMessageType(msg.MessageType || msg.LastMessageType);
+            })();
 
-            return {
-                ...msg,
-                MessageType: resolvedType,
-                ...(!forceTextReply && attachmentUrl ? { previewUrl: attachmentUrl } : {}),
-                ...(!forceTextReply && attachmentName ? { fileName: attachmentName } : {}),
-                ...(!forceTextReply && attachmentMime ? { fileType: attachmentMime } : {}),
-                ...(!forceTextReply && mediaItems.length ? { mediaItems } : {}),
-            };
-        }
+        // Common normalization for all shapes
+        const isMyMessage = Number(msg.SenderId || msg.Sender || msg.LastMessageSender) === Number(auth?.id ?? auth?.userId);
 
-        const isMyMessage = Number(msg.SenderId || msg.Sender) === Number(auth?.id ?? auth?.userId);
-
-        const dateTime = msg.DateTime || msg.SentAt || msg.LastUpdatedDate;
+        const dateTime = msg.DateTime || msg.SentAt || msg.LastMessageDate || msg.LastUpdatedDate;
         let date = msg.Date;
+        let time = msg.Time;
         if (!date && dateTime) {
             try {
                 date = new Date(dateTime).toISOString().split('T')[0];
+                time = formatTime12h(new Date(dateTime).toISOString());
+
             } catch {
                 date = undefined;
+                time = undefined;
             }
         }
 
@@ -163,38 +156,36 @@ export const normalizeServerMessages = (messagesArray, auth) => {
             || msg.ReplyToMessage
             || null;
 
-        // Map backend MessageStatus to internal Status codes
-        let normalizedStatus = msg.Status;
-        if (typeof msg.MessageStatus === 'number') {
+        // Map backend MessageStatus to internal Status codes (1: sent, 2: delivered, 3: read)
+        let normalizedStatus = msg.Status ?? msg.status;
+        const rawMessageStatus = msg.MessageStatus !== undefined ? Number(msg.MessageStatus) : undefined;
+
+        if (typeof rawMessageStatus === 'number' && !isNaN(rawMessageStatus)) {
             // Mapping: 0: sent/delivered, 1: sent, 2: read
-            if (msg.MessageStatus === 2) {
+            if (rawMessageStatus === 2) {
                 normalizedStatus = 3; // internal 3 is Read (blue ticks)
-            } else if (msg.MessageStatus === 1 || msg.MessageStatus === 0) {
+            } else if (rawMessageStatus === 1 || rawMessageStatus === 0) {
                 normalizedStatus = 1; // internal 1 is Sent (gray ticks)
             }
         }
 
-        const resolvedMessageType = forceTextReply
-            ? 'text'
-            : (() => {
-                if (attachmentUrl) {
-                    if ((attachmentMime || '').startsWith('image/')) return 'image';
-                    if ((attachmentMime || '').startsWith('video/')) return 'video';
-                    return 'document';
-                }
-                return mapTypeCodeToMessageType(msg.MessageType);
-            })();
+        const normalizedSystemMsg = msg.SystemMsg !== undefined
+            ? (typeof msg.SystemMsg === 'string' ? parseInt(msg.SystemMsg, 10) : msg.SystemMsg)
+            : (msg.system_msg !== undefined ? (typeof msg.system_msg === 'string' ? parseInt(msg.system_msg, 10) : msg.system_msg) : 0);
 
         return {
             ...msg,
-            Id: msg.Id ?? msg.MessageId,
-            MessageId: msg.MessageId ?? msg.Id,
+            Id: msg.Id ? String(msg.Id) : (msg.MessageId ? String(msg.MessageId) : undefined),
+            MessageId: msg.MessageId ? String(msg.MessageId) : (msg.Id ? String(msg.Id) : undefined),
             IsMyMessage: typeof msg.IsMyMessage === 'boolean' ? msg.IsMyMessage : isMyMessage,
             Direction: isMyMessage ? 1 : (typeof msg.Direction === 'number' ? (msg.Direction === 1 || msg.Direction === 2 ? 0 : msg.Direction) : 0),
             MessageType: resolvedMessageType,
+            Message: msg.Message ?? msg.LastMessage,
             Status: normalizedStatus,
+            SystemMsg: normalizedSystemMsg,
             DateTime: dateTime,
             Date: date,
+            Time: time,
             ReactionEmojis: msg.ReactionEmojis ?? msg.Reactions ?? '[]',
             SenderInfo: trimmedSenderInfo || msg.SenderEmail || '',
             FirstName: msg.FirstName || '',

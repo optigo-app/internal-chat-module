@@ -4,6 +4,7 @@ export const readMessageApi = async (
     auth,
     {
         ConversationId,
+        IsGroup = 0,
         fLabel = "Read Message",
         signal = null,
     }
@@ -15,7 +16,8 @@ export const readMessageApi = async (
 
         const payload = {
             ConversationId: ConversationId,
-            UserId: auth?.id ?? 0,
+            UserId: auth?.id ?? auth?.userId ?? 0,
+            // IsGroup: IsGroup ? 1 : 0
         };
 
         const body = buildCommonBody("ReadMessage", auth, payload, fLabel);

@@ -25,7 +25,7 @@ export const RemoveInGroupProvider = ({ children }) => {
     }, []);
 
     const isRemovedFromGroup = useCallback((conversationId) => {
-        return removeInGroupState[conversationId]?.isRemoved ?? false;
+        return removeInGroupState[conversationId]?.isRemoved; // Returns undefined if not found
     }, [removeInGroupState]);
 
     const clearRemoveInGroupStatus = useCallback((conversationId) => {

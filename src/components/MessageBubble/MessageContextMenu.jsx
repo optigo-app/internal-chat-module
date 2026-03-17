@@ -13,6 +13,7 @@ import {
   Trash2,
   Star,
   Laugh,
+  Info,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -73,10 +74,16 @@ const MessageContextMenu = ({
   onDelete,
   onStar,
   onReact,
+  onMessageInfo,
   message,
   mouseX,
   mouseY,
 }) => {
+  const handleMessageInfo = () => {
+    onMessageInfo?.(message);
+    onClose();
+  };
+
   const handleReply = () => {
     onReply?.(message);
     onClose();
@@ -122,6 +129,16 @@ const MessageContextMenu = ({
       transformOrigin={{ horizontal: "left", vertical: "top" }}
     >
 
+      {/* Message Info - Outgoing only */}
+      {message?.Direction === 1 && (
+        <StyledMenuItem onClick={handleMessageInfo}>
+          <ListItemIcon>
+            <Info />
+          </ListItemIcon>
+          <ListItemText>Message Info</ListItemText>
+        </StyledMenuItem>
+      )}
+
       {/* Reply */}
       <StyledMenuItem onClick={handleReply}>
         <ListItemIcon>
@@ -137,6 +154,7 @@ const MessageContextMenu = ({
         </ListItemIcon>
         <ListItemText>Forward</ListItemText>
       </StyledMenuItem>
+
 
       {/* Copy */}
       <StyledMenuItem onClick={handleCopy}>

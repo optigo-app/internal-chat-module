@@ -10,7 +10,7 @@ import { readMessageApi } from '../../API/SendMessage/ReadMessageApi';
 import { uploadMediaAPi } from '../../API/FileUpload/uploadHelpers';
 import { toast } from 'react-hot-toast';
 import { LoginContext } from '../../context/LoginData';
-import { formatDateHeader } from '../../utils/DateFnc';
+import { formatDateHeader, formatTime12h } from '../../utils/DateFnc';
 import { forwardMessageApi } from '../../API/SendMessage/forwardMessageApi';
 import { replyToMessageApi } from '../../API/SendMessage/replyToMessageApi';
 import imageNotFound from '../../assets/image-not-found.jpg';
@@ -32,26 +32,24 @@ const getMessageId = (msg) => {
 const normalizeMessagesList = (prev) =>
     Array.isArray(prev) ? prev : (prev?.data || []);
 
-/** Return current IST time components. */
+/** Return current time components (consistent with backend local-as-UTC pattern). */
 const getISTTime = () => {
     const now = new Date();
+    // Offset-adjusted ISO string provides local time numbers with a 'Z' suffix, 
+    // matching the backend's behavior for correct sorting and display.
+    const offset = now.getTimezoneOffset() * 60000;
+    const localISO = new Date(now.getTime() - offset).toISOString();
+    
     return {
-        time: now.toLocaleTimeString('en-IN', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true,
-            timeZone: 'Asia/Kolkata',
-        }),
-        date: new Date(
-            now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })
-        ).toISOString().split('T')[0],
-        dateTime: now.toISOString(),
+        time: formatTime12h(localISO),
+        date: localISO.split('T')[0],
+        dateTime: localISO,
     };
 };
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
-export const useConversation = (selectedCustomer, onConversationRead, onViewConversationRead) => {
+export const useConversation = (selectedCustomer, onConversationRead, onViewConversationRead, isDrawerOpen = false) => {
     const [inputValue, setInputValue] = useState('');
     const [tagsList, setTagsList] = useState([]);
     const [messages, setMessages] = useState([]);
@@ -77,6 +75,12 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     const [showMedia, setShowMedia] = useState(false);
     const [mediaViewerIndex, setMediaViewerIndex] = useState(0);
     const [mediaViewerMessage, setMediaViewerMessage] = useState(null);
+    const [searchResults, setSearchResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+
+    const readTimeoutRef = useRef(null);
+    const lastReadConvRef = useRef(null);
+    const lastReadTimeRef = useRef(0);
 
     const { auth } = useContext(LoginContext);
 
@@ -162,7 +166,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
         const normalizedWithDirection = { ...normalized, Direction: normalizedDirection };
 
-        const incomingId = normalizedWithDirection.Id || normalizedWithDirection.MessageId;
+        // Use the stable getMessageId helper for both deduplication and storage
+        const incomingId = getMessageId(normalizedWithDirection);
         if (!incomingId) return;
 
         // Fast-path guard: skip if already processed
@@ -197,30 +202,54 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
     // ── Read receipt ─────────────────────────────────────────────────────────
 
-    const handleReadMessage = useCallback(async (custConverId, signal = null) => {
+    const handleReadMessage = useCallback(async (custConverId, signal = null, force = false, skipDrawerCheck = false) => {
         if (!custConverId) return;
         if (document.visibilityState !== 'visible') return;
+        if (!skipDrawerCheck && isDrawerOpen) return;
 
-        const response = await readMessageApi(auth, { ConversationId: custConverId, signal });
-
-        const currentConvId = selectedCustomerRef.current?.ConversationId;
-        const receiverId =
-            selectedCustomerRef.current?.ReceiverId ||
-            selectedCustomerRef.current?.CustomerId ||
-            selectedCustomerRef.current?.UserId;
-
-        if (receiverId && currentConvId && Number(currentConvId) === Number(custConverId)) {
-            emitInternalMessageRead({
-                ufcc: auth?.ufcc,
-                ReceiverId: receiverId,
-                ConversationId: custConverId,
-                Status: 2,
-                MessageStatus: 2,
-            });
+        const now = Date.now();
+        // Skip if same conversation and read within last 3 seconds (unless forced)
+        if (!force && lastReadConvRef.current === custConverId && (now - lastReadTimeRef.current < 3000)) {
+            return;
         }
 
-        return response?.rd ?? null;
-    }, [auth]);
+        // Debounce: wait for 500ms of inactivity before calling API
+        if (readTimeoutRef.current) {
+            clearTimeout(readTimeoutRef.current);
+        }
+
+        readTimeoutRef.current = setTimeout(async () => {
+            try {
+                const currentConvId = selectedCustomerRef.current?.ConversationId;
+                // Only proceed if still on the same conversation
+                if (Number(currentConvId) !== Number(custConverId)) return;
+
+                const response = await readMessageApi(auth, { ConversationId: custConverId, signal });
+
+                lastReadConvRef.current = custConverId;
+                lastReadTimeRef.current = Date.now();
+
+                const receiverId =
+                    selectedCustomerRef.current?.ReceiverId ||
+                    selectedCustomerRef.current?.CustomerId ||
+                    selectedCustomerRef.current?.UserId;
+
+                if (receiverId) {
+                    emitInternalMessageRead({
+                        ufcc: auth?.ufcc,
+                        ReceiverId: receiverId,
+                        ConversationId: custConverId,
+                        Status: 2,
+                        MessageStatus: 2,
+                    });
+                }
+
+                if (response?.rd && onConversationRead) onConversationRead(true);
+            } catch (error) {
+                console.error('Error in handleReadMessage:', error);
+            }
+        }, 500);
+    }, [auth, onConversationRead, isDrawerOpen]);
 
     // ── Socket handlers (registered once per auth token change) ─────────────
 
@@ -379,7 +408,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             if (activeConvId && incomingConvId && Number(activeConvId) === Number(incomingConvId)) {
                 setMessId(data?.MessageId);
                 addUniqueMessage(data);
-                handleReadMessage(incomingConvId);
+                handleReadMessage(incomingConvId, null, false, true); // skipDrawerCheck = true for incoming messages
             }
         };
 
@@ -605,7 +634,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     useEffect(() => {
         const handleAutoRead = () => {
             if (document.visibilityState === 'visible' && selectedCustomerRef.current?.ConversationId) {
-                handleReadMessage(selectedCustomerRef.current.ConversationId);
+                handleReadMessage(selectedCustomerRef.current.ConversationId, null, true);
             }
         };
 
@@ -616,6 +645,13 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             document.removeEventListener('visibilitychange', handleAutoRead);
         };
     }, [handleReadMessage]);
+
+    // Mark as read when drawer/panel is closed
+    useEffect(() => {
+        if (!isDrawerOpen && selectedCustomer?.ConversationId) {
+            handleReadMessage(selectedCustomer.ConversationId, null, true);
+        }
+    }, [isDrawerOpen, selectedCustomer?.ConversationId, handleReadMessage]);
 
     // Notify parent about conversation read state
     useEffect(() => {
@@ -835,8 +871,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                         // Add group-specific fields if it's a group
                         if (isGroup) {
                             mediaPayload.IsGroup = 1;
-                            mediaPayload.FirstName = auth?.firstName;
-                            mediaPayload.LastName = auth?.lastName;
+                            mediaPayload.FirstName = auth?.firstName || auth?.FirstName;
+                            mediaPayload.LastName = auth?.lastName || auth?.LastName;
                             mediaPayload.SenderEmail = auth?.email;
                             mediaPayload.SenderProfilePicture = auth?.profilePicture;
                         }
@@ -867,8 +903,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                     // Add group-specific fields if it's a group
                     if (isGroup) {
                         mediaPayload.IsGroup = 1;
-                        mediaPayload.FirstName = auth?.firstName;
-                        mediaPayload.LastName = auth?.lastName;
+                        mediaPayload.FirstName = auth?.firstName || auth?.FirstName;
+                        mediaPayload.LastName = auth?.lastName || auth?.LastName;
                         mediaPayload.SenderEmail = auth?.email;
                         mediaPayload.SenderProfilePicture = auth?.profilePicture;
                     }
@@ -1061,8 +1097,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                     // Add group-specific fields if it's a group
                     if (isGroup) {
                         messagePayload.IsGroup = 1;
-                        messagePayload.FirstName = auth?.firstName;
-                        messagePayload.LastName = auth?.lastName;
+                        messagePayload.FirstName = auth?.firstName || auth?.FirstName;
+                        messagePayload.LastName = auth?.lastName || auth?.LastName;
                         messagePayload.SenderEmail = auth?.email;
                         messagePayload.SenderProfilePicture = auth?.profilePicture;
                     }
@@ -1253,6 +1289,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                                         SenderId: auth?.id, Sender: auth?.id, ConversationId: convId,
                                         ConversationName: auth?.username || auth?.userName || auth?.userId,
                                         SenderName: auth?.username || auth?.userId || auth?.name,
+                                        FirstName: auth?.firstName || auth?.FirstName,
+                                        LastName: auth?.lastName || auth?.LastName,
                                         RecieverName: auth?.username || auth?.userId || auth?.name,
                                         Message: forwardMessage?.Message || (isMedia ? '' : 'Forwarded Message'),
                                         MessageId: realMessageId, Status: 1, MessageStatus: 1,
@@ -1286,21 +1324,69 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         }
     }, [auth, selectedCustomer, forwardMessage, messId]);
 
+    const searchMessages = useCallback(async (query) => {
+        if (!selectedCustomer?.ConversationId || !query?.trim()) {
+            setSearchResults([]);
+            return;
+        }
+
+        setIsSearching(true);
+        try {
+            const response = await conversationView(
+                selectedCustomer.ConversationId,
+                1,
+                100, // Search within first 100 results
+                auth,
+                'SearchView',
+                null,
+                query
+            );
+
+            const rawResults = Array.isArray(response.data?.rd)
+                ? response.data.rd
+                : (Array.isArray(response.data) ? response.data : []);
+            
+            setSearchResults(normalizeServerMessages(rawResults));
+        } catch (error) {
+            console.error('Search failed:', error);
+            setSearchResults([]);
+        } finally {
+            setIsSearching(false);
+        }
+    }, [selectedCustomer?.ConversationId, auth, normalizeServerMessages]);
+
     const scrollToMessage = useCallback(async (messageId, containerRef, attachmentId = null) => {
         if (!containerRef.current || !messageId) return;
-        const messageElement = containerRef.current.querySelector(`[data-message-id="${messageId}"]`);
+        
+        // Use both string and number for ID matching to be safe
+        const sid = String(messageId);
+        let messageElement = containerRef.current.querySelector(`[data-message-id="${sid}"]`);
+
+        // If not found, it might even be an older message not loaded. 
+        // For now, let's try to reload the conversation if it's missing (jump to message logic)
+        if (!messageElement) {
+            const messageList = normalizeMessagesList(messages);
+            const existsLocally = messageList.some(m => String(m.MessageId || m.Id) === sid);
+            
+            if (!existsLocally) {
+                setLoading(true);
+                await loadConversation(1, true, true); // Reset and reload
+                // Wait for render
+                await new Promise(r => setTimeout(r, 500));
+                messageElement = containerRef.current.querySelector(`[data-message-id="${sid}"]`);
+            }
+        }
 
         if (messageElement) {
             messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            setBlinkMessageId(messageId);
+            setBlinkMessageId(sid);
 
             if (attachmentId) {
                 const messageList = normalizeMessagesList(messages);
-                const targetMsg = messageList.find(m => m.Id === messageId || m.MessageId === messageId);
+                const targetMsg = messageList.find(m => String(m.Id || m.MessageId) === sid);
                 if (targetMsg?.mediaItems) {
                     const itemIndex = targetMsg.mediaItems.findIndex(item =>
-                        item.attachmentId === attachmentId || item.AttachmentId === attachmentId ||
-                        item.Id === attachmentId || item.id === attachmentId
+                        String(item.attachmentId || item.AttachmentId || item.Id || item.id) === String(attachmentId)
                     );
                     if (itemIndex >= 0) handleMediaClick(targetMsg, itemIndex);
                 }
@@ -1308,7 +1394,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
             setTimeout(() => setBlinkMessageId(null), 3000);
         }
-    }, [messages, handleMediaClick]);
+    }, [messages, loadConversation, handleMediaClick]);
 
     const getMessageStatusIcon = useCallback((msg) => {
         const raw = msg?.Status ?? msg?.status ?? msg?.MessageStatus;
@@ -1350,6 +1436,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         currentPage, setCurrentPage,
         forwardAnchorEl, setForwardAnchorEl,
         messId,
+        searchResults,
+        isSearching,
 
         // Functions
         loadConversation,
@@ -1369,8 +1457,10 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         handleCloseForward,
         handleSendForward,
         scrollToMessage,
+        searchMessages,
         getMessageStatusIcon,
         formatDateHeader,
+        addUniqueMessage,
         refresh: () => loadConversation(1, true, true),
     };
 };

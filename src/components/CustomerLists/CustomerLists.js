@@ -40,6 +40,7 @@ import CreateGroup from '../AddConversation/CreateGroup';
 import useOnlineStatus from '../../utils/internetCheck';
 import useFaviconBadge from '../../hooks/useFaviconBadge';
 import { useFavorite } from '../../contexts/FavoriteContext';
+import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
 
 const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, selectedStatus = 'All', selectedTag = 'All', isConversationRead = false, viewConversationRead = false, onConversationList = () => { } }) => {
     const isOnline = useOnlineStatus();
@@ -361,12 +362,9 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     lastMessageTimeValue: isStatusChange
                         ? currentChat.lastMessageTimeValue
                         : (() => {
-                            // Server list uses "Local Time as LastUpdatedDate" (e.g., 10:40 Z) but socket sends UTC (05:10 Z).
-                            // We need to generate a timestamp that matches the list's "Local" magnitude to ensure it sorts to top.
                             const now = new Date();
                             const offset = now.getTimezoneOffset() * 60000;
-                            const localISO = new Date(now.getTime() - offset).toISOString();
-                            return localISO;
+                            return new Date(now.getTime() - offset).toISOString();
                         })(),
                     unreadCount: unreadFinal,
                     UnreadCount: unreadFinal,
@@ -488,8 +486,50 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 notify(data, notificationTemplate, auth);
             }
 
-            // Refresh conversation list to show updated group info
-            loadMembers(1, true, searchTerm);
+            // Optimistic Update: Use conversationData if present (group_created/updated)
+            if (data.conversationData) {
+                const normalized = processApiResponse([data.conversationData])[0];
+                if (normalized) {
+                    setChatMembers(prev => {
+                        const prevData = Array.isArray(prev?.data) ? prev.data : [];
+                        const updatedData = [...prevData];
+                        const index = updatedData.findIndex(c => Number(c.ConversationId) === Number(data.conversationId));
+                        
+                        if (index !== -1) {
+                            // Safely merge: Don't overwrite valid name/desc with "Unknown" or null
+                            const existing = updatedData[index];
+                            const merged = { ...existing, ...normalized };
+                            
+                            if (!normalized.ConversationName || normalized.name === 'Unknown') {
+                                merged.name = existing.name;
+                                merged.ConversationName = existing.ConversationName;
+                            }
+                            if (!normalized.GroupDesc) {
+                                merged.GroupDesc = existing.GroupDesc;
+                            }
+                            if (!normalized.ProfileImageUrl) {
+                                merged.ProfileImageUrl = existing.ProfileImageUrl;
+                            }
+
+                            updatedData[index] = merged;
+                        } else if (data.eventType === 'group_created') {
+                            // Add new conversation (for group_created)
+                            updatedData.push(normalized);
+                            return { 
+                                ...prev, 
+                                data: updatedData.sort(conversationComparator),
+                                total: (prev?.total ?? 0) + 1 
+                            };
+                        }
+                        
+                        updatedData.sort(conversationComparator);
+                        return { ...prev, data: updatedData };
+                    });
+                }
+            } else {
+                // Refresh conversation list to show updated group info
+                loadMembers(1, true, searchTerm);
+            }
         };
 
         // Handle member events (added, removed, promoted, demoted)
@@ -514,8 +554,40 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 notify(data, notificationTemplate, auth);
             }
 
-            // Refresh conversation list
-            loadMembers(1, true, searchTerm);
+            // Optimistic Update: If data has conversationData (member_added/removed), update list immediately
+            if (data.conversationData) {
+                const normalized = processApiResponse([data.conversationData])[0];
+                if (normalized) {
+                    setChatMembers(prev => {
+                        const prevData = Array.isArray(prev?.data) ? prev.data : [];
+                        const updatedData = [...prevData];
+                        const index = updatedData.findIndex(c => Number(c.ConversationId) === Number(data.conversationId));
+                        
+                        if (index !== -1) {
+                            const existing = updatedData[index];
+                            const merged = { ...existing, ...normalized };
+                            
+                            // Safely preserve identity fields if missing in update
+                            if (!normalized.ConversationName || normalized.name === 'Unknown') {
+                                merged.name = existing.name;
+                                merged.ConversationName = existing.ConversationName;
+                            }
+                            if (!normalized.GroupDesc) {
+                                merged.GroupDesc = existing.GroupDesc;
+                            }
+                            
+                            updatedData[index] = merged;
+                        } else if (data.eventType === 'member_added') {
+                            updatedData.push(normalized);
+                        }
+                        
+                        updatedData.sort(conversationComparator);
+                        return { ...prev, data: updatedData };
+                    });
+                }
+            } else {
+                loadMembers(1, true, searchTerm);
+            }
         };
 
         // Handle permission events
@@ -563,6 +635,27 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             loadMembers(1, true);
         }
     }, [auth?.token, auth?.userId]); // Only reload when auth changes
+
+    useEffect(() => {
+        const handleRefresh = () => loadMembers(1, true);
+        const handleDelete = (event) => {
+            const conversationId = event.detail?.conversationId;
+            if (conversationId) {
+                setChatMembers(prev => ({
+                    ...prev,
+                    data: prev.data?.filter(member => Number(member.ConversationId) !== Number(conversationId)) || []
+                }));
+            }
+        };
+
+        window.addEventListener('REFRESH_CONVERSATION_LIST', handleRefresh);
+        window.addEventListener('DELETE_CONVERSATION', handleDelete);
+        
+        return () => {
+            window.removeEventListener('REFRESH_CONVERSATION_LIST', handleRefresh);
+            window.removeEventListener('DELETE_CONVERSATION', handleDelete);
+        };
+    }, [loadMembers]);
 
     const handleSearchChange = (e) => {
         const value = e.target.value;
@@ -733,11 +826,24 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     useEffect(() => {
         const conversationId = selectedCustomer?.ConversationId;
 
-        if ((isConversationRead || viewConversationRead) && conversationId !== tempConversationId) {
+        if ((isConversationRead || viewConversationRead) && conversationId) {
+            // Optimization: Instead of reloading the entire list (GetConversationList API),
+            // we update the unread count locally for the active conversation.
+            setChatMembers(prev => {
+                if (!prev?.data) return prev;
+                const index = prev.data.findIndex(m => Number(m.ConversationId) === Number(conversationId));
+                if (index === -1) return prev;
+                
+                // If it's already 0, skip to avoid unnecessary render
+                if (Number(prev.data[index].unreadCount) === 0) return prev;
+
+                const updatedData = [...prev.data];
+                updatedData[index] = { ...updatedData[index], unreadCount: 0 };
+                return { ...prev, data: updatedData };
+            });
             setTempConversationId(conversationId);
-            loadMembers(currentPage, true);
         }
-    }, [isConversationRead, viewConversationRead, selectedCustomer?.ConversationId, tempConversationId]);
+    }, [isConversationRead, viewConversationRead, selectedCustomer?.ConversationId]);
 
     const totalUnread = chatMembers?.data?.reduce((acc, curr) => {
         const count = Number(curr.unreadCount ?? curr.UnreadCount ?? 0);
@@ -832,10 +938,10 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     <CreateGroup
                         onBack={() => setShowCreateGroup(false)}
                         onClose={() => setShowCreateGroup(false)}
-                        onContinue={(selected) => {
-                            console.log('Final selected members for group:', selected);
-                            // logic for next step or API call
+                        onContinue={() => {
                             setShowCreateGroup(false);
+                            // Refresh list to show the new group immediately
+                            loadMembers(1, true, searchTerm);
                         }}
                     />
                 </Box>
@@ -971,15 +1077,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                             >
                                                 <div className={`member-item ${isSelected ? 'active' : ''} ${isSelectedAndReading ? 'reading' : ''}`}>
                                                     <div className="member-avatar">
-                                                        {!hasCustomerName(member) ? (
-                                                            <Avatar
-                                                                {...getWhatsAppAvatarConfig(getCustomerAvatarSeed(member))}
-                                                            >
-                                                                <PersonIcon fontSize="small" />
-                                                            </Avatar>
-                                                        ) : (
-                                                            <Avatar {...member.avatarConfig} />
-                                                        )}
+                                                        <ConversationAvatar member={member} />
                                                     </div>
 
                                                     <div className="member-info">
@@ -1116,15 +1214,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                                     onClick={() => onCustomerSelect(member)}
                                                 >
                                                     <div className="member-avatar">
-                                                        {!hasCustomerName(member) ? (
-                                                            <Avatar
-                                                                {...getWhatsAppAvatarConfig(getCustomerAvatarSeed(member))}
-                                                            >
-                                                                <PersonIcon fontSize="small" />
-                                                            </Avatar>
-                                                        ) : (
-                                                            <Avatar {...getWhatsAppAvatarConfig(member.name)} />
-                                                        )}
+                                                        <ConversationAvatar member={member} />
                                                     </div>
                                                     <div className="member-details">
                                                         <div className="member-name">

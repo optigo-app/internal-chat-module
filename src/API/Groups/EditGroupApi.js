@@ -24,11 +24,23 @@ export const editGroupApi = async (auth, { conversationId, groupName, groupDesc,
             if (groupDesc) changes.groupDesc = groupDesc;
             if (groupProfile) changes.groupProfile = groupProfile;
             
+            const rd = response?.Data?.rd?.[0] || (Array.isArray(response?.rd) ? response.rd[0] : (response?.Data?.rd || response?.rd));
+
+            // Enrich conversationData with edited fields if they aren't in rd
+            const enrichedRd = {
+                ...rd,
+                ConversationId: Number(conversationId),
+                ConversationName: groupName || rd?.ConversationName,
+                GroupDesc: groupDesc || rd?.GroupDesc,
+                ProfileImageUrl: groupProfile || rd?.ProfileImageUrl
+            };
+
             emitGroupUpdated({
                 ufcc: auth?.ufcc,
                 eventType: 'group_updated',
                 conversationId: Number(conversationId),
                 ReceiverId: memberIds, // Array of all member IDs
+                conversationData: enrichedRd, // Pass enriched group record
                 updatedBy: {
                     userId: auth?.id || auth?.userId,
                     name: auth?.username || auth?.name,

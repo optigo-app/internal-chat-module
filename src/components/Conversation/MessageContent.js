@@ -49,7 +49,8 @@ const MessageContent = ({
     handleMediaClick,
     getMessageStatusIcon,
     getMessageById,
-    handleForward
+    handleForward,
+    selectedCustomer
 }) => {
 
     const theme = useTheme();
@@ -330,6 +331,25 @@ const MessageContent = ({
                         </Typography>
                     </Box>
                 )}
+
+                {/* Group Sender Name */}
+                {(selectedCustomer?.IsGroup === 1 && !isOutgoing) && (
+                    <Typography
+                        variant="caption"
+                        sx={{
+                            fontWeight: 700,
+                            color: theme.palette.primary.main,
+                            display: 'block',
+                            mb: 0.5,
+                            fontSize: '12.5px',
+                            cursor: 'pointer',
+                            '&:hover': { textDecoration: 'underline' }
+                        }}
+                    >
+                        {msg.SenderInfo || (msg.FirstName ? `${msg.FirstName} ${msg.LastName || ''}` : msg.Sender) || 'Member'}
+                    </Typography>
+                )}
+
                 {/* Reply Preview (Quoted message) */}
                 {msg.ContextType === 2 && (
                     <div className="">

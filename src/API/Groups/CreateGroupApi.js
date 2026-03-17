@@ -56,20 +56,32 @@ export const createGroupApi = async (auth, {
         const body = buildCommonBody("CreateGroup", auth, payload, fLabel);
         const response = await CommonAPI(body);
         
+        // Extract ConversationId correctly from response.Data.rd[0]
+        const rd = response?.Data?.rd?.[0] || (Array.isArray(response?.rd) ? response.rd[0] : (response?.Data?.rd || response?.rd));
+        
+        // Enrich conversationData with necessary fields
+        const enrichedRd = {
+            ...rd,
+            SystemMsg: 1
+        };
+        
+        const convId = rd?.ConversationId || response?.rd?.ConversationId;
+
         // Emit socket event if group created successfully
-        if (response?.Status === "200" && response?.rd?.ConversationId) {
+        if (response?.Status === "200" && convId) {
             const memberIds = Array.isArray(groupMembers) 
-                ? groupMembers.map(m => m.UserId || m.userId || m.id)
+                ? groupMembers.map(m => Number(m.UserId || m.userId || m.id))
                 : [];
             
             emitGroupCreated({
                 ufcc: auth?.ufcc,
                 eventType: 'group_created',
-                conversationId: response.rd.ConversationId,
-                ReceiverId: memberIds, // Array of all member IDs
+                conversationId: convId,
+                ReceiverId: memberIds, // Array of all member IDs to notify
                 groupName: groupName,
                 groupDesc: groupDesc,
                 groupProfile: groupProfile,
+                conversationData: enrichedRd, // Pass the full group record for immediate UI update
                 createdBy: {
                     userId: auth?.id || auth?.userId,
                     name: auth?.username || auth?.name,
@@ -82,7 +94,8 @@ export const createGroupApi = async (auth, {
                     addOtherMembers: addOtherMembers ? 1 : 0,
                     approveNewMembers: approveNewMembers ? 1 : 0
                 },
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                receiveEvent: "internal:group_created"
             });
         }
         

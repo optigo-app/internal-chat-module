@@ -28,14 +28,26 @@ export const removeMemberApi = async (auth, { conversationId, memberId, removedM
 
         // Emit socket event if member removed successfully
         if (response?.Status === "200") {
-            // Get member IDs before removal for broadcasting
+            // Get member IDs after removal, but add the removed member back into broadcast list
+            // so they receive the event on their side (to clear state/notify)
             const allMemberIds = await getGroupMemberIds(conversationId, auth);
+            const broadcastIds = Array.from(new Set([...allMemberIds, Number(memberId)]));
             
+            const rd = response?.Data?.rd?.[0] || (Array.isArray(response?.rd) ? response.rd[0] : (response?.Data?.rd || response?.rd));
+
+            // Enrich conversationData with necessary fields
+            const enrichedRd = {
+                ...rd,
+                ConversationId: Number(conversationId),
+                SystemMsg: 1
+            };
+
             emitMemberRemoved({
                 ufcc: auth?.ufcc,
                 eventType: 'member_removed',
                 conversationId: Number(conversationId),
-                ReceiverId: allMemberIds, // Array of remaining member IDs
+                ReceiverId: broadcastIds, // Array of remaining member IDs + removed member
+                conversationData: enrichedRd, // Pass enriched group record
                 removedBy: {
                     userId: currentUserId,
                     name: auth?.username || auth?.name,

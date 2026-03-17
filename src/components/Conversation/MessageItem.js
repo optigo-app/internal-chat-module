@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Avatar, Skeleton } from '@mui/material';
-import PersonIcon from '@mui/icons-material/Person';
 import MessageContent from './MessageContent';
-import { getWhatsAppAvatarConfig } from '../../utils/globalFunc';
+import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
 
 const MessageItem = ({
     msg,
@@ -34,8 +32,6 @@ const MessageItem = ({
     handleForward
 }) => {
     const hoverHideTimeoutRef = useRef(null);
-    const [imageLoadState, setImageLoadState] = useState('loading'); // 'loading', 'loaded', 'error'
-
     const messageDomId = msg.Id ?? msg.fileName;
     const isOutgoing = msg.Direction === 1;
     const isBlinking = blinkMessageId === messageDomId;
@@ -43,23 +39,6 @@ const MessageItem = ({
     const isHovered = hoveredMessageId === currentHoverId;
     const isReactionMenuOpenForCurrent = reactionMenuMessageId === currentHoverId && Boolean(reactionMenuAnchorEl);
     const shouldShowActions = isHovered || isReactionMenuOpenForCurrent;
-
-    // Reset image load state when message changes
-    useEffect(() => {
-        if (msg.SenderProfilePicture) {
-            setImageLoadState('loading');
-        } else {
-            setImageLoadState('error'); // No image URL, skip to fallback
-        }
-    }, [msg.SenderProfilePicture, msg.Id]);
-
-    const handleImageLoad = useCallback(() => {
-        setImageLoadState('loaded');
-    }, []);
-
-    const handleImageError = useCallback(() => {
-        setImageLoadState('error');
-    }, []);
 
     const handleMouseEnter = useCallback(() => {
         if (hoverHideTimeoutRef.current) {
@@ -138,51 +117,22 @@ const MessageItem = ({
             onMouseLeave={handleMouseLeave}
         >
 
-            {msg.Direction === 0 && (
-                (() => {
-                    const senderName = `${msg.FirstName || ''} ${msg.LastName || ''}`.trim() || 'User';
-                    const avatarSeed = senderName;
-                    const cfg = getWhatsAppAvatarConfig(avatarSeed, 38);
-                    if (msg.SenderProfilePicture && imageLoadState === 'loading') {
-                        return (
-                            <div style={{ marginRight: 8 }}>
-                                <Skeleton
-                                    variant="circular"
-                                    width={38}
-                                    height={38}
-                                    sx={{ bgcolor: 'grey.200' }}
-                                />
-                                <img
-                                    src={msg.SenderProfilePicture}
-                                    onLoad={handleImageLoad}
-                                    onError={handleImageError}
-                                    style={{ display: 'none' }}
-                                    alt=""
-                                />
-                            </div>
-                        );
-                    }
-                    if (msg.SenderProfilePicture && imageLoadState === 'loaded') {
-                        return (
-                            <Avatar
-                                src={msg.SenderProfilePicture}
-                                alt={senderName}
-                            />
-                        );
-                    }
-                    return (
-                        <Avatar
-                            {...cfg}
-                            sx={{ ...cfg.sx, mr: 1 }}
-                        >
-                        </Avatar>
-                    );
-                })()
+            {(msg.Direction === 0 && selectedCustomer?.IsGroup === 1) && (
+                <div style={{ marginRight: 8, alignSelf: 'flex-end', marginBottom: '4px' }}>
+                    <ConversationAvatar
+                        member={{
+                            ProfileImageUrl: msg.SenderProfilePicture,
+                            ...msg
+                        }}
+                        size={38}
+                    />
+                </div>
             )}
 
             <MessageContent
                 auth={auth}
                 msg={msg}
+                selectedCustomer={selectedCustomer}
                 isOutgoing={isOutgoing}
                 shouldShowActions={shouldShowActions}
                 isReactionMenuOpenForCurrent={isReactionMenuOpenForCurrent}

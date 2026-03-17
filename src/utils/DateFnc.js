@@ -33,7 +33,7 @@ export function formatChatTimestamp(input) {
 
     if (dateKey === yesterdayKey) {
         return 'Yesterday';
-    }   
+    }
 
     if (diffDays >= 0 && diffDays < 7) {
         return new Intl.DateTimeFormat('en-US', {
@@ -51,7 +51,7 @@ export function formatChatTimestamp(input) {
 }
 
 
-// Extract current time from ISO date string in UTC timezone
+// Extract current time from date string (converted to local)
 export const extractTimeFromISO = (isoString) => {
     if (!isoString) return '';
 
@@ -63,13 +63,48 @@ export const extractTimeFromISO = (isoString) => {
         }
 
         return new Intl.DateTimeFormat('en-US', {
-            timeZone: 'UTC',
             hour: 'numeric',
             minute: '2-digit',
             hour12: true,
         }).format(date);
     } catch (error) {
         console.warn('Error extracting time from ISO string:', isoString, error);
+        return '';
+    }
+};
+
+// GLOBAL FUNCTION: formats any date string/object to 12h local time (AM/PM)
+export const formatTime12h = (dateInput) => {
+    if (!dateInput) return '';
+    try {
+        const date = new Date(dateInput);
+        if (isNaN(date.getTime())) return '';
+
+        return date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+            timeZone: 'UTC'   // ✅ FIX
+        });
+    } catch (error) {
+        console.error("Error formatting time:", error);
+        return '';
+    }
+};
+
+// GLOBAL FUNCTION: formats to local date
+export const formatDateLocal = (dateInput) => {
+    if (!dateInput) return '';
+    try {
+        const date = new Date(dateInput);
+        if (isNaN(date.getTime())) return '';
+
+        return date.toLocaleDateString('en-US', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        });
+    } catch (error) {
         return '';
     }
 };
@@ -113,7 +148,6 @@ export const FormatDateIST = (date, formatOptions) => {
             hour: "2-digit",
             minute: "2-digit",
             hour12: true,
-            timeZone: "UTC",
         });
 
         return { date: formattedDate, time: formattedTime };

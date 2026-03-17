@@ -15,8 +15,7 @@ export const fetchGroupDetails = async (conversationId, auth, fLabel = "Group ( 
                 status: response.Status,
                 message: response.Message,
                 groupDetails: response.Data.rd?.[0] || null,
-                members: response.Data.rd1 || [],
-                media: response.Data.rd2 || []
+                members: response.Data.rd1 || []
             };
         }
         return null;

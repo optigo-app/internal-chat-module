@@ -8,12 +8,12 @@ import { LoginContext } from '../../context/LoginData';
 import MessageContextMenu from '../MessageBubble/MessageContextMenu';
 import ForwardMessage from '../ForwardMessage/ForwardMessage';
 import MediaViewer from '../MediaViewer/MediaViewer';
-import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig, hasCustomerName } from '../../utils/globalFunc';
+import { getCustomerDisplayName } from '../../utils/globalFunc';
 import ChatBox from './ChatBox';
 import MessageArea from './MessageArea';
 import ViewContext from './ViewContext';
 import { useConversation } from './useConversation';
-import PersonIcon from '@mui/icons-material/Person';
+import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { addReactionApi } from '../../API/SendMessage/addReactionApi';
 import { removeReactionApi } from '../../API/SendMessage/removeReactionApi';
@@ -28,6 +28,7 @@ import { removeMemberApi } from '../../API/Groups/RemoveMemberApi';
 import { fetchGroupDetails } from '../../API/Groups/FetchGroupDetails';
 import { updateConversationApi } from '../../API/SendMessage/updateConversationApi';
 import { clearChatApi } from '../../API/ClearChat/ClearChatApi';
+import { deleteConversationApi } from '../../API/ConversationView/DeleteConversationApi';
 import { useFavorite } from '../../contexts/FavoriteContext';
 import { useRemoveInGroup } from '../../contexts/RemoveInGroupContext';
 import { useGroupSocket } from '../../contexts/GroupSocketContext';
@@ -41,7 +42,8 @@ import {
     X,
     Trash2,
     LogOut,
-    Star
+    Star,
+    Search
 } from 'lucide-react';
 
 const Conversation = ({ selectedCustomer, onConversationRead, onViewConversationRead, onCustomerSelect }) => {
@@ -72,6 +74,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         isOpen: false,
         actionType: null // 'exitGroup' | 'adminCannotLeave'
     });
+    const [drawerViewState, setDrawerViewState] = useState('info');
+    const [selectedMessageForInfo, setSelectedMessageForInfo] = useState(null);
     const messagesRef = useRef(null);
 
     // Use Context for global favorite state management
@@ -87,7 +91,11 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const isFavorite = favoriteState[selectedCustomer?.ConversationId]?.isStar ?? (selectedCustomer?.IsStar === 1);
 
     // Get removed from group status from Context state or fallback to selectedCustomer prop
-    const isRemovedFromCurrentGroup = isRemovedFromGroup(selectedCustomer?.ConversationId) || (selectedCustomer?.RemoveInGroup === 1);
+    const contextRemovedStatus = isRemovedFromGroup(selectedCustomer?.ConversationId);
+    // Use context value if it exists, otherwise fallback to prop
+    const isRemovedFromCurrentGroup = contextRemovedStatus !== null && contextRemovedStatus !== undefined
+        ? contextRemovedStatus
+        : (selectedCustomer?.RemoveInGroup === 1);
 
     // Update RemoveInGroup context when selectedCustomer data changes
     useEffect(() => {
@@ -95,6 +103,22 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
             updateRemoveInGroupStatus(selectedCustomer.ConversationId, selectedCustomer.RemoveInGroup === 1);
         }
     }, [selectedCustomer?.ConversationId, selectedCustomer?.RemoveInGroup, updateRemoveInGroupStatus]);
+
+    // Close drawer when switching conversations
+    useEffect(() => {
+        setDrawerOpen(false);
+        setDrawerViewState('info');
+    }, [selectedCustomer?.ConversationId]);
+
+    const handleOpenSearch = () => {
+        setDrawerViewState('search');
+        setDrawerOpen(true);
+    };
+
+    const handleOpenInfo = () => {
+        setDrawerViewState('info');
+        setDrawerOpen(true);
+    };
 
     const isNarrowScreen = useMediaQuery('(max-width: 992px)');
     const isTopPanelScreen = useMediaQuery('(max-width: 1620px)');
@@ -147,10 +171,14 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         handleForward,
         handleSendForward,
         scrollToMessage,
+        searchMessages,
         getMessageStatusIcon,
         processFiles,
         refresh,
-    } = useConversation(selectedCustomer, onConversationRead, onViewConversationRead);
+        addUniqueMessage,
+        searchResults,
+        isSearching,
+    } = useConversation(selectedCustomer, onConversationRead, onViewConversationRead, drawerOpen);
 
     // Group socket event listeners with callback-based approach (no state updates in context)
     useEffect(() => {
@@ -163,20 +191,25 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         const callbacks = {
             onGroupEvent: (data) => {
                 if (data.conversationId !== conversationId) return;
-                
+
+                // Insert system message if present
+                if (data.conversationData && addUniqueMessage) {
+                    addUniqueMessage(data.conversationData);
+                }
+
                 // Map event types to notification templates
                 const eventNotificationMap = {
                     'group_created': 'GROUP_CREATED',
                     'group_updated': 'GROUP_UPDATED',
                 };
-                
+
                 const notificationTemplate = eventNotificationMap[data.eventType];
-                
+
                 // Show browser notification
                 if (notificationTemplate) {
                     notify(data, notificationTemplate, auth);
                 }
-                
+
                 // Show toast notification
                 const eventMessages = {
                     'group_created': 'Group created',
@@ -184,20 +217,28 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     'group_deleted': 'Group deleted',
                     'group_info_request': 'Group info requested'
                 };
-                
+
                 const message = eventMessages[data.eventType] || 'Group event';
                 toast(message);
 
-                // Refresh conversation
-                if (refresh) {
+                // Skip refresh for common updates as we now use addUniqueMessage
+                const shouldSkipRefresh = ['group_updated', 'group_created'].includes(data.eventType);
+
+                // Refresh conversation only if necessary
+                if (refresh && !shouldSkipRefresh) {
                     setTimeout(() => refresh(), 500);
                 }
             },
             onMemberEvent: (data) => {
                 if (data.conversationId !== conversationId) return;
 
+                // Insert system message if present
+                if (data.conversationData && addUniqueMessage) {
+                    addUniqueMessage(data.conversationData);
+                }
+
                 // Check if current user was removed
-                const isCurrentUserRemoved = data.eventType === 'member_removed' && 
+                const isCurrentUserRemoved = data.eventType === 'member_removed' &&
                     Number(data.removedMemberId) === Number(currentUserId);
 
                 // Map event types to notification templates
@@ -207,9 +248,9 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     'member_promoted': 'MEMBER_PROMOTED',
                     'member_demoted': 'MEMBER_DEMOTED'
                 };
-                
+
                 const notificationTemplate = eventNotificationMap[data.eventType];
-                
+
                 // Show browser notification
                 if (notificationTemplate) {
                     notify(data, notificationTemplate, auth);
@@ -222,18 +263,30 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     'member_promoted': `${data.memberName || 'Member'} promoted to admin`,
                     'member_demoted': `${data.memberName || 'Member'} demoted from admin`
                 };
-                
+
                 const message = eventMessages[data.eventType] || 'Member event';
 
                 if (isCurrentUserRemoved) {
                     updateRemoveInGroupStatus(conversationId, true);
                     toast.error('You were removed from this group');
+                } else if (data.eventType === 'member_added') {
+                    // Check if WE were added (or re-added)
+                    const isCurrentUserAdded = data.newMemberIds?.some(id => Number(id) === Number(currentUserId));
+                    if (isCurrentUserAdded) {
+                        updateRemoveInGroupStatus(conversationId, false);
+                        toast.success('You were added to the group');
+                    } else {
+                        toast(message);
+                    }
                 } else {
                     toast(message);
                 }
 
-                // Refresh conversation
-                if (refresh) {
+                // Skip refresh for standard member events as we now use addUniqueMessage
+                const shouldSkipRefresh = ['member_added', 'member_removed', 'member_promoted', 'member_demoted'].includes(data.eventType);
+
+                // Only refresh if necessary
+                if (refresh && !shouldSkipRefresh) {
                     setTimeout(() => refresh(), 500);
                 }
             },
@@ -261,7 +314,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
             unregisterListener(conversationId);
         };
     }, [
-        selectedCustomer?.ConversationId, 
+        selectedCustomer?.ConversationId,
         selectedCustomer?.IsGroup,
         auth?.id,
         auth?.userId,
@@ -391,7 +444,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 const senderId = auth?.id ?? auth?.userId;
                 const isGroup = selectedCustomer?.IsGroup === 1;
                 let receiverIdValue;
-                
+
                 if (isGroup) {
                     // For groups, ReceiverId is an array of all member IDs
                     try {
@@ -409,7 +462,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     // For 1-to-1, ReceiverId is a single value
                     receiverIdValue = selectedCustomer?.ReceiverId;
                 }
-                
+
                 if (receiverIdValue && senderId && auth?.ufcc) {
                     const socketReactionEmojis = reactionPayload === ""
                         ? JSON.stringify([{ Reaction: "", Direction: 0 }])
@@ -429,8 +482,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     if (isGroup) {
                         reactionPayloadData.IsGroup = 1;
                         reactionPayloadData.UserName = auth?.username || auth?.name;
-                        reactionPayloadData.FirstName = auth?.firstName;
-                        reactionPayloadData.LastName = auth?.lastName;
+                        reactionPayloadData.FirstName = auth?.firstName || auth?.FirstName;
+                        reactionPayloadData.LastName = auth?.lastName || auth?.LastName;
                     }
 
                     emitSendReaction(reactionPayloadData);
@@ -798,6 +851,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const handleMenuAction = useCallback(async (action) => {
         setHeaderMenuAnchorEl(null);
         if (action === 'groupInfo') {
+            setDrawerViewState('info');
             setDrawerOpen(true);
         } else if (action === 'close') {
             onCustomerSelect(null);
@@ -815,11 +869,11 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
             });
         } else if (action === 'exitGroup') {
             await checkAdminStatusAndShowConfirmation();
-        } else if (action === 'deleteGroup') {
-            // Show confirmation for deleting group conversation
+        } else if (action === 'deleteGroup' || action === 'deleteChat') {
+            // Show confirmation for deleting conversation
             setConfirmationModal({
                 isOpen: true,
-                actionType: 'deleteGroup'
+                actionType: action
             });
         }
     }, [onCustomerSelect, handleToggleFavorite, checkAdminStatusAndShowConfirmation]);
@@ -848,20 +902,29 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         }
     }, [selectedCustomer, auth, onCustomerSelect, refresh]);
 
-    const handleConfirmDeleteGroup = useCallback(async () => {
+    const handleConfirmDeleteChat = useCallback(async () => {
         try {
-            // For now, just close the conversation and show success message
-            // In the future, this could call a delete conversation API
-            toast.success('Group conversation deleted');
-            setConfirmationModal({ isOpen: false, actionType: null });
-            onCustomerSelect(null);
-            refresh();
+            const response = await deleteConversationApi(auth, {
+                conversationId: selectedCustomer.ConversationId
+            });
+
+            if (response?.Status === "200" || response?.success === true) {
+                toast.success('Conversation deleted');
+                setConfirmationModal({ isOpen: false, actionType: null });
+                onCustomerSelect(null);
+                window.dispatchEvent(new CustomEvent('DELETE_CONVERSATION', {
+                    detail: { conversationId: selectedCustomer.ConversationId }
+                }));
+            } else {
+                toast.error(response?.Message || 'Failed to delete conversation');
+                setConfirmationModal({ isOpen: false, actionType: null });
+            }
         } catch (error) {
-            console.error('Error deleting group conversation:', error);
+            console.error('Error deleting conversation:', error);
             setConfirmationModal({ isOpen: false, actionType: null });
-            toast.error('Error deleting group conversation');
+            toast.error('Error deleting conversation');
         }
-    }, [onCustomerSelect, refresh]);
+    }, [selectedCustomer, auth, onCustomerSelect]);
 
     const handleConfirmClearChat = useCallback(async () => {
         try {
@@ -897,11 +960,16 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         { label: isFavorite ? 'Remove from favourite' : 'Add to favourite', action: 'favourite', icon: <Star size={18} fill={isFavorite ? '#FFD700' : 'none'} color={isFavorite ? '#FFD700' : 'currentColor'} /> },
         { label: 'Close chat', action: 'close', icon: <X size={18} /> },
         { divider: true },
-        { label: 'Clear chat', action: 'clearChat', icon: <Trash2 size={18} />, danger: true },
-        ...(selectedCustomer?.IsGroup === 1
+        {
+            label: (selectedCustomer?.IsGroup === 1 && isRemovedFromCurrentGroup) ? 'Delete group' : 'Delete chat',
+            action: (selectedCustomer?.IsGroup === 1 && isRemovedFromCurrentGroup) ? 'deleteGroup' : 'deleteChat',
+            icon: <Trash2 size={18} />,
+            danger: true
+        },
+        ...(selectedCustomer?.IsGroup === 1 && !isRemovedFromCurrentGroup
             ? [{
-                label: isRemovedFromCurrentGroup ? 'Delete group' : 'Exit group',
-                action: isRemovedFromCurrentGroup ? 'deleteGroup' : 'exitGroup',
+                label: 'Exit group',
+                action: 'exitGroup',
                 icon: <LogOut size={18} />,
                 danger: true
             }]
@@ -957,6 +1025,12 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const handleSendMessageCallback = useCallback((messageOverride) => {
         handleSendMessage(containerRef, scrollToBottom, messageOverride);
     }, [handleSendMessage, scrollToBottom]);
+
+    const handleMessageInfo = useCallback((message) => {
+        setSelectedMessageForInfo(message);
+        setDrawerViewState('messageInfo');
+        setDrawerOpen(true);
+    }, []);
 
     if (!isOnline) {
         return (
@@ -1017,23 +1091,14 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     {!showFullDetails && (
                         <div className="conversation-header">
                             <div className="header-left">
-                                <div style={{ width: 40, height: 40, marginRight: 10, cursor: "pointer" }}>
-                                    {!hasCustomerName(selectedCustomer) ? (
-                                        <Avatar
-                                            {...getWhatsAppAvatarConfig(getCustomerAvatarSeed(selectedCustomer), 40)}
-                                            onClick={() => setDrawerOpen(true)}
-                                        >
-                                            <PersonIcon fontSize="small" />
-                                        </Avatar>
-                                    ) : (
-                                        <Avatar
-                                            {...(selectedCustomer?.avatarConfig || getWhatsAppAvatarConfig(getCustomerAvatarSeed(selectedCustomer), 40))}
-                                            onClick={() => setDrawerOpen(true)}
-                                        />
-                                    )}
+                                <div 
+                                    style={{ width: 40, height: 40, marginRight: 10, cursor: "pointer" }}
+                                    onClick={handleOpenInfo}
+                                >
+                                    <ConversationAvatar member={selectedCustomer} size={40} />
                                 </div>
                                 <div className="customer-info">
-                                    <Typography variant="subtitle1" className="customer-name" onClick={() => setDrawerOpen(true)} style={{ cursor: 'pointer' }}>
+                                    <Typography variant="subtitle1" className="customer-name" onClick={handleOpenInfo} style={{ cursor: 'pointer' }}>
                                         {getCustomerDisplayName(selectedCustomer)}
                                     </Typography>
                                     {selectedCustomer?.IsGroup === 1 ? (
@@ -1062,6 +1127,15 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                         <RefreshIcon fontSize="small" />
                                     </IconButton>
                                 </Tooltip>
+                                <Tooltip title="Search messages">
+                                    <IconButton
+                                        onClick={handleOpenSearch}
+                                        size="small"
+                                        sx={{ color: '#6b7280', '&:hover': { color: '#374151', backgroundColor: 'rgba(0,0,0,0.04)' } }}
+                                    >
+                                        <Search size={20} />
+                                    </IconButton>
+                                </Tooltip>
                                 <Tooltip title="More options">
                                     <IconButton
                                         size="small"
@@ -1082,6 +1156,10 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                 onClose={() => setDrawerOpen(false)}
                                 open={drawerOpen}
                                 variant="panel"
+                                initialViewState={drawerViewState}
+                                messageInfo={selectedMessageForInfo}
+                                messages={messages}
+                                scrollToMessage={scrollToMessage}
                             />
                         </div>
                     ) : (
@@ -1159,6 +1237,14 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                             onClose={() => setDrawerOpen(false)}
                             open={drawerOpen}
                             variant="drawer"
+                            initialViewState={drawerViewState}
+                            messageInfo={selectedMessageForInfo}
+                            messages={messages}
+                            scrollToMessage={scrollToMessage}
+                            searchResults={searchResults}
+                            isSearching={isSearching}
+                            onSearchMessages={searchMessages}
+                            containerRef={containerRef}
                         />
                     ) : (
                         !isTopPanelScreen ? (
@@ -1168,6 +1254,14 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                     onClose={() => setDrawerOpen(false)}
                                     open={drawerOpen}
                                     variant="panel"
+                                    initialViewState={drawerViewState}
+                                    messageInfo={selectedMessageForInfo}
+                                    messages={messages}
+                                    scrollToMessage={scrollToMessage}
+                                    searchResults={searchResults}
+                                    isSearching={isSearching}
+                                    onSearchMessages={searchMessages}
+                                    containerRef={containerRef}
                                 />
                             </div>
                         ) : null
@@ -1190,6 +1284,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 onClose={() => setMessageContextMenu(null)}
                 onReply={handleReply}
                 onForward={handleForward}
+                onMessageInfo={handleMessageInfo}
                 message={messageContextMenu?.message}
                 mouseX={messageContextMenu?.mouseX}
                 mouseY={messageContextMenu?.mouseY}
@@ -1227,8 +1322,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 onClose={() => setConfirmationModal({ isOpen: false, actionType: null })}
                 onConfirm={confirmationModal.actionType === 'adminCannotLeave'
                     ? () => setConfirmationModal({ isOpen: false, actionType: null })
-                    : confirmationModal.actionType === 'deleteGroup'
-                        ? handleConfirmDeleteGroup
+                    : (confirmationModal.actionType === 'deleteGroup' || confirmationModal.actionType === 'deleteChat')
+                        ? handleConfirmDeleteChat
                         : confirmationModal.actionType === 'clearChat'
                             ? handleConfirmClearChat
                             : handleConfirmExitGroup
@@ -1236,8 +1331,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 title={
                     confirmationModal.actionType === 'adminCannotLeave'
                         ? 'Cannot Leave Group'
-                        : confirmationModal.actionType === 'deleteGroup'
-                            ? 'Delete Group?'
+                        : (confirmationModal.actionType === 'deleteGroup' || confirmationModal.actionType === 'deleteChat')
+                            ? 'Delete Chat?'
                             : confirmationModal.actionType === 'clearChat'
                                 ? 'Clear Chat?'
                                 : 'Exit Group?'
@@ -1245,8 +1340,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 description={
                     confirmationModal.actionType === 'adminCannotLeave'
                         ? 'You cannot leave the group because you are the only administrator. Please assign another admin before leaving.'
-                        : confirmationModal.actionType === 'deleteGroup'
-                            ? 'Are you sure you want to delete this group conversation? This will remove the conversation from your chat list.'
+                        : (confirmationModal.actionType === 'deleteGroup' || confirmationModal.actionType === 'deleteChat')
+                            ? 'Are you sure you want to delete this conversation? This will remove it from your chat list.'
                             : confirmationModal.actionType === 'clearChat'
                                 ? 'Are you sure you want to clear all messages in this chat?'
                                 : 'Are you sure you want to exit this group?'
@@ -1254,13 +1349,13 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 confirmText={
                     confirmationModal.actionType === 'adminCannotLeave'
                         ? 'OK'
-                        : confirmationModal.actionType === 'deleteGroup'
+                        : (confirmationModal.actionType === 'deleteGroup' || confirmationModal.actionType === 'deleteChat')
                             ? 'Delete'
                             : confirmationModal.actionType === 'clearChat'
                                 ? 'Clear'
                                 : 'Exit'
                 }
-                variant={['exitGroup', 'deleteGroup', 'clearChat'].includes(confirmationModal.actionType) ? 'danger' : 'primary'}
+                variant={['exitGroup', 'deleteGroup', 'deleteChat', 'clearChat'].includes(confirmationModal.actionType) ? 'danger' : 'primary'}
                 showCancel={confirmationModal.actionType !== 'adminCannotLeave'}
             />
         </Box>

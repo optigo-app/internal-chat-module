@@ -29,11 +29,21 @@ export const assignRoleApi = async (auth, { conversationId, memberId, currentIsA
             const allMemberIds = await getGroupMemberIds(conversationId, auth);
             const isPromotion = currentIsAdmin === 0; // If was not admin, now promoted
             
+            const rd = response?.Data?.rd?.[0] || (Array.isArray(response?.rd) ? response.rd[0] : (response?.Data?.rd || response?.rd));
+
+            // Enrich conversationData with necessary fields
+            const enrichedRd = {
+                ...rd,
+                ConversationId: Number(conversationId),
+                SystemMsg: 1
+            };
+
             const eventData = {
                 ufcc: auth?.ufcc,
                 eventType: isPromotion ? 'member_promoted' : 'member_demoted',
                 conversationId: Number(conversationId),
                 ReceiverId: allMemberIds, // Array of all member IDs
+                conversationData: enrichedRd, // Pass enriched group record
                 changedBy: {
                     userId: auth?.id || auth?.userId,
                     name: auth?.username || auth?.name,

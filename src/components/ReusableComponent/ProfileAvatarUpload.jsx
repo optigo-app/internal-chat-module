@@ -210,12 +210,10 @@ const ProfileAvatarUpload = ({
         try {
             // Step 1: Remove existing image if it exists
             if (hasExistingImage) {
-                console.log('Removing existing image before upload...');
                 await removeExistingImage();
             }
 
             // Step 2: Upload new image
-            console.log('Uploading new image...');
             const uploadedFiles = await uploadMediaAPi({
                 folderName,
                 files: [file],
@@ -227,7 +225,7 @@ const ProfileAvatarUpload = ({
             if (uploadedFiles && Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
                 const uploadedFile = uploadedFiles[0];
                 const imageUrl = uploadedFile?.FileUrl || uploadedFile?.fileUrl || uploadedFile?.Url || uploadedFile?.url || uploadedFile?.path;
-                
+
                 if (!imageUrl) {
                     throw new Error('Failed to get image URL from upload');
                 }
@@ -242,45 +240,6 @@ const ProfileAvatarUpload = ({
             }
         } catch (error) {
             console.error('Error in upload process:', error);
-            // Restore previous preview on error
-            setPreviewImage(currentImageUrl);
-            
-            if (onUploadError) {
-                onUploadError(error);
-            } else {
-                toast.error('Error uploading photo');
-            }
-        } finally {
-            setIsUploading(false);
-        }
-    };
-
-    const uploadPhoto = async (file) => {
-        setIsUploading(true);
-        try {
-            const uploadedFiles = await uploadMediaAPi({
-                folderName,
-                files: [file],
-                onProgress: (progress) => {
-                    console.log('Upload progress:', progress);
-                }
-            });
-            if (uploadedFiles && Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
-                const uploadedFile = uploadedFiles[0];
-                const imageUrl = uploadedFile?.FileUrl || uploadedFile?.fileUrl || uploadedFile?.Url || uploadedFile?.url || uploadedFile?.path;
-                if (!imageUrl) {
-                    throw new Error('Failed to get image URL from upload');
-                }
-                if (onUploadComplete) {
-                    onUploadComplete(imageUrl, file);
-                } else {
-                    toast.success('Photo uploaded successfully');
-                }
-            } else {
-                throw new Error('Upload failed - no files returned');
-            }
-        } catch (error) {
-            console.error('Error uploading photo:', error);
             setPreviewImage(currentImageUrl);
             if (onUploadError) {
                 onUploadError(error);

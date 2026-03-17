@@ -122,28 +122,52 @@ export const getSoftAvatarColors = (seed) => {
 };
 
 export const hasCustomerName = (customer) => {
-    const name = (customer?.MemberName ?? customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? customer.Name) ?? '';
+    const name = (
+        customer?.MemberName ?? 
+        customer?.ConversationName ?? 
+        customer?.name ?? 
+        customer?.UserName ?? 
+        customer?.CustomerName ?? 
+        customer?.Name ?? 
+        customer?.SenderInfo ??
+        (customer?.FirstName || customer?.LastName ? `${customer?.FirstName || ''} ${customer?.LastName || ''}`.trim() : null)
+    ) ?? '';
     return Boolean(String(name ?? '').trim());
 };
 
 export const getCustomerDisplayName = (customer) => {
-    const name = String(customer?.MemberName ?? customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? customer.Name ?? '').trim();
+    const name = String(
+        customer?.MemberName ?? 
+        customer?.ConversationName ?? 
+        customer?.name ?? 
+        customer?.UserName ?? 
+        customer?.CustomerName ?? 
+        customer?.Name ?? 
+        customer?.SenderInfo ??
+        (customer?.FirstName || customer?.LastName ? `${customer?.FirstName || ''} ${customer?.LastName || ''}`.trim() : '')
+    ).trim();
     if (name) return name;
 
-    const email = String(customer?.UserEmail ?? '').trim();
+    const email = String(customer?.UserEmail ?? customer?.SenderEmail ?? '').trim();
     if (email) return email;
-
-    const fallback = String(customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? '').trim();
-    if (fallback) return fallback;
 
     return 'Unknown';
 };
 
 export const getCustomerAvatarSeed = (customer) => {
-    const name = String(customer?.MemberName ?? customer?.ConversationName ?? customer?.name ?? customer?.UserName ?? customer?.CustomerName ?? '').trim();
+    const name = String(
+        customer?.MemberName ?? 
+        customer?.ConversationName ?? 
+        customer?.name ?? 
+        customer?.UserName ?? 
+        customer?.CustomerName ?? 
+        customer?.Name ?? 
+        customer?.SenderInfo ??
+        (customer?.FirstName || customer?.LastName ? `${customer?.FirstName || ''} ${customer?.LastName || ''}`.trim() : '')
+    ).trim();
     if (name) return name;
 
-    const email = String(customer?.UserEmail ?? '').trim();
+    const email = String(customer?.UserEmail ?? customer?.SenderEmail ?? '').trim();
     if (email) return email;
 
     return 'Unknown';
@@ -367,3 +391,23 @@ export async function compressImagesToWebP(files, customOptions = {}) {
 }
 
 
+export const getTimeLabel = (input) => {
+    if (!input) return "";
+    const date = new Date(input);
+    if (isNaN(date.getTime())) return "";
+
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday = date.toDateString() === yesterday.toDateString();
+
+    if (isToday) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else if (isYesterday) {
+        return "Yesterday";
+    } else {
+        return date.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' });
+    }
+};

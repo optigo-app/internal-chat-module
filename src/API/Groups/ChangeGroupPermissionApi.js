@@ -17,7 +17,7 @@ export const changeGroupPermissionApi = async (auth, { conversationId, permissio
         // Emit socket event if permission changed successfully
         if (response?.Status === "200") {
             const allMemberIds = await getGroupMemberIds(conversationId, auth);
-            
+
             emitPermissionChanged({
                 ufcc: auth?.ufcc,
                 eventType: 'permission_changed',

@@ -7,6 +7,7 @@ export const conversationView = async (
     auth,
     pageName,
     signal,
+    SearchMsg = "",
     fLabel = "Chat ( list )"
 ) => {
     try {
@@ -15,6 +16,7 @@ export const conversationView = async (
             PageSize,
             ConversationId,
             UserId: auth?.id,
+            SearchMsg: SearchMsg || ""
         };
 
         const body = buildCommonBody("GetMessages", auth, payload, fLabel);
