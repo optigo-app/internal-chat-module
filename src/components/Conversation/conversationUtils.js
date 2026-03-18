@@ -194,6 +194,23 @@ export const normalizeServerMessages = (messagesArray, auth) => {
             ContextType: contextType,
             ContextId: contextId,
             ReplyContextMsg: replyContextMsg,
+            ReplyToAttachmentId: (() => {
+                const raw = msg.ReplyToAttachmentId;
+                if (!raw) return null;
+                const str = String(raw).trim();
+                // Handle JSON array format: "[47]" or "[43, 44]"
+                if (str.startsWith('[')) {
+                    try {
+                        const parsed = JSON.parse(str);
+                        if (Array.isArray(parsed)) {
+                            return parsed.filter(Boolean).join(',') || null;
+                        }
+                    } catch (_) { /* fall through */ }
+                }
+                // Already a plain id or comma-separated: "43" or "43,44"
+                return str || null;
+            })(),
+            ReplyToSenderName: msg.ReplyToSenderName || null,
             ...(!forceTextReply && attachmentUrl ? { previewUrl: attachmentUrl } : {}),
             ...(!forceTextReply && attachmentName ? { fileName: attachmentName } : {}),
             ...(!forceTextReply && attachmentMime ? { fileType: attachmentMime } : {}),

@@ -17,7 +17,7 @@ import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { addReactionApi } from '../../API/SendMessage/addReactionApi';
 import { removeReactionApi } from '../../API/SendMessage/removeReactionApi';
-import { emitSendReaction } from '../../socket';
+import { emitSendReaction, emitRemoveReaction } from '../../socket';
 import useOnlineStatus from '../../utils/internetCheck';
 import OfflineOverlay from './OfflineOverlay';
 import AddMemberDialog from '../ReusableComponent/AddMemberDialog';
@@ -38,7 +38,6 @@ import {
     Info,
     CheckSquare,
     BellOff,
-    Heart,
     X,
     Trash2,
     LogOut,
@@ -465,8 +464,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
 
                 if (receiverIdValue && senderId && auth?.ufcc) {
                     const socketReactionEmojis = reactionPayload === ""
-                        ? JSON.stringify([{ Reaction: "", Direction: 0 }])
-                        : JSON.stringify([{ Reaction: nextEmoji, Unified: nextUnified, Direction: 0 }]);
+                        ? JSON.stringify([{ Reaction: "", Direction: 0, UserId: senderId }])
+                        : JSON.stringify([{ Reaction: nextEmoji, Unified: nextUnified, Direction: 0, UserId: senderId }]);
 
                     const reactionPayloadData = {
                         ufcc: auth?.ufcc,
@@ -542,6 +541,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
 
             const response = await removeReactionApi(auth, { messageId: messageIdToUse });
             if (response) {
+                // Optimistic local update
                 setMessages(prev => {
                     const prevData = Array.isArray(prev) ? prev : prev?.data || [];
                     const updatedData = prevData.map(m => {
@@ -567,13 +567,51 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     });
                     return Array.isArray(prev) ? updatedData : { ...prev, data: updatedData };
                 });
+
+                // Notify other participants via socket
+                const senderId = auth?.id ?? auth?.userId;
+                const isGroup = selectedCustomer?.IsGroup === 1;
+                let receiverIdValue;
+
+                if (isGroup) {
+                    try {
+                        const groupData = await fetchGroupDetails(selectedCustomer.ConversationId, auth);
+                        receiverIdValue = groupData?.members
+                            ? groupData.members.map(m => m.UserId)
+                            : [selectedCustomer?.ReceiverId];
+                    } catch {
+                        receiverIdValue = [selectedCustomer?.ReceiverId];
+                    }
+                } else {
+                    receiverIdValue = selectedCustomer?.ReceiverId;
+                }
+
+                if (receiverIdValue && senderId && auth?.ufcc) {
+                    emitRemoveReaction({
+                        ufcc: auth?.ufcc,
+                        userId: senderId,
+                        SenderId: senderId,
+                        ReceiverId: receiverIdValue,
+                        ConversationId: selectedCustomer?.ConversationId,
+                        MessageId: messageIdToUse,
+                        // Signal to receiver that this is a removal: empty Reaction, Direction 0
+                        ReactionEmojis: JSON.stringify([{ Reaction: '', Direction: 0, UserId: senderId }]),
+                        ...(isGroup && {
+                            IsGroup: 1,
+                            UserName: auth?.username || auth?.name,
+                            FirstName: auth?.firstName || auth?.FirstName,
+                            LastName: auth?.lastName || auth?.LastName,
+                        }),
+                    });
+                }
+
                 toast.success("Reaction removed!");
             }
         } catch (error) {
             console.error("Error removing reaction:", error);
             toast.error("Failed to remove reaction");
         }
-    }, [auth]);
+    }, [auth, selectedCustomer]);
 
     const captureMessageScrollState = useCallback(() => {
         const el = containerRef.current;
@@ -1091,7 +1129,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     {!showFullDetails && (
                         <div className="conversation-header">
                             <div className="header-left">
-                                <div 
+                                <div
                                     style={{ width: 40, height: 40, marginRight: 10, cursor: "pointer" }}
                                     onClick={handleOpenInfo}
                                 >

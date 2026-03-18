@@ -401,14 +401,66 @@ const MessageContent = ({
                                     return original?.SenderInfo || original?.Sender || (msg.SenderInfo != '' ? msg.SenderInfo : msg.Sender);
                                 })();
 
-                            const specificMedia = (msg.ReplyToAttachmentId && original?.mediaItems)
-                                ? original.mediaItems.find(item =>
-                                    (item.attachmentId === msg.ReplyToAttachmentId || item.AttachmentId === msg.ReplyToAttachmentId || item.Id === msg.ReplyToAttachmentId || item.id === msg.ReplyToAttachmentId)
-                                )
-                                : null;
-                            const specificMediaUrl = specificMedia?.url || specificMedia?.src;
-                            const fallbackMediaUrl = original?.previewUrl || original?.mediaItems?.[0]?.url || original?.mediaItems?.[0]?.src;
-                            const replyMediaUrl = specificMediaUrl || fallbackMediaUrl;
+                            // --- Reply Thumbnail Resolution ---
+                            // ReplyToAttachmentId can be a single id ("43") or comma-separated ("43,44,45")
+                            // The server embeds the referenced Attachments inside the reply message itself,
+                            // so we parse msg.Attachments first — no need to track the original message.
+                            const rawReplyAttachId = msg.ReplyToAttachmentId;
+                            const replyAttachIds = rawReplyAttachId
+                                ? String(rawReplyAttachId).split(',').map(s => s.trim()).filter(Boolean)
+                                : [];
+                            const firstReplyAttachId = replyAttachIds[0] || null;
+
+                            // Helper: parse an Attachments field (string JSON or array)
+                            const parseAttachments = (raw) => {
+                                if (!raw) return [];
+                                try {
+                                    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                                    return Array.isArray(parsed) ? parsed : [];
+                                } catch (_) { return []; }
+                            };
+
+                            // Helper: find first matching attachment from an array by ID
+                            const findByReplyId = (arr) => arr.find(a => {
+                                const id = String(a?.Id || a?.id || a?.attachmentId || a?.AttachmentId || '');
+                                return replyAttachIds.includes(id);
+                            });
+
+                            // 1. PRIMARY: Parse Attachments from the reply message itself
+                            let replyMediaUrl = null;
+                            if (firstReplyAttachId) {
+                                const msgAttachments = parseAttachments(msg.Attachments);
+                                const matched = findByReplyId(msgAttachments);
+                                if (matched) {
+                                    replyMediaUrl = matched.FileUrl || matched.fileUrl || matched.Url || matched.url;
+                                }
+                            }
+
+                            // 2. FALLBACK: Check original message's normalized mediaItems (in-memory)
+                            if (!replyMediaUrl && firstReplyAttachId && original?.mediaItems) {
+                                const matchedItem = original.mediaItems.find(item => {
+                                    const id = String(item.attachmentId || item.AttachmentId || item.Id || item.id || '');
+                                    return replyAttachIds.includes(id);
+                                });
+                                replyMediaUrl = matchedItem?.url || matchedItem?.src || null;
+                            }
+
+                            // 3. FALLBACK: Check original message's raw Attachments JSON
+                            if (!replyMediaUrl && firstReplyAttachId && original?.Attachments) {
+                                const origAttachments = parseAttachments(original.Attachments);
+                                const matched = findByReplyId(origAttachments);
+                                if (matched) {
+                                    replyMediaUrl = matched.FileUrl || matched.fileUrl || matched.url || matched.Url;
+                                }
+                            }
+
+                            // 4. LAST RESORT: Show the first media of the original regardless of ID
+                            if (!replyMediaUrl) {
+                                replyMediaUrl = original?.previewUrl
+                                    || original?.mediaItems?.[0]?.url
+                                    || original?.mediaItems?.[0]?.src
+                                    || null;
+                            }
 
                             return (
                                 <div className="reply-preview" style={{
@@ -541,7 +593,7 @@ const MessageContent = ({
                                                 border: `1px solid ${alpha(theme.palette.text.primary, 0.08)}`
                                             }}
                                         >
-                                            {specificMedia?.mimeType?.startsWith('video/') || String(replyMediaUrl).includes('.mp4') ? (
+                                            {String(replyMediaUrl).match(/\.(mp4|webm|ogg|mov)(\?|$)/i) ? (
                                                 <video
                                                     src={replyMediaUrl}
                                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}

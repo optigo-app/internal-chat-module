@@ -113,6 +113,8 @@ export function initializeSocket(token) {
 
     socketInstance.on('internal:reaction_receive', dispatchReactionEvent);
     socketInstance.on('internal:reaction_send', dispatchReactionEvent);
+    socketInstance.on('internal:reaction_remove_receive', dispatchReactionEvent);
+    socketInstance.on('internal:reaction_remove', dispatchReactionEvent);
 
     socketInstance.on('internal:msg_receive', (data) => {
         internalMessageHandlers.forEach(handler => {
@@ -177,16 +179,10 @@ export function initializeSocket(token) {
     return socketInstance;
 }
 
-/**
- * Get the current socket instance
- */
 export const getSocket = () => {
     return socketInstance;
 };
 
-/**
- * Check if socket is connected and authenticated
- */
 export const isSocketConnected = () => {
     const state = socketInstance?.connected && isAuthenticated;
     if (!state && !socketInstance) {
@@ -207,16 +203,10 @@ export const isSocketConnected = () => {
     return state;
 };
 
-/**
- * Check if user is authenticated
- */
 export const isSocketAuthenticated = () => {
     return isAuthenticated;
 };
 
-/**
- * Add a handler for session logout
- */
 export const addSessionLogoutHandler = (handler) => {
     sessionLogout.add(handler);
     return () => {
@@ -224,9 +214,6 @@ export const addSessionLogoutHandler = (handler) => {
     };
 };
 
-/**
- * Add reaction message handler
- */
 export const addMessageReactionHandler = (handler) => {
     if (typeof handler === 'function') {
         messageReactionHandlers.add(handler);
@@ -255,9 +242,6 @@ export const addInternalTypingHandler = (handler) => {
     };
 };
 
-/**
- * Add group event handler (created, updated, deleted, info_request)
- */
 export const addGroupEventHandler = (handler) => {
     if (typeof handler === 'function') {
         groupEventHandlers.add(handler);
@@ -265,9 +249,6 @@ export const addGroupEventHandler = (handler) => {
     }
 };
 
-/**
- * Add group member event handler (added, removed, promoted, demoted)
- */
 export const addGroupMemberHandler = (handler) => {
     if (typeof handler === 'function') {
         groupMemberHandlers.add(handler);
@@ -275,9 +256,6 @@ export const addGroupMemberHandler = (handler) => {
     }
 };
 
-/**
- * Add group permission event handler
- */
 export const addGroupPermissionHandler = (handler) => {
     if (typeof handler === 'function') {
         groupPermissionHandlers.add(handler);
@@ -288,8 +266,6 @@ export const addGroupPermissionHandler = (handler) => {
 export const emitInternalMessageSend = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:msg_send', { ...payload, receiveEvent: "internal:msg_receive" });
-
-    // Manually trigger local handlers for optimized update (as server might not echo back to sender)
     internalMessageHandlers.forEach(handler => {
         try {
             handler(payload);
@@ -313,15 +289,18 @@ export const emitSendReaction = (payload) => {
     return true;
 };
 
+export const emitRemoveReaction = (payload) => {
+    if (!socketInstance) return false;
+    socketInstance.emit('internal:reaction_remove', { ...payload, receiveEvent: "internal:reaction_remove_receive" });
+    return true;
+};
+
 export const emitInternalStoreSocketData = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal.store_sockets', payload);
     return true;
 };
 
-/**
- * Emit group created event
- */
 export const emitGroupCreated = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:group_created', {
@@ -331,9 +310,6 @@ export const emitGroupCreated = (payload) => {
     return true;
 };
 
-/**
- * Emit group updated event
- */
 export const emitGroupUpdated = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:group_updated', {
@@ -343,9 +319,6 @@ export const emitGroupUpdated = (payload) => {
     return true;
 };
 
-/**
- * Emit group deleted event
- */
 export const emitGroupDeleted = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:group_deleted', {
@@ -355,9 +328,6 @@ export const emitGroupDeleted = (payload) => {
     return true;
 };
 
-/**
- * Emit member added event
- */
 export const emitMemberAdded = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:member_added', {
@@ -367,9 +337,6 @@ export const emitMemberAdded = (payload) => {
     return true;
 };
 
-/**
- * Emit member removed event
- */
 export const emitMemberRemoved = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:member_removed', {
@@ -379,9 +346,6 @@ export const emitMemberRemoved = (payload) => {
     return true;
 };
 
-/**
- * Emit member promoted event
- */
 export const emitMemberPromoted = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:member_promoted', {
@@ -391,9 +355,6 @@ export const emitMemberPromoted = (payload) => {
     return true;
 };
 
-/**
- * Emit member demoted event
- */
 export const emitMemberDemoted = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:member_demoted', {
@@ -403,9 +364,6 @@ export const emitMemberDemoted = (payload) => {
     return true;
 };
 
-/**
- * Emit permission changed event
- */
 export const emitPermissionChanged = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:permission_changed', {
@@ -415,9 +373,6 @@ export const emitPermissionChanged = (payload) => {
     return true;
 };
 
-/**
- * Emit group info request event
- */
 export const emitGroupInfoRequest = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:group_info_request', {
@@ -427,9 +382,6 @@ export const emitGroupInfoRequest = (payload) => {
     return true;
 };
 
-/**
- * Disconnect socket
- */
 export const disconnectSocket = (permanent = false) => {
     if (socketInstance) {
         socketInstance.disconnect();

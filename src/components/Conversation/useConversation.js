@@ -39,7 +39,7 @@ const getISTTime = () => {
     // matching the backend's behavior for correct sorting and display.
     const offset = now.getTimezoneOffset() * 60000;
     const localISO = new Date(now.getTime() - offset).toISOString();
-    
+
     return {
         time: formatTime12h(localISO),
         date: localISO.split('T')[0],
@@ -342,12 +342,21 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         const handleReactionMessage = (data) => {
             if (data._isFromCurrentUser) return;
 
+            // Skip if the reaction was sent by the current user — they already applied an
+            // optimistic update locally in Conversation.js, so we must not double-apply it.
+            const myId = Number(auth?.id ?? auth?.userId);
+            const senderId = Number(data?.SenderId ?? data?.userId ?? data?.UserId);
+            if (myId && senderId && myId === senderId) return;
+
             setMessages((prevMessages) => {
                 const prevData = normalizeMessagesList(prevMessages);
                 let messageUpdated = false;
 
                 const updatedMessagesList = prevData.map(msg => {
-                    if (msg?.MessageId !== data?.MessageId) return msg;
+                    const msgId = msg?.MessageId || msg?.Id || msg?.id;
+                    const dataId = data?.MessageId || data?.Id || data?.id;
+
+                    if (String(msgId) !== String(dataId)) return msg;
                     messageUpdated = true;
 
                     let existingReactions = [];
@@ -363,7 +372,21 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
                     const isRemoval = newReactions.some(r => r.Direction === 0 && (!r.Reaction || r.Reaction === ''));
                     if (isRemoval) {
-                        return { ...msg, ReactionEmojis: JSON.stringify(existingReactions.filter(r => r.Direction !== 0)) };
+                        // Resolve who removed — prefer UserId embedded in the emoji object, then data fields
+                        const removerUserId = String(
+                            newReactions.find(r => r.Direction === 0)?.UserId ??
+                            data?.SenderId ?? data?.userId ?? data?.UserId ?? ''
+                        );
+                        // Try UserId-based removal first (works when reactions carry UserId)
+                        let filtered = removerUserId
+                            ? existingReactions.filter(r => String(r.UserId) !== removerUserId)
+                            : existingReactions;
+                        // Fallback: if nothing matched (legacy reactions stored without UserId),
+                        // remove all Direction=0 reactions so the reaction doesn't stay stuck
+                        if (filtered.length === existingReactions.length) {
+                            filtered = existingReactions.filter(r => r.Direction !== 0);
+                        }
+                        return { ...msg, ReactionEmojis: JSON.stringify(filtered) };
                     }
                     if (newReactions.length === 0) return msg;
 
@@ -399,6 +422,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         };
 
         const handleInternalMessage = (data) => {
+            debugger
             if (!data || typeof data !== 'object') return;
             if (Number(data?.Sender) === auth?.id || Number(data?.SenderId) === auth?.id) return;
 
@@ -804,6 +828,27 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             const sentIdString = res?.Data?.rd?.[0]?.MessageId;
             const sentIds = sentIdString ? String(sentIdString).split(',').map(id => id.trim()) : [];
 
+            // Parse server-returned Attachments to get real attachment IDs
+            let serverAttachments = [];
+            try {
+                const rawAttachments = res?.Data?.rd?.[0]?.Attachments;
+                if (rawAttachments) {
+                    serverAttachments = typeof rawAttachments === 'string'
+                        ? JSON.parse(rawAttachments)
+                        : (Array.isArray(rawAttachments) ? rawAttachments : []);
+                }
+            } catch (e) {
+                console.error('Error parsing server Attachments:', e);
+            }
+
+            // Enrich mediaItems with real attachmentId from server response
+            const enrichMediaItems = (items) => items.map((item, i) => ({
+                ...item,
+                attachmentId: serverAttachments[i]?.Id || serverAttachments[i]?.id || item.attachmentId || null,
+            }));
+
+            const enrichedMediaItems = enrichMediaItems(mediaItems);
+
             // Determine ReceiverId based on group or 1-to-1
             const isGroup = selectedCustomer?.IsGroup === 1;
             let ReceiverId;
@@ -834,7 +879,12 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                 }));
 
                 sentIds.forEach((messageId, index) => {
-                    const singleMediaItem = [{ url: uploadedUrls[index], filename: safeFiles[index]?.name, mimeType: safeFiles[index]?.type }];
+                    const singleMediaItem = [{
+                        url: uploadedUrls[index],
+                        filename: safeFiles[index]?.name,
+                        mimeType: safeFiles[index]?.type,
+                        attachmentId: serverAttachments[index]?.Id || serverAttachments[index]?.id || null,
+                    }];
 
                     setMessages(prev => ({
                         data: [
@@ -893,8 +943,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                         ufcc: auth?.ufcc, ReceiverId, Id: sentId || tempId, MessageId: sentId,
                         SenderId: auth?.id, Direction: 2, Status: 1, MessageStatus: 1,
                         MessageType: type, Message: caption, Time: time, Date: date, DateTime: dateTime,
-                        mediaItems, previewUrl: uploadedUrls[0],
-                        fileName: mediaItems?.[0]?.filename, fileType: mediaItems?.[0]?.mimeType,
+                        mediaItems: enrichedMediaItems, previewUrl: uploadedUrls[0],
+                        fileName: enrichedMediaItems?.[0]?.filename, fileType: enrichedMediaItems?.[0]?.mimeType,
                         ConversationId: selectedCustomer?.ConversationId || tempConversationId,
                         SenderName: auth?.username || auth?.userId || auth?.name,
                         RecieverName: auth?.username || auth?.userId || auth?.name,
@@ -919,8 +969,9 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                                 ...m,
                                 ...(sentId && { Id: sentId, MessageId: sentId }),
                                 previewUrl: uploadedUrls[0] || m.previewUrl,
-                                mediaItems, fileName: mediaItems[0]?.filename || m.fileName,
-                                fileType: mediaItems[0]?.mimeType || m.fileType,
+                                mediaItems: enrichedMediaItems,
+                                fileName: enrichedMediaItems[0]?.filename || m.fileName,
+                                fileType: enrichedMediaItems[0]?.mimeType || m.fileType,
                                 isUploading: false, percent: 100, Status: 1,
                             }
                             : m
@@ -1130,7 +1181,6 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     }, [auth, selectedCustomer, tempConversationId, inputValue, mediaFiles, replyToMessage, storeMessData, uploadAndSendMedia]);
 
     // ── Reply / Forward / Scroll ─────────────────────────────────────────────
-
     const handleReply = useCallback(async (message, attachmentId = null) => {
         setStoreMessData({ messageId: message?.MessageId });
 
@@ -1163,12 +1213,20 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             if (specificItem) mediaUrl = specificItem.url || specificItem.src;
         }
 
+        let finalAttachmentId = attachmentId;
+        if (!finalAttachmentId && mediaCount > 0) {
+            finalAttachmentId = message.mediaItems
+                .map(item => item.attachmentId || item.AttachmentId || item.Id || item.id)
+                .filter(Boolean)
+                .join(',');
+        }
+
         setReplyToMessage({
             Id: message?.Id,
             sender: message?.Direction === 1 ? 'You' : selectedCustomer?.name || 'Customer',
             text: replyText,
             MessageType: message?.MessageType,
-            ReplyToAttachmentId: attachmentId,
+            ReplyToAttachmentId: finalAttachmentId || null,
             mediaUrl,
         });
     }, [selectedCustomer?.name]);
@@ -1191,6 +1249,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     }, []);
 
     const handleSendForward = useCallback(async (selectedContactsArr = []) => {
+        debugger
+        console.log("selectedContactsArr", selectedContactsArr);
         if (!selectedContactsArr.length || !forwardMessage) {
             toast.error('Please select at least one contact to forward message.');
             return;
@@ -1201,13 +1261,12 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         const orderedRecipients = [];
 
         for (const contact of selectedContactsArr) {
-            if (contact?.Type === 'conversation' && contact.ConversationId) {
+            if (contact?.ConversationId) {
+                // Has a ConversationId — forward to existing conversation
                 conversationIdsArr.push(contact.ConversationId);
                 orderedRecipients.push(contact);
-            }
-        }
-        for (const contact of selectedContactsArr) {
-            if (contact?.Type === 'user' && (contact.UserId || contact.id)) {
+            } else if (contact?.UserId || contact?.id) {
+                // No ConversationId — forward to individual user (will create new conversation)
                 userIdsArr.push(contact.UserId || contact.id);
                 orderedRecipients.push(contact);
             }
@@ -1223,16 +1282,32 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             ConversationIds: conversationIdsArr.join(',') || null,
             UserIds: userIdsArr.join(',') || null,
             ForwardedAttachmentIds: (() => {
-                if (forwardMessage?.ReplyToAttachmentId) return String(forwardMessage.ReplyToAttachmentId);
-                let attachments = forwardMessage?.Attachments;
-                if (!attachments) return '';
-                if (typeof attachments === 'string') {
-                    try { attachments = JSON.parse(attachments); }
-                    catch { return ''; }
+                // 1. If specific attachment IDs are set (from media viewer reply/forward), use them
+                if (forwardMessage?.ReplyToAttachmentId) {
+                    return String(forwardMessage.ReplyToAttachmentId);
                 }
-                return Array.isArray(attachments)
-                    ? attachments.map(a => a?.Id).filter(Boolean).join(',') || ''
-                    : '';
+
+                // 2. Try normalized mediaItems (already parsed by conversationUtils)
+                if (Array.isArray(forwardMessage?.mediaItems) && forwardMessage.mediaItems.length > 0) {
+                    const ids = forwardMessage.mediaItems
+                        .map(a => a?.attachmentId || a?.AttachmentId || a?.Id || a?.id)
+                        .filter(Boolean);
+                    if (ids.length) return ids.join(',');
+                }
+
+                // 3. Try raw Attachments field (string JSON or array)
+                let attachments = forwardMessage?.Attachments;
+                if (attachments) {
+                    if (typeof attachments === 'string') {
+                        try { attachments = JSON.parse(attachments); } catch { attachments = null; }
+                    }
+                    if (Array.isArray(attachments) && attachments.length > 0) {
+                        const ids = attachments.map(a => a?.Id || a?.id || a?.attachmentId || a?.AttachmentId).filter(Boolean);
+                        if (ids.length) return ids.join(',');
+                    }
+                }
+
+                return null;
             })(),
         };
 
@@ -1284,6 +1359,43 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                                         }
                                     }
 
+                                    const { time, date, dateTime } = getISTTime();
+
+                                    if (selectedCustomer?.ConversationId && Number(convId) === Number(selectedCustomer.ConversationId)) {
+                                        setMessages(prev => {
+                                            const normalized = normalizeMessagesList(prev);
+                                            if (normalized.some(m => m.MessageId === realMessageId || m.Id === realMessageId)) return prev;
+
+                                            return {
+                                                data: [
+                                                    ...normalized,
+                                                    {
+                                                        Id: realMessageId,
+                                                        MessageId: realMessageId,
+                                                        SenderId: auth?.id,
+                                                        ConversationId: convId,
+                                                        Message: forwardMessage?.Message || (isMedia ? '' : 'Forwarded Message'),
+                                                        Status: 1,
+                                                        MessageStatus: 1,
+                                                        Direction: 1, // Local direction for sender is 1
+                                                        DateTime: dateTime,
+                                                        MessageType: forwardMessage?.Type || forwardMessage?.MessageType || 'text',
+                                                        Type: forwardMessage?.Type || forwardMessage?.MessageType || 'text',
+                                                        IsForwarded: true,
+                                                        ForwardedFrom: forwardMessage?.MessageId || forwardMessage?.Id || auth?.id,
+                                                        mediaItems: mediaItemsToSend,
+                                                        previewUrl: previewUrlToSend,
+                                                        fileName: fileNameToSend,
+                                                        fileType: fileTypeToSend,
+                                                        Time: time,
+                                                        Date: date,
+                                                    }
+                                                ],
+                                                total: (prev?.total || 0) + 1
+                                            };
+                                        });
+                                    }
+
                                     emitInternalMessageSend({
                                         Id: realMessageId, ReceiverId: receiverId, ufcc: auth?.ufcc,
                                         SenderId: auth?.id, Sender: auth?.id, ConversationId: convId,
@@ -1294,14 +1406,14 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                                         RecieverName: auth?.username || auth?.userId || auth?.name,
                                         Message: forwardMessage?.Message || (isMedia ? '' : 'Forwarded Message'),
                                         MessageId: realMessageId, Status: 1, MessageStatus: 1,
-                                        Direction: 2, DateTime: new Date().toISOString(),
+                                        Direction: 2, DateTime: dateTime,
                                         MessageType: forwardMessage?.Type || forwardMessage?.MessageType || 'text',
                                         Type: forwardMessage?.Type || forwardMessage?.MessageType || 'text',
-                                        IsForwarded: true, ForwardedFrom: auth?.id,
+                                        IsForwarded: true, ForwardedFrom: forwardMessage?.MessageId || forwardMessage?.Id || auth?.id,
                                         mediaItems: mediaItemsToSend, previewUrl: previewUrlToSend,
                                         fileName: fileNameToSend, fileType: fileTypeToSend,
-                                        Time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                                        Date: new Date().toLocaleDateString(),
+                                        Time: time,
+                                        Date: date,
                                     });
                                 }
                             });
@@ -1345,7 +1457,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             const rawResults = Array.isArray(response.data?.rd)
                 ? response.data.rd
                 : (Array.isArray(response.data) ? response.data : []);
-            
+
             setSearchResults(normalizeServerMessages(rawResults));
         } catch (error) {
             console.error('Search failed:', error);
@@ -1357,7 +1469,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
     const scrollToMessage = useCallback(async (messageId, containerRef, attachmentId = null) => {
         if (!containerRef.current || !messageId) return;
-        
+
         // Use both string and number for ID matching to be safe
         const sid = String(messageId);
         let messageElement = containerRef.current.querySelector(`[data-message-id="${sid}"]`);
@@ -1367,7 +1479,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         if (!messageElement) {
             const messageList = normalizeMessagesList(messages);
             const existsLocally = messageList.some(m => String(m.MessageId || m.Id) === sid);
-            
+
             if (!existsLocally) {
                 setLoading(true);
                 await loadConversation(1, true, true); // Reset and reload

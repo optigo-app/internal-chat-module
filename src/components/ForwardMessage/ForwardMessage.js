@@ -98,6 +98,9 @@ const ForwardMessage = ({ message, onSend, onClose, anchorEl, open, isCentered =
     useEffect(() => {
         if (open) {
             loadMembers(true);
+        } else {
+            setSelectedContacts([]);
+            setSearchTerm('');
         }
     }, [open, auth?.token, auth?.userId, auth?.id]);
 

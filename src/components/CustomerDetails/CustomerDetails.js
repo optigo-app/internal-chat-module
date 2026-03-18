@@ -242,9 +242,9 @@ const CustomerDetails = ({
 
             // Initial fetch logic: 
             // Load group metadata if applicable
-            if (customer.IsGroup === 1) {
-                loadGroupInfo();
-            }
+            // if (customer.IsGroup === 1) {
+            //     loadGroupInfo();
+            // }
             
             // Always fetch media data using the unified fetchMediaLists API for the sidebar preview
             fetchMediaData('images', 1);
