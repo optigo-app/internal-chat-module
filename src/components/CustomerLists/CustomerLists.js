@@ -870,7 +870,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                         </IconButton>
                     )}
                     <Typography variant="h6" className="header_title">
-                        {isArchiveOpen ? 'Archived Chats' : 'Chat Members'}
+                        {isArchiveOpen ? 'Archived Chats' : 'Chats'}
                     </Typography>
                 </Box>
 

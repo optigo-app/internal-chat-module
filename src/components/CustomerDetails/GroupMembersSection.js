@@ -18,6 +18,8 @@ const GroupMembersSection = ({
     const visibleMembers = showAllMembers ? members : members.slice(0, 10);
     const hasMoreMembers = members.length > 10;
 
+    console.log('members', members);
+
     return (
         <div className="info-block members-block">
             <div className="block-header">
@@ -43,7 +45,7 @@ const GroupMembersSection = ({
                     </div>
                 )}
 
-                {visibleMembers.map((member, idx) => (
+                {visibleMembers?.map((member, idx) => (
                     <div
                         key={member.UserId || idx}
                         className={`setting-item no-border member-item ${member.UserId !== (auth?.id || auth?.userId) ? 'clickable-member' : ''}`}
@@ -58,8 +60,27 @@ const GroupMembersSection = ({
                                 {...getWhatsAppAvatarConfig(member.Name || 'User', 42)}
                                 src={member.ProfileImageUrl}
                             />
-                            <div className="text-stack">
-                                <span className="member-name">{member.Name || 'User'}</span>
+                            <div className="text-stack" style={{ flex: 1 }}>
+                                <div className="member-name-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                    <span className="member-name">{member.Name || 'User'}</span>
+                                    {member.IsAdmin && (
+                                        <div className="admin-badge">
+                                            Group Admin
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="member-id-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                    <Typography variant="caption" className="sub-text">
+                                        {member.DisplayEmail ?? ''}
+                                    </Typography>
+                                    {isCurrentUserAdmin && member.UserId !== (auth?.id || auth?.userId) && (
+                                        <ChevronDown
+                                            size={18}
+                                            className={`member-chevron ${hoveredMemberId === member.UserId ? 'visible' : ''}`}
+                                            style={{ color: '#667781', opacity: hoveredMemberId === member.UserId ? 1 : 0, transition: 'opacity 0.2s' }}
+                                        />
+                                    )}
+                                </div>
                                 {member.About && (
                                     <Typography variant="caption" className="sub-text">
                                         {member.About}
@@ -68,13 +89,6 @@ const GroupMembersSection = ({
                             </div>
                         </div>
                         <div className="member-right-actions">
-                            {member.IsAdmin && <div className="admin-badge">Group Admin</div>}
-                            {isCurrentUserAdmin && member.UserId !== (auth?.id || auth?.userId) && (
-                                <ChevronDown
-                                    size={18}
-                                    className={`member-chevron ${hoveredMemberId === member.UserId ? 'visible' : ''}`}
-                                />
-                            )}
                         </div>
                     </div>
                 ))}

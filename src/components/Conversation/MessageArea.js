@@ -149,9 +149,7 @@ const MessageArea = ({
             }}
             onContextMenu={(e) => {
                 if (isMediaPreviewOpen) return;
-
                 e.preventDefault();
-
                 setContextMenu({
                     mouseX: e.clientX + 2,
                     mouseY: e.clientY + 2,
@@ -232,7 +230,7 @@ const MessageArea = ({
                                 {/* Messages for this date */}
                                 {dateMessages.map((msg, index) => (
                                     <MessageItem
-                                        key={msg.Id ?? msg.MessageId ?? index}
+                                        key={msg.Id ? `msg-${msg.Id}` : (msg.MessageId ? `msg-${msg.MessageId}` : `msg-idx-${date}-${index}`)}
                                         msg={msg}
                                         index={index}
                                         auth={auth}

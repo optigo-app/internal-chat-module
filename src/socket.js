@@ -199,7 +199,6 @@ export const isSocketConnected = () => {
             }
         }
     }
-
     return state;
 };
 

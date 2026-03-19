@@ -16,6 +16,8 @@ const MemberActions = ({
     const memberName = confirmationModal.member?.Name?.split(' ')[0] || 'member';
     const fullMemberName = confirmationModal.member?.Name || 'member';
 
+    console.log("iusidi", localGroupData)
+
     return (
         <>
             <WhatsAppMenu
@@ -58,7 +60,7 @@ const MemberActions = ({
             />
 
             <ConfirmationDialog
-                isOpen={confirmationModal.isOpen}
+                isOpen={confirmationModal.isOpen && Boolean(confirmationModal.member)}
                 onClose={onCloseConfirmation}
                 onConfirm={onConfirmAction}
                 title={

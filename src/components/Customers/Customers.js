@@ -57,7 +57,20 @@ const Customers = ({ selectedStatus, selectedTag }) => {
         };
 
         window.addEventListener('SELECT_CONVERSATION', handleSelectConversation);
-        return () => window.removeEventListener('SELECT_CONVERSATION', handleSelectConversation);
+
+        const handleSelectNewConversation = (event) => {
+            const { customer } = event.detail;
+            if (customer) {
+                handleCustomerSelect(customer);
+            }
+        };
+
+        window.addEventListener('SELECT_NEW_CONVERSATION', handleSelectNewConversation);
+
+        return () => {
+            window.removeEventListener('SELECT_CONVERSATION', handleSelectConversation);
+            window.removeEventListener('SELECT_NEW_CONVERSATION', handleSelectNewConversation);
+        };
     }, []);
 
     return (

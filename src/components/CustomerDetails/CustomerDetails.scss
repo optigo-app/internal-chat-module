@@ -660,13 +660,6 @@ $sp-10: 40px;
                     color: $text-primary;
                     font-weight: 500;
                 }
-            }
-
-            .member-right-actions {
-                display: flex;
-                align-items: center;
-                gap: $sp-2;
-
                 .admin-badge {
                     font-size: 11px;
                     padding: 2px 8px;
@@ -676,20 +669,6 @@ $sp-10: 40px;
                     font-weight: 600;
                     background: rgba($accent, 0.06);
                     white-space: nowrap;
-                }
-
-                .member-chevron {
-                    color: $text-secondary;
-                    opacity: 0;
-                    transform: translateX(8px);
-                    transition: $transition-base;
-                    pointer-events: none;
-
-                    &.visible {
-                        opacity: 1;
-                        transform: translateX(0);
-                        pointer-events: auto;
-                    }
                 }
             }
         }

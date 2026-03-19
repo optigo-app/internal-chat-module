@@ -17,6 +17,7 @@ import DetailsHeader from './DetailsHeader';
 import DetailsViews from './DetailsViews';
 import MemberActions from './MemberActions';
 import GroupDialogs from './GroupDialogs';
+import ConfirmationDialog from '../ReusableComponent/ConfirmationDialog';
 import { getCustomerAvatarSeed, getCustomerDisplayName } from '../../utils/globalFunc';
 import { useFavorite } from '../../contexts/FavoriteContext';
 import { useRemoveInGroup } from '../../contexts/RemoveInGroupContext';
@@ -242,10 +243,10 @@ const CustomerDetails = ({
 
             // Initial fetch logic: 
             // Load group metadata if applicable
-            // if (customer.IsGroup === 1) {
-            //     loadGroupInfo();
-            // }
-            
+            if (customer.IsGroup === 1) {
+                loadGroupInfo();
+            }
+
             // Always fetch media data using the unified fetchMediaLists API for the sidebar preview
             fetchMediaData('images', 1);
         }
@@ -296,6 +297,7 @@ const CustomerDetails = ({
             // Update members state
             if (data.members) {
                 const mappedMembers = data.members.map(m => ({
+                    ...m,
                     UserId: m.UserId,
                     Name: m.MemberName,
                     ProfileImageUrl: m.ProfileImage,
@@ -449,12 +451,34 @@ const CustomerDetails = ({
     };
 
     const handleMenuAction = (action) => {
-        if (action === 'makeAdmin' || action === 'removeAdmin') {
+        if (action === 'clearChat') {
+            setConfirmationModal({ isOpen: true, member: null, actionType: 'clearChat' });
+        } else if (action === 'makeAdmin' || action === 'removeAdmin') {
             setConfirmationModal(prev => ({ ...prev, isOpen: true, actionType: 'roleUpdate' }));
         } else if (action === 'removeMember') {
             setConfirmationModal(prev => ({ ...prev, isOpen: true, actionType: 'remove' }));
         } else if (action === 'messageMember') {
-            toast('Message — coming soon!');
+            const member = confirmationModal.member;
+            if (member) {
+                if (member.ConversationId) {
+                    window.dispatchEvent(new CustomEvent('SELECT_CONVERSATION', {
+                        detail: { conversationId: member.ConversationId }
+                    }));
+                } else {
+                    window.dispatchEvent(new CustomEvent('SELECT_NEW_CONVERSATION', {
+                        detail: {
+                            customer: {
+                                ...member,
+                                UserId: member.UserId,
+                                name: member.Name || member.MemberName,
+                                ProfileImageUrl: member.ProfileImageUrl || member.ProfileImage,
+                                IsGroup: 0
+                            }
+                        }
+                    }));
+                }
+                onClose?.();
+            }
         } else if (action === 'viewMember') {
             toast('Contact info — coming soon!');
         }
@@ -462,6 +486,10 @@ const CustomerDetails = ({
 
     const handleClearChatClick = () => {
         setConfirmationModal({ isOpen: true, member: null, actionType: 'clearChat' });
+    };
+
+    const handleDeleteChatClick = () => {
+        setConfirmationModal({ isOpen: true, member: null, actionType: 'deleteChat' });
     };
 
     // Helper function to check if current user is the only admin
@@ -506,7 +534,22 @@ const CustomerDetails = ({
                 });
                 if (response?.Status === "200" || response?.success === true) {
                     toast.success('Chat cleared successfully');
+                    
+                    // Clear messages from sessionStorage (unified key)
+                    const cacheKey = `chat_cache_${customer.ConversationId}`;
+                    sessionStorage.removeItem(cacheKey);
+                    
+                    // Clear other related state if necessary
+                    const lastPageKey = `chat_last_page_${customer.ConversationId}`;
+                    sessionStorage.removeItem(lastPageKey);
+
                     setConfirmationModal({ isOpen: false, member: null, actionType: null });
+                    
+                    // Dispatch event to notify Conversation component to clear its state
+                    window.dispatchEvent(new CustomEvent('CLEAR_CONVERSATION_MESSAGES', {
+                        detail: { conversationId: customer.ConversationId }
+                    }));
+                    
                     window.dispatchEvent(new CustomEvent('REFRESH_CONVERSATION_LIST'));
                 } else {
                     toast.error(response?.Message || 'Failed to clear chat');
@@ -546,25 +589,25 @@ const CustomerDetails = ({
             return;
         }
 
-        if (actionType === 'deleteGroup') {
+        if (actionType === 'deleteGroup' || actionType === 'deleteChat') {
             try {
                 const response = await deleteConversationApi(auth, {
                     conversationId: customer.ConversationId
                 });
 
                 if (response?.Status === "200" || response?.success === true) {
-                    toast.success('Group conversation deleted');
+                    toast.success(actionType === 'deleteChat' ? 'Chat deleted successfully' : 'Group conversation deleted');
                     setConfirmationModal({ isOpen: false, member: null, actionType: null });
                     onClose?.();
                     window.dispatchEvent(new CustomEvent('DELETE_CONVERSATION', {
                         detail: { conversationId: customer.ConversationId }
                     }));
                 } else {
-                    toast.error(response?.Message || 'Failed to delete group conversation');
+                    toast.error(response?.Message || `Failed to delete ${actionType === 'deleteChat' ? 'chat' : 'group conversation'}`);
                 }
             } catch (error) {
-                console.error('Error deleting group conversation:', error);
-                toast.error('Error deleting group conversation');
+                console.error(`Error deleting ${actionType === 'deleteChat' ? 'chat' : 'group conversation'}:`, error);
+                toast.error(`Error deleting ${actionType === 'deleteChat' ? 'chat' : 'group conversation'}`);
             }
             return;
         }
@@ -782,6 +825,7 @@ const CustomerDetails = ({
                             isFavorite={isFavorite}
                             handleToggleFavorite={handleToggleFavorite}
                             handleClearChatClick={handleClearChatClick}
+                            handleDeleteChatClick={handleDeleteChatClick}
                             handleExitGroupClick={handleExitGroupClick}
                             activeTab={activeTab}
                             setActiveTab={setActiveTab}
@@ -832,6 +876,50 @@ const CustomerDetails = ({
                     onCloseConfirmation={() => setConfirmationModal({ isOpen: false, member: null, actionType: null })}
                 />
 
+                <ConfirmationDialog
+                    isOpen={confirmationModal.isOpen && !confirmationModal.member}
+                    onClose={() => setConfirmationModal({ isOpen: false, member: null, actionType: null })}
+                    onConfirm={handleConfirmMemberAction}
+                    title={
+                        confirmationModal.actionType === 'clearChat'
+                            ? 'Clear Chat?'
+                            : confirmationModal.actionType === 'deleteGroup'
+                                ? 'Delete Group?'
+                                : confirmationModal.actionType === 'deleteChat'
+                                    ? 'Delete Chat?'
+                                    : confirmationModal.actionType === 'adminCannotLeave'
+                                        ? 'Cannot Leave Group'
+                                        : confirmationModal.actionType === 'exitGroup'
+                                            ? 'Exit Group?'
+                                            : 'Confirm Action'
+                    }
+                    description={
+                        confirmationModal.actionType === 'clearChat'
+                            ? 'Are you sure you want to clear all messages in this chat?'
+                            : confirmationModal.actionType === 'deleteGroup'
+                                ? 'Are you sure you want to delete this group conversation? This will remove the conversation from your chat list.'
+                                : confirmationModal.actionType === 'deleteChat'
+                                    ? `Are you sure you want to delete the chat with ${displayName}?`
+                                    : confirmationModal.actionType === 'adminCannotLeave'
+                                        ? 'You cannot leave the group because you are the only administrator. Please assign another admin before leaving.'
+                                        : confirmationModal.actionType === 'exitGroup'
+                                            ? 'Are you sure you want to exit this group?'
+                                            : 'Are you sure you want to proceed?'
+                    }
+                    confirmText={
+                        confirmationModal.actionType === 'clearChat'
+                            ? 'Clear'
+                            : confirmationModal.actionType === 'deleteGroup' || confirmationModal.actionType === 'deleteChat'
+                                ? 'Delete'
+                                : confirmationModal.actionType === 'adminCannotLeave'
+                                    ? 'OK'
+                                    : confirmationModal.actionType === 'exitGroup'
+                                        ? 'Exit'
+                                        : 'Confirm'
+                    }
+                    variant={['clearChat', 'deleteGroup', 'deleteChat', 'exitGroup'].includes(confirmationModal.actionType) ? 'danger' : 'primary'}
+                    showCancel={confirmationModal.actionType !== 'adminCannotLeave'}
+                />
             </div>
         </>
     );

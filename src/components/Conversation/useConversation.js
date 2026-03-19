@@ -635,6 +635,22 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     // ── Conversation selection effects ───────────────────────────────────────
 
     useEffect(() => {
+        const handleClearMessages = (event) => {
+            const { conversationId } = event.detail;
+            if (Number(conversationId) === Number(selectedCustomer?.ConversationId)) {
+                setMessages({ data: [], total: 0 });
+                setCurrentPage(1);
+                setHasMore(false);
+            }
+        };
+
+        window.addEventListener('CLEAR_CONVERSATION_MESSAGES', handleClearMessages);
+        return () => {
+            window.removeEventListener('CLEAR_CONVERSATION_MESSAGES', handleClearMessages);
+        };
+    }, [selectedCustomer?.ConversationId]);
+
+    useEffect(() => {
         if (!selectedCustomer?.ConversationId) {
             setMessages({ data: [], total: 0 });
             setCurrentPage(1);

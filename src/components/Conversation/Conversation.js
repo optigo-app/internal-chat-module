@@ -42,7 +42,8 @@ import {
     Trash2,
     LogOut,
     Star,
-    Search
+    Search,
+    CircleMinus
 } from 'lucide-react';
 
 const Conversation = ({ selectedCustomer, onConversationRead, onViewConversationRead, onCustomerSelect }) => {
@@ -973,6 +974,20 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
 
             if (response?.Status === "200" || response?.success === true) {
                 toast.success('Chat cleared successfully');
+
+                // Clear messages from sessionStorage (unified key)
+                const cacheKey = `chat_cache_${selectedCustomer.ConversationId}`;
+                sessionStorage.removeItem(cacheKey);
+
+                // Clear other related state if necessary
+                const lastPageKey = `chat_last_page_${selectedCustomer.ConversationId}`;
+                sessionStorage.removeItem(lastPageKey);
+
+                // Dispatch event to notify Conversation component to clear its state
+                window.dispatchEvent(new CustomEvent('CLEAR_CONVERSATION_MESSAGES', {
+                    detail: { conversationId: selectedCustomer.ConversationId }
+                }));
+
                 setConfirmationModal({ isOpen: false, actionType: null });
                 // Refresh the conversation to show cleared state
                 if (refresh) refresh();
@@ -993,22 +1008,39 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
             action: 'groupInfo',
             icon: <Info size={18} />
         },
-        { label: 'Select message', action: 'selectMessage', icon: <CheckSquare size={18} /> },
+        {
+            label: 'Select messages',
+            action: 'selectMessages',
+            icon: <CheckSquare size={18} />
+        },
         { label: 'Mute notification', action: 'mute', icon: <BellOff size={18} /> },
         { label: isFavorite ? 'Remove from favourite' : 'Add to favourite', action: 'favourite', icon: <Star size={18} fill={isFavorite ? '#FFD700' : 'none'} color={isFavorite ? '#FFD700' : 'currentColor'} /> },
         { label: 'Close chat', action: 'close', icon: <X size={18} /> },
         { divider: true },
         {
-            label: (selectedCustomer?.IsGroup === 1 && isRemovedFromCurrentGroup) ? 'Delete group' : 'Delete chat',
-            action: (selectedCustomer?.IsGroup === 1 && isRemovedFromCurrentGroup) ? 'deleteGroup' : 'deleteChat',
-            icon: <Trash2 size={18} />,
-            danger: true
+            label: 'Clear chat',
+            action: 'clearChat',
+            icon: <CircleMinus size={18} />
         },
         ...(selectedCustomer?.IsGroup === 1 && !isRemovedFromCurrentGroup
             ? [{
                 label: 'Exit group',
                 action: 'exitGroup',
                 icon: <LogOut size={18} />,
+                danger: true
+            },
+            {
+                label: 'Delete group',
+                action: 'deleteGroup',
+                icon: <Trash2 size={18} />,
+                danger: true
+            }]
+            : []),
+        ...(selectedCustomer?.IsGroup !== 1 || isRemovedFromCurrentGroup
+            ? [{
+                label: 'Delete chat',
+                action: 'deleteChat',
+                icon: <Trash2 size={18} />,
                 danger: true
             }]
             : []),
