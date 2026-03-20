@@ -1,6 +1,6 @@
 import { Typography, Box, TextField, InputAdornment, IconButton } from '@mui/material';
 import { Pencil, X, Check } from 'lucide-react';
-import { FormatDateIST } from '../../utils/DateFnc';
+import { formatDate, formatTime12h } from '../../utils/DateFnc';
 
 const GroupDescription = ({
     localGroupData,
@@ -12,6 +12,8 @@ const GroupDescription = ({
     startEditingDesc,
     setIsEditingDesc
 }) => {
+    const date = formatDate(localGroupData.entryDate);
+    const time = formatTime12h(localGroupData.entryDate);
     return (
         <div className="info-block desc-block">
             <div className="desc-header">
@@ -47,7 +49,7 @@ const GroupDescription = ({
                                     <IconButton size="small" onClick={() => {
                                         setEditedDesc(localGroupData.description);
                                         setIsEditingDesc(false);
-                                    }} sx={{ color: '#667781', mr: 0.5 }}>
+                                    }} sx={{ color: '#7D7f85', mr: 0.5 }}>
                                         <X size={18} />
                                     </IconButton>
                                     <IconButton size="small" onClick={handleSaveDesc} sx={{ color: 'primary.main' }}>
@@ -69,8 +71,8 @@ const GroupDescription = ({
             )}
 
             {(localGroupData.createdBy || localGroupData.entryDate) && (
-                <Typography sx={{ mt: 1.5, mb: 0.5, fontSize: '13px', color: '#667781' }}>
-                    Group created by {localGroupData.createdBy || 'Unknown'}, on {localGroupData.entryDate ? FormatDateIST(localGroupData.entryDate, "dd/mm/yyyy").date : 'Unknown Date'}
+                <Typography sx={{ mt: 1.5, mb: 0.5, fontSize: '14px', color: '#7D7f85' }}>
+                    Group created by {localGroupData.createdBy || ''}, on {date} at {time}
                 </Typography>
             )}
         </div>

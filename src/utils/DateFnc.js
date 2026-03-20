@@ -187,3 +187,22 @@ export const formatDateHeader = (dateString) => {
         }
     }
 };
+
+// output like 01/01/2023
+export const formatDate = (dateStr) => {
+    const date = new Date(dateStr);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+
+    return `${day}/${month}/${year}`;
+}
+
+// output like 01 Jan 2023
+export function formatDate2(dateStr) {
+    const dateObj = new Date(dateStr);
+    const day = dateObj.getDate();
+    const month = dateObj.toLocaleString('default', { month: 'short' });
+    const year = dateObj.getFullYear();
+    return `${day} ${month} ${year}`;
+}

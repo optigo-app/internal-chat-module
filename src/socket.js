@@ -134,6 +134,15 @@ export function initializeSocket(token) {
         });
     });
 
+    socketInstance.on('internal:typing', (data) => {
+        internalTypingHandlers.forEach(handler => {
+            try {
+                handler(data);
+            } catch (error) {
+            }
+        });
+    });
+
     // Group event handlers
     const dispatchGroupEvent = (data) => {
         groupEventHandlers.forEach((handler) => {
@@ -369,6 +378,12 @@ export const emitPermissionChanged = (payload) => {
         ...payload,
         receiveEvent: 'internal:permission_changed'
     });
+    return true;
+};
+
+export const emitInternalTyping = (payload) => {
+    if (!socketInstance) return false;
+    socketInstance.emit('internal:typing', { ...payload, receiveEvent: "internal:typing" });
     return true;
 };
 

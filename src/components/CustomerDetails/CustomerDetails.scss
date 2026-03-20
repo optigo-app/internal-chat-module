@@ -162,7 +162,6 @@ $sp-10: 40px;
 .info-view-container {
     display: flex;
     flex-direction: column;
-    gap: $sp-2;
     margin-bottom: 30px;
 }
 
@@ -276,11 +275,11 @@ $sp-10: 40px;
     }
 
     .customer-name {
-        font-size: 22px !important;
-        font-weight: 700 !important;
+        font-size: 28px !important;
+        font-weight: 500 !important;
         color: $text-primary;
         letter-spacing: -0.02em;
-        line-height: 1.25;
+        line-height: 1;
     }
 
     .customer-phone {
@@ -366,7 +365,7 @@ $sp-10: 40px;
 
     // Group-specific action cards
     &.group-block-actions {
-        padding: $sp-4 $sp-5 $sp-5;
+        padding: 0 $sp-5 5px;
         gap: $sp-3;
 
         .action-block-item {
@@ -563,7 +562,7 @@ $sp-10: 40px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: $sp-3 $sp-3;
+        padding: $sp-4;
         border-radius: 12px;
         cursor: pointer;
         transition: background 0.18s;
@@ -613,11 +612,11 @@ $sp-10: 40px;
     &.members-list {
         background: transparent;
         box-shadow: none;
-        padding: 0 $sp-3;
+        padding: 0;
         gap: 0;
 
         .setting-item {
-            padding: $sp-2 $sp-3;
+            padding: $sp-2 $sp-4;
             border-radius: 14px;
             margin: 1px 0;
             transition: $transition-base;
@@ -660,6 +659,7 @@ $sp-10: 40px;
                     color: $text-primary;
                     font-weight: 500;
                 }
+
                 .admin-badge {
                     font-size: 11px;
                     padding: 2px 8px;
@@ -702,7 +702,7 @@ $sp-10: 40px;
         display: flex;
         align-items: center;
         gap: $sp-3;
-        padding: $sp-3 $sp-3;
+        padding: $sp-4;
         border-radius: 12px;
         cursor: pointer;
         color: $text-danger;
@@ -721,6 +721,72 @@ $sp-10: 40px;
             font-weight: 400;
         }
     }
+}
+
+// ─── Typing Indicator Bubble ───────────────────────────────────────────────
+.typing-indicator-wrapper {
+    display: flex;
+    align-items: flex-end;
+    gap: $sp-2;
+    margin: $sp-2 $sp-6;
+    animation: typingBubbleFadeIn 0.3s ease-out;
+}
+
+.typing-indicator-bubble {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 12px 8px;
+    background: #ffffff;
+    border-radius: 0 12px 12px 12px;
+    box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+    max-width: fit-content;
+
+    .typing-user-name {
+        font-size: 12.5px;
+        font-weight: 500;
+        color: #d62976; // WhatsApp-like pink for name
+        margin-bottom: 2px;
+    }
+
+.typing-dots-container {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        height: 14px;
+
+        &.sidebar-dots {
+            gap: 2px;
+            height: 10px;
+            
+            .typing-dot {
+                width: 3.5px;
+                height: 3.5px;
+                background: #25D366; // Match the green text in sidebar
+            }
+        }
+    }
+
+    .typing-dot {
+        width: 5px;
+        height: 5px;
+        background: #919191;
+        border-radius: 50%;
+        animation: typingAnimation 1.4s infinite ease-in-out;
+
+        &:nth-child(1) { animation-delay: 0s; }
+        &:nth-child(2) { animation-delay: 0.2s; }
+        &:nth-child(3) { animation-delay: 0.4s; }
+    }
+}
+
+@keyframes typingAnimation {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.6; }
+    30% { transform: translateY(-4px); opacity: 1; }
+}
+
+@keyframes typingBubbleFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 // ─── Toggle Switch ────────────────────────────────────────────────────────────
@@ -833,7 +899,7 @@ $sp-10: 40px;
 
     .status-sections-container {
         padding-bottom: $sp-10;
-        
+
         .sections-wrapper {
             background: $bg-white;
             border-top: 1px solid rgba(0, 0, 0, 0.05);
@@ -886,7 +952,7 @@ $sp-10: 40px;
 
     .status-divider {
         height: 1px;
-        background-color: rgba(0,0,0,0.04);
+        background-color: rgba(0, 0, 0, 0.04);
         margin: $sp-2 $sp-6;
     }
 
@@ -915,7 +981,7 @@ $sp-10: 40px;
                     width: 40px !important;
                     height: 40px !important;
                     border: 1.5px solid white;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
                 }
 
                 .member-name {

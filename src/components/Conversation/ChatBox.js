@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo, useRef } from 'react'
+import React, { useState, useEffect, memo, useRef, useCallback } from 'react'
 import ReplyPreview from '../ReplyToComponents/ReplyPreview'
 import { IconButton, Menu, MenuItem, ListItemIcon, ListItemText, Popper, Paper, Box } from '@mui/material'
 import AttachFile from '@mui/icons-material/AttachFile'
@@ -8,6 +8,10 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import EmojiPicker from 'emoji-picker-react'
 import TextField from '@mui/material/TextField'
 import { SendHorizontal, Smile } from 'lucide-react'
+import { emitInternalTyping } from '../../socket'
+import { LoginContext } from '../../context/LoginData'
+import { useContext } from 'react'
+import { fetchGroupDetails } from '../../API/Groups/FetchGroupDetails'
 
 const ChatBox = ({
     mediaFiles,
@@ -46,10 +50,61 @@ const ChatBox = ({
 
     const [tempQuery, setTempQuery] = useState(inputValue || '')
     const prevInputValueRef = useRef(inputValue)
+    const typingTimeoutRef = useRef(null)
+    const { auth } = useContext(LoginContext)
 
-    // Sync tempQuery when parent explicitly clears inputValue (after sending)
+    const lastTypingEmitRef = useRef(0);
+
+    const onInputChange = (e) => {
+        const val = e.target.value;
+        setTempQuery(val);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        const now = Date.now();
+        if (now - lastTypingEmitRef.current > 1000) {
+            handleTyping(true);
+            lastTypingEmitRef.current = now;
+        }
+        typingTimeoutRef.current = setTimeout(() => {
+            handleTyping(false);
+            lastTypingEmitRef.current = 0;
+        }, 1000);
+    };
+
+    const handleTyping = useCallback(async (isTyping) => {
+        if (!selectedCustomer?.ConversationId || !auth) return;
+        const senderId = auth?.id || auth?.userId;
+        const isGroup = selectedCustomer?.IsGroup === 1;
+        let receiverIdValue;
+        if (isGroup) {
+            if (Array.isArray(selectedCustomer.members) && selectedCustomer.members.length > 0) {
+                receiverIdValue = selectedCustomer.members.map(m => m.UserId || m.id);
+            } else {
+                try {
+                    const groupData = await fetchGroupDetails(selectedCustomer.ConversationId, auth);
+                    if (groupData && groupData.members) {
+                        receiverIdValue = groupData.members.map(m => m.UserId);
+                    } else {
+                        receiverIdValue = [];
+                    }
+                } catch (error) {
+                    receiverIdValue = [];
+                }
+            }
+        } else {
+            receiverIdValue = selectedCustomer.ReceiverId || selectedCustomer.UserId || selectedCustomer.CustomerId;
+        }
+        emitInternalTyping({
+            ConversationId: selectedCustomer.ConversationId,
+            SenderId: senderId,
+            ReceiverId: receiverIdValue,
+            IsGroup: isGroup ? 1 : 0,
+            UserName: auth?.username || auth?.name,
+            ufcc: auth?.ufcc,
+            isTyping: isTyping
+        });
+    }, [selectedCustomer, auth]);
+
     useEffect(() => {
-        // Only clear local state if parent went from non-empty to empty
         if (prevInputValueRef.current !== '' && inputValue === '') {
             setTempQuery('')
         }
@@ -58,9 +113,15 @@ const ChatBox = ({
 
     const onEmojiClick = (emojiData) => {
         const emoji = emojiData?.emoji || '';
-        setTempQuery((prev) => prev + emoji);
-
-        // keep the cursor in input
+        setTempQuery((prev) => {
+            const newVal = prev + emoji;
+            handleTyping(true);
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => {
+                handleTyping(false);
+            }, 3000);
+            return newVal;
+        });
         if (inputRef.current) {
             inputRef.current.focus();
         }
@@ -259,7 +320,7 @@ const ChatBox = ({
                         autoFocus={replyToMessage?.Id !== '' ? true : false}
                         maxRows={4}
                         value={tempQuery}
-                        onChange={(e) => setTempQuery(e.target.value)}
+                        onChange={onInputChange}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault()

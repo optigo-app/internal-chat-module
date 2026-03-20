@@ -10,16 +10,23 @@ const DangerZone = ({
     return (
         <div className="danger-zone">
             {isGroup ? (
-                // Group Chat: Show "Clear Chat" and "Exit Group"
+                // Group Chat: Show "Clear Chat" and either "Exit Group" or "Delete Group"
                 <>
                     <div className="danger-item" onClick={onClearChat} style={{ cursor: 'pointer' }}>
                         <CircleMinus size={20} />
                         <span>Clear chat</span>
                     </div>
-                    <div className="danger-item" onClick={onExitGroup} style={{ cursor: 'pointer' }}>
-                        <LogOut size={20} />
-                        <span>{isRemovedFromCurrentGroup ? 'Delete group' : 'Exit group'}</span>
-                    </div>
+                    {isRemovedFromCurrentGroup ? (
+                        <div className="danger-item" onClick={onDeleteChat} style={{ cursor: 'pointer' }}>
+                            <Trash2 size={20} />
+                            <span>Delete group</span>
+                        </div>
+                    ) : (
+                        <div className="danger-item" onClick={onExitGroup} style={{ cursor: 'pointer' }}>
+                            <LogOut size={20} />
+                            <span>Exit group</span>
+                        </div>
+                    )}
                 </>
             ) : (
                 // Individual Chat: Show "Clear Chat" and "Delete Chat"

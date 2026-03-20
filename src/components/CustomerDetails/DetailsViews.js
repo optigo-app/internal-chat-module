@@ -73,7 +73,7 @@ const DetailsViews = ({
         <div className={`views-container view-${currentViewState} direction-${direction}`}>
             {currentViewState === 'info' ? (
                 <div className={`view-content info-view ${direction}`} key="info">
-                    <div className="info-view-container" style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+                    <div className="info-view-container" style={{ display: 'flex', flexDirection: 'column' }}>
                         <div className="info-sections-wrapper" style={{ flex: 1 }}>
                             <ProfileSection
                                 customer={customer}
@@ -91,8 +91,6 @@ const DetailsViews = ({
                                 handleProfileRemoveComplete={handleProfileRemoveComplete}
                             />
 
-                            <div className="section-divider" style={{ height: '1px', backgroundColor: '#f0f2f5', margin: '0 -24px' }} />
-
                             <ActionButtons
                                 customer={customer}
                                 isCurrentUserAdmin={isCurrentUserAdmin}
@@ -105,7 +103,6 @@ const DetailsViews = ({
 
                             {customer?.IsGroup === 1 && (
                                 <>
-                                    <div className="section-divider" style={{ height: '1px', backgroundColor: '#f0f2f5', margin: '0 -24px' }} />
                                     <GroupDescription
                                         localGroupData={localGroupData}
                                         isCurrentUserAdmin={isCurrentUserAdmin}

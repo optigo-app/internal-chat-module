@@ -37,7 +37,7 @@ const ActionButtons = ({
     }
 
     return (
-        <div className="action-buttons group-block-actions">
+        <div className="action-buttons group-block-actions" style={{ marginBottom: '15px' }}>
             <div className="action-block-item" onClick={onSearchClick}>
                 <IconButton className="action-circle">
                     <Search size={20} />

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Box, CircularProgress, Typography } from '@mui/material';
+import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
 import MediaPreview from '../MediaPreview/MediaPreview';
 import MessageItem from './MessageItem';
 import ScrollToBottomButton from './ScrollToBottomButton';
@@ -38,7 +39,8 @@ const MessageArea = ({
     replyToMessage,
     handleForward,
     processFiles,
-    captureMessageScrollState
+    captureMessageScrollState,
+    typingStatus
 }) => {
     const [hoveredMessageId, setHoveredMessageId] = useState(null);
     const [reactionMenuAnchorEl, setReactionMenuAnchorEl] = useState(null);
@@ -49,6 +51,17 @@ const MessageArea = ({
 
     const isMediaPreviewOpen = (mediaFiles?.length || 0) > 0;
     const scrollToBottomBottomOffset = replyToMessage ? 170 : 110;
+
+    // Scroll to bottom when typing status appears
+    useEffect(() => {
+        if (typingStatus && containerRef.current) {
+            const container = containerRef.current;
+            const isNearBottom = container.scrollHeight - container.clientHeight - container.scrollTop < 100;
+            if (isNearBottom) {
+                scrollToBottom('smooth');
+            }
+        }
+    }, [typingStatus, scrollToBottom, containerRef]);
 
     const closeReactionMenu = useCallback(() => {
         setReactionMenuAnchorEl(null);
@@ -265,6 +278,29 @@ const MessageArea = ({
                     </React.Fragment>
                 ))}
                 <div ref={messagesEndRef} />
+                
+                {typingStatus && (
+                    <div className="typing-indicator-wrapper">
+                        <ConversationAvatar 
+                            member={{
+                                UserName: typingStatus.UserName,
+                                ufcc: typingStatus.ufcc,
+                                IsGroup: 0
+                            }} 
+                            size={28} 
+                        />
+                        <div className="typing-indicator-bubble">
+                            {selectedCustomer?.IsGroup === 1 && (
+                                <span className="typing-user-name">{typingStatus.UserName}</span>
+                            )}
+                            <div className="typing-dots-container">
+                                <div className="typing-dot"></div>
+                                <div className="typing-dot"></div>
+                                <div className="typing-dot"></div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {isMediaPreviewOpen && (

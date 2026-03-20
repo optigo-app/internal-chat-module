@@ -17,7 +17,7 @@ import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { addReactionApi } from '../../API/SendMessage/addReactionApi';
 import { removeReactionApi } from '../../API/SendMessage/removeReactionApi';
-import { emitSendReaction, emitRemoveReaction } from '../../socket';
+import { emitSendReaction, emitRemoveReaction, addInternalTypingHandler } from '../../socket';
 import useOnlineStatus from '../../utils/internetCheck';
 import OfflineOverlay from './OfflineOverlay';
 import AddMemberDialog from '../ReusableComponent/AddMemberDialog';
@@ -77,6 +77,43 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const [drawerViewState, setDrawerViewState] = useState('info');
     const [selectedMessageForInfo, setSelectedMessageForInfo] = useState(null);
     const messagesRef = useRef(null);
+    const [typingStatus, setTypingStatus] = useState(null);
+    const typingTimeoutRef = useRef(null);
+
+    // Typing indicator handler
+    useEffect(() => {
+        const cleanup = addInternalTypingHandler((data) => {
+            const incomingConvId = data.ConversationId;
+            const currentConvId = selectedCustomer?.ConversationId;
+
+            // Strict ID matching: Number conversion handles string/number mismatch
+            if (Number(incomingConvId) === Number(currentConvId)) {
+                const currentUserId = auth?.id || auth?.userId;
+                if (Number(data.SenderId) !== Number(currentUserId)) {
+                    if (data.isTyping === false) {
+                        setTypingStatus(null);
+                        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                    } else {
+                        // For groups, ensure we have the member's name
+                        setTypingStatus({
+                            ...data,
+                            UserName: data.UserName || data.senderName || 'Someone'
+                        });
+                        
+                        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                        typingTimeoutRef.current = setTimeout(() => {
+                            setTypingStatus(null);
+                        }, 5000); // 5s fallback
+                    }
+                }
+            }
+        });
+
+        return () => {
+            cleanup();
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        };
+    }, [selectedCustomer?.ConversationId, auth]);
 
     // Use Context for global favorite state management
     const { favoriteState, updateFavoriteStatus } = useFavorite();
@@ -1022,28 +1059,28 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
             action: 'clearChat',
             icon: <CircleMinus size={18} />
         },
-        ...(selectedCustomer?.IsGroup === 1 && !isRemovedFromCurrentGroup
-            ? [{
-                label: 'Exit group',
-                action: 'exitGroup',
-                icon: <LogOut size={18} />,
-                danger: true
-            },
-            {
-                label: 'Delete group',
-                action: 'deleteGroup',
-                icon: <Trash2 size={18} />,
-                danger: true
-            }]
-            : []),
-        ...(selectedCustomer?.IsGroup !== 1 || isRemovedFromCurrentGroup
-            ? [{
+        ...(selectedCustomer?.IsGroup === 1 
+            ? (isRemovedFromCurrentGroup 
+                ? [{
+                    label: 'Delete group',
+                    action: 'deleteGroup',
+                    icon: <Trash2 size={18} />,
+                    danger: true
+                }]
+                : [{
+                    label: 'Exit group',
+                    action: 'exitGroup',
+                    icon: <LogOut size={18} />,
+                    danger: true
+                }]
+            )
+            : [{
                 label: 'Delete chat',
                 action: 'deleteChat',
                 icon: <Trash2 size={18} />,
                 danger: true
             }]
-            : []),
+        ),
     ];
 
     const toggleEmojiPicker = useCallback(() => {
@@ -1171,18 +1208,24 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                     <Typography variant="subtitle1" className="customer-name" onClick={handleOpenInfo} style={{ cursor: 'pointer' }}>
                                         {getCustomerDisplayName(selectedCustomer)}
                                     </Typography>
-                                    {selectedCustomer?.IsGroup === 1 ? (
-                                        selectedCustomer?.GroupDesc ? (
-                                            <Typography variant="body2" className="customer-email">
-                                                {selectedCustomer.GroupDesc}
-                                            </Typography>
-                                        ) : null
+                                    {typingStatus ? (
+                                        <Typography variant="body2" className="typing-indicator" sx={{ color: '#25D366', fontWeight: 500 }}>
+                                            {selectedCustomer?.IsGroup === 1 ? `${typingStatus.UserName} is typing...` : 'typing...'}
+                                        </Typography>
                                     ) : (
-                                        displayEmail ? (
-                                            <Typography variant="body2" className="customer-email">
-                                                {displayEmail}
-                                            </Typography>
-                                        ) : null
+                                        selectedCustomer?.IsGroup === 1 ? (
+                                            selectedCustomer?.GroupDesc ? (
+                                                <Typography variant="body2" className="customer-email">
+                                                    {selectedCustomer.GroupDesc}
+                                                </Typography>
+                                            ) : null
+                                        ) : (
+                                            displayEmail ? (
+                                                <Typography variant="body2" className="customer-email">
+                                                    {displayEmail}
+                                                </Typography>
+                                            ) : null
+                                        )
                                     )}
                                 </div>
                             </div>
@@ -1272,6 +1315,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                 isSwitchingConversation={isSwitchingConversation}
                                 processFiles={processFiles}
                                 captureMessageScrollState={captureMessageScrollState}
+                                typingStatus={typingStatus}
                             />
 
                             <ChatBox

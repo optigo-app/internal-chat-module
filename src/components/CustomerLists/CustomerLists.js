@@ -31,7 +31,7 @@ import WhatsAppMenu from '../ReusableComponent/WhatsAppMenu';
 import { getMessagePreview, processApiResponse, getCustomerListMenuItems } from './CustomerListFunc';
 import { updateConversationApi } from '../../API/SendMessage/updateConversationApi';
 import { updateChatCache } from '../Conversation/conversationUtils';
-import { addInternalMessageHandler, addInternalStatusHandler } from '../../socket';
+import { addInternalMessageHandler, addInternalStatusHandler, addInternalTypingHandler } from '../../socket';
 import { Helmet } from 'react-helmet-async';
 import { notify } from '../../utils/notificationTemplates';
 import NotificationPermissionBar from '../_ui/NotificationPermissionBar';
@@ -57,6 +57,8 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const [anchorEl, setAnchorEl] = useState(null);
     const [selectMember, setSelectMember] = useState({});
     const [hoveredId, setHoveredId] = useState(null);
+    const [typingStates, setTypingStates] = useState({}); // { conversationId: { isTyping, userName } }
+    const typingTimeoutsRef = useRef({});
     const [showNewChat, setShowNewChat] = useState(false);
     const [showCreateGroup, setShowCreateGroup] = useState(false);
     const containerRef = useRef(null);
@@ -199,6 +201,57 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             }, 0);
         }
     }, [chatMembers, onConversationList]);
+
+    useEffect(() => {
+        if (!auth?.token || !auth?.userId) return;
+
+        const cleanup = addInternalTypingHandler((data) => {
+            const conversationId = Number(data.ConversationId);
+            const senderId = Number(data.SenderId);
+            const currentUserId = Number(auth?.id || auth?.userId);
+
+            if (senderId === currentUserId) return;
+
+            if (data.isTyping === false) {
+                setTypingStates(prev => {
+                    const newState = { ...prev };
+                    delete newState[conversationId];
+                    return newState;
+                });
+                if (typingTimeoutsRef.current[conversationId]) {
+                    clearTimeout(typingTimeoutsRef.current[conversationId]);
+                    delete typingTimeoutsRef.current[conversationId];
+                }
+            } else {
+                setTypingStates(prev => ({
+                    ...prev,
+                    [conversationId]: {
+                        isTyping: true,
+                        userName: data.UserName
+                    }
+                }));
+
+                if (typingTimeoutsRef.current[conversationId]) {
+                    clearTimeout(typingTimeoutsRef.current[conversationId]);
+                }
+
+                typingTimeoutsRef.current[conversationId] = setTimeout(() => {
+                    setTypingStates(prev => {
+                        const newState = { ...prev };
+                        delete newState[conversationId];
+                        return newState;
+                    });
+                    delete typingTimeoutsRef.current[conversationId];
+                }, 5000);
+            }
+        });
+
+        return () => {
+            cleanup();
+            Object.values(typingTimeoutsRef.current).forEach(clearTimeout);
+            typingTimeoutsRef.current = {};
+        };
+    }, [auth?.id, auth?.userId, auth?.token]);
 
     const normalizeMessageType = (type) => {
         if (typeof type === 'string') return type;
@@ -1100,41 +1153,54 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                                                 className={shouldShowUnreadBadge ? 'last-message-unread' : 'last-message'}
                                                                 style={{ display: 'flex', alignItems: 'center' }}
                                                             >
-                                                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                    {getMessageStatusIcon(member)}
+                                                                {typingStates[member.ConversationId] ? (
+                                                                    <span style={{ color: '#25D366', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                        <div className="typing-dots-container sidebar-dots">
+                                                                            <div className="typing-dot"></div>
+                                                                            <div className="typing-dot"></div>
+                                                                            <div className="typing-dot"></div>
+                                                                        </div>
+                                                                        {member.IsGroup === 1 
+                                                                            ? `${typingStates[member.ConversationId].userName} is typing...` 
+                                                                            : 'typing...'}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                        {getMessageStatusIcon(member)}
 
-                                                                    {/* TEXT MESSAGE */}
-                                                                    {member.LastMessageType === 1 && (
-                                                                        member.LastMessage || 'Text'
-                                                                    )}
+                                                                        {/* TEXT MESSAGE */}
+                                                                        {member.LastMessageType === 1 && (
+                                                                            member.LastMessage || 'Text'
+                                                                        )}
 
-                                                                    {/* IMAGE */}
-                                                                    {member.LastMessageType === 2 && (
-                                                                        <>
-                                                                            <Image size={12} />
-                                                                            <span>Image</span>
-                                                                        </>
-                                                                    )}
+                                                                        {/* IMAGE */}
+                                                                        {member.LastMessageType === 2 && (
+                                                                            <>
+                                                                                <Image size={12} />
+                                                                                <span>Image</span>
+                                                                            </>
+                                                                        )}
 
-                                                                    {/* VIDEO */}
-                                                                    {member.LastMessageType === 3 && (
-                                                                        <>
-                                                                            <Video size={14} />
-                                                                            <span>Video</span>
-                                                                        </>
-                                                                    )}
+                                                                        {/* VIDEO */}
+                                                                        {member.LastMessageType === 3 && (
+                                                                            <>
+                                                                                <Video size={14} />
+                                                                                <span>Video</span>
+                                                                            </>
+                                                                        )}
 
-                                                                    {/* DOCUMENT */}
-                                                                    {member.LastMessageType === 4 && (
-                                                                        <>
-                                                                            <FileText size={12} />
-                                                                            <span>Document</span>
-                                                                        </>
-                                                                    )}
+                                                                        {/* DOCUMENT */}
+                                                                        {member.LastMessageType === 4 && (
+                                                                            <>
+                                                                                <FileText size={12} />
+                                                                                <span>Document</span>
+                                                                            </>
+                                                                        )}
 
-                                                                    {/* FALLBACK */}
-                                                                    {!member.LastMessageType && <span>Text</span>}
-                                                                </span>
+                                                                        {/* FALLBACK */}
+                                                                        {!member.LastMessageType && <span>Text</span>}
+                                                                    </span>
+                                                                )}
 
                                                             </Typography>
 

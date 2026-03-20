@@ -10,7 +10,7 @@ const MediaPreview = ({
         (mediaItems.documents?.length || 0);
 
     return (
-        <div className="settings-list" style={{ marginTop: '12px' }}>
+        <div className="settings-list">
             <div className="setting-item clickable-member" onClick={onClick} style={{ cursor: 'pointer' }}>
                 <div className="setting-left">
                     <Image size={20} color="#667781" />
