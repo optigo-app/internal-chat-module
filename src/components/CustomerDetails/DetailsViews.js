@@ -9,6 +9,7 @@ import MediaPanelView from './MediaPanelView';
 import SearchMessages from './SearchMessages';
 import GroupPermissions from './GroupPermissions';
 import MessageInfo from './MessageInfo';
+import ContactInfo from './ContactInfo';
 import { Box, Typography } from '@mui/material';
 
 const DetailsViews = ({
@@ -62,6 +63,7 @@ const DetailsViews = ({
     scrollToMessage,
     groupPermissions,
     handlePermissionChange,
+    onEditAdmins,
     messageInfo,
     onClose,
     searchResults = [],
@@ -89,6 +91,7 @@ const DetailsViews = ({
                                 startEditingName={startEditingName}
                                 handleProfileUploadComplete={handleProfileUploadComplete}
                                 handleProfileRemoveComplete={handleProfileRemoveComplete}
+                                groupPermissions={groupPermissions}
                             />
 
                             <ActionButtons
@@ -99,6 +102,7 @@ const DetailsViews = ({
                                     setDirection('forward');
                                     setCurrentViewState('search');
                                 }}
+                                groupPermissions={groupPermissions}
                             />
 
                             {customer?.IsGroup === 1 && (
@@ -112,11 +116,19 @@ const DetailsViews = ({
                                         handleSaveDesc={handleSaveDesc}
                                         startEditingDesc={startEditingDesc}
                                         setIsEditingDesc={setIsEditingDesc}
+                                        groupPermissions={groupPermissions}
                                     />
                                 </>
                             )}
 
                             <div className="section-divider" style={{ height: '1px', backgroundColor: '#f0f2f5', margin: '0 -24px' }} />
+
+                            {customer?.IsGroup !== 1 && (
+                                <>
+                                    <ContactInfo customer={customer} />
+                                    <div className="section-divider" style={{ height: '1px', backgroundColor: '#f0f2f5', margin: '0 -24px' }} />
+                                </>
+                            )}
 
                             <MediaPreview
                                 mediaItems={mediaItems}
@@ -146,6 +158,7 @@ const DetailsViews = ({
                                         onMemberClick={handleMemberClick}
                                         showAllMembers={showAllMembers}
                                         setShowAllMembers={setShowAllMembers}
+                                        groupPermissions={groupPermissions}
                                     />
                                 </>
                             )}
@@ -211,6 +224,8 @@ const DetailsViews = ({
                     <GroupPermissions
                         permissions={groupPermissions}
                         onPermissionChange={handlePermissionChange}
+                        groupMembers={localGroupData.members}
+                        onEditAdmins={onEditAdmins}
                         onBack={() => { setDirection('backward'); setCurrentViewState('info'); }}
                     />
                 </div>

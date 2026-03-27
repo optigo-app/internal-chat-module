@@ -36,6 +36,28 @@ export const toastConfig = {
                 secondary: '#fef2f2',
             },
         },
+        warning: {
+            style: {
+                background: '#fef3c7',
+                color: '#92400e',
+                border: '1px solid #fde68a',
+            },
+            iconTheme: {
+                primary: '#f59e0b',
+                secondary: '#fef3c7',
+            },
+        },
+        info: {
+            style: {
+                background: '#eff6ff',
+                color: '#1e40af',
+                border: '1px solid #bfdbfe',
+            },
+            iconTheme: {
+                primary: '#3b82f6',
+                secondary: '#eff6ff',
+            },
+        },
         loading: {
             style: {
                 background: '#f9fafb',

@@ -28,12 +28,18 @@ export const removeMemberApi = async (auth, { conversationId, memberId, removedM
 
         // Emit socket event if member removed successfully
         if (response?.Status === "200") {
+            const rd = response?.Data?.rd?.[0] || (Array.isArray(response?.rd) ? response.rd[0] : (response?.Data?.rd || response?.rd));
+
+            // Only emit socket and proceed if business logic succeeded (stat !== 0)
+            if (rd?.stat === 0) {
+                return response;
+            }
+
             // Get member IDs after removal, but add the removed member back into broadcast list
             // so they receive the event on their side (to clear state/notify)
             const allMemberIds = await getGroupMemberIds(conversationId, auth);
             const broadcastIds = Array.from(new Set([...allMemberIds, Number(memberId)]));
             
-            const rd = response?.Data?.rd?.[0] || (Array.isArray(response?.rd) ? response.rd[0] : (response?.Data?.rd || response?.rd));
 
             // Enrich conversationData with necessary fields
             const enrichedRd = {

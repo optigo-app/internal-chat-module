@@ -23,13 +23,19 @@ export const assignRoleApi = async (auth, { conversationId, memberId, currentIsA
 
         const body = buildCommonBody("AssignRole", auth, payload, "Group ( AssignRole )");
         const response = await CommonAPI(body);
-        
+
         // Emit socket event if role changed successfully
         if (response?.Status === "200") {
+            const rd = response?.Data?.rd?.[0] || (Array.isArray(response?.rd) ? response.rd[0] : (response?.Data?.rd || response?.rd));
+
+            // Only emit socket and proceed if business logic succeeded (stat !== 0)
+            if (rd?.stat === 0) {
+                return response;
+            }
+
             const allMemberIds = await getGroupMemberIds(conversationId, auth);
             const isPromotion = currentIsAdmin === 0; // If was not admin, now promoted
-            
-            const rd = response?.Data?.rd?.[0] || (Array.isArray(response?.rd) ? response.rd[0] : (response?.Data?.rd || response?.rd));
+
 
             // Enrich conversationData with necessary fields
             const enrichedRd = {
@@ -58,7 +64,7 @@ export const assignRoleApi = async (auth, { conversationId, memberId, currentIsA
                 isGroupAdmin: isPromotion ? 1 : 0,
                 timestamp: new Date().toISOString()
             };
-            
+
             if (isPromotion) {
                 emitMemberPromoted(eventData);
             } else {

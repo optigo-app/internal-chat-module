@@ -2,14 +2,18 @@ import {
     Typography,
     styled,
     Switch,
-    Divider
-} from '@mui/material';
+    Divider,
+    Box
+} from "@mui/material";
 import {
     Edit,
     MessageSquare,
     UserPlus,
-    UserCheck
-} from 'lucide-react';
+    UserCheck,
+    ChevronRight,
+    UserStar,
+    Link2
+} from "lucide-react";
 
 const IOSSwitch = styled((props) => (
     <Switch focusVisibleClassName=".Mui-focusVisible" disableRipple {...props} />
@@ -17,116 +21,179 @@ const IOSSwitch = styled((props) => (
     width: 42,
     height: 26,
     padding: 0,
-    '& .MuiSwitch-switchBase': {
+    "& .MuiSwitch-switchBase": {
         padding: 0,
         margin: 2,
-        transitionDuration: '300ms',
-        '&.Mui-checked': {
-            transform: 'translateX(16px)',
-            color: '#fff',
-            '& + .MuiSwitch-track': {
+        transitionDuration: "300ms",
+        "&.Mui-checked": {
+            transform: "translateX(16px)",
+            color: "#fff",
+            "& + .MuiSwitch-track": {
                 backgroundColor: theme.palette.primary.main,
                 opacity: 1,
-                border: 0,
-            },
-            '&.Mui-disabled + .MuiSwitch-track': {
-                opacity: 0.5,
-            },
-        },
-        '&.Mui-focusVisible .MuiSwitch-thumb': {
-            color: theme.palette.primary.main,
-            border: '6px solid #fff',
-        },
-        '&.Mui-disabled .MuiSwitch-thumb': {
-            color: theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[600],
-        },
-        '&.Mui-disabled + .MuiSwitch-track': {
-            opacity: theme.palette.mode === 'light' ? 0.7 : 0.3,
-        },
+                border: 0
+            }
+        }
     },
-    '& .MuiSwitch-thumb': {
-        boxSizing: 'border-box',
+    "& .MuiSwitch-thumb": {
+        boxSizing: "border-box",
         width: 22,
-        height: 22,
+        height: 22
     },
-    '& .MuiSwitch-track': {
-        borderRadius: 26 / 2,
-        backgroundColor: theme.palette.mode === 'light' ? '#E9E9EA' : '#39393D',
-        opacity: 1,
-        transition: theme.transitions.create(['background-color'], {
-            duration: 500,
-        }),
-    },
+    "& .MuiSwitch-track": {
+        borderRadius: 13,
+        backgroundColor: "#E9E9EA",
+        opacity: 1
+    }
 }));
 
-const GroupPermissions = ({ permissions, onPermissionChange, onBack }) => {
+const GroupPermissions = ({
+    permissions,
+    onPermissionChange,
+    groupMembers = [],
+    onEditAdmins
+}) => {
+    const admins = groupMembers.filter(
+        (m) => m.IsAdmin === 1 || m.IsAdmin === true
+    );
+
+    const adminNames = admins
+        .map((m) => m.Name || m.DisplayName || m.UserName || "Admin")
+        .join(", ");
+
     return (
-        <div className="media-panel-view permissions-view">
-            <div className="permissions-content" style={{ padding: '0 0 20px 0' }}>
-                <div className="permission_group" style={{ padding: '20px' }}>
-                    <Typography className="group_label" sx={{ mb: 2, color: '#667781', fontSize: '14px', fontWeight: 500 }}>
+        <div className="permissions-view">
+            <div className="permissions-content">
+
+                {/* MEMBERS PERMISSIONS */}
+                <div className="permission_group">
+                    <Typography className="group_label">
                         Members can:
                     </Typography>
 
-                    <div className="permission_item" style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-                        <Edit size={22} color="#667781" />
-                        <div className="item_text" style={{ flex: 1 }}>
-                            <Typography variant="body1" sx={{ fontSize: '16px', color: '#111b21' }}>Edit group settings</Typography>
-                            <Typography variant="caption" sx={{ color: '#667781', fontSize: '13px', display: 'block', mt: 0.5 }}>
-                                This includes the name, icon, description, disappearing message timer, and the ability to pin, keep or unkeep messages.
+                    <div className="permission_item">
+                        <Edit className="item_icon" />
+                        <div className="item_text">
+                            <Typography variant="body1">
+                                Edit group settings
+                            </Typography>
+                            <Typography variant="caption">
+                                This includes the name, icon, description, disappearing message timer, and pin messages.
                             </Typography>
                         </div>
+
                         <IOSSwitch
                             checked={permissions?.editGroupSettings ?? true}
-                            onChange={(e) => onPermissionChange('editGroupSettings', e.target.checked)}
+                            onChange={(e) =>
+                                onPermissionChange("editGroupSettings", e.target.checked)
+                            }
                         />
                     </div>
 
-                    <div className="permission_item" style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'center' }}>
-                        <MessageSquare size={22} color="#667781" />
-                        <div className="item_text" style={{ flex: 1 }}>
-                            <Typography variant="body1" sx={{ fontSize: '16px', color: '#111b21' }}>Send new messages</Typography>
+                    <div className="permission_item">
+                        <MessageSquare className="item_icon" />
+                        <div className="item_text">
+                            <Typography variant="body1">
+                                Send new messages
+                            </Typography>
                         </div>
+
                         <IOSSwitch
                             checked={permissions?.sendMessages ?? true}
-                            onChange={(e) => onPermissionChange('sendMessages', e.target.checked)}
+                            onChange={(e) =>
+                                onPermissionChange("sendMessages", e.target.checked)
+                            }
                         />
                     </div>
 
-                    <div className="permission_item" style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'center' }}>
-                        <UserPlus size={22} color="#667781" />
-                        <div className="item_text" style={{ flex: 1 }}>
-                            <Typography variant="body1" sx={{ fontSize: '16px', color: '#111b21' }}>Add other members</Typography>
+                    <div className="permission_item">
+                        <UserPlus className="item_icon" />
+                        <div className="item_text">
+                            <Typography variant="body1">
+                                Add other members
+                            </Typography>
                         </div>
+
                         <IOSSwitch
                             checked={permissions?.addOtherMembers ?? true}
-                            onChange={(e) => onPermissionChange('addOtherMembers', e.target.checked)}
+                            onChange={(e) =>
+                                onPermissionChange("addOtherMembers", e.target.checked)
+                            }
                         />
                     </div>
 
+                    <div className="permission_item">
+                        <Link2 className="item_icon" />
+                        <div className="item_text">
+                            <Typography variant="body1">
+                                Invite via link
+                            </Typography>
+                        </div>
+
+                        <IOSSwitch
+                            checked={permissions?.inviteToGroup ?? true}
+                            onChange={(e) =>
+                                onPermissionChange("inviteToGroup", e.target.checked)
+                            }
+                        />
+                    </div>
                 </div>
 
-                <Divider sx={{ mx: 0, my: 1, borderColor: 'rgba(134, 150, 160, 0.15)' }} />
+                <Divider />
 
-                <div className="permission_group" style={{ padding: '20px' }}>
-                    <Typography className="group_label" sx={{ mb: 2, color: '#667781', fontSize: '14px', fontWeight: 500 }}>
+                {/* ADMIN SETTINGS */}
+                <div className="permission_group">
+                    <Typography className="group_label">
                         Admins can:
                     </Typography>
 
-                    <div className="permission_item" style={{ display: 'flex', gap: '15px' }}>
-                        <UserCheck size={22} color="#667781" />
-                        <div className="item_text" style={{ flex: 1 }}>
-                            <Typography variant="body1" sx={{ fontSize: '16px', color: '#111b21' }}>Approve new members</Typography>
-                            <Typography variant="caption" sx={{ color: '#667781', fontSize: '13px', display: 'block', mt: 0.5 }}>
+                    <div className="permission_item">
+                        <UserCheck className="item_icon" />
+                        <div className="item_text">
+                            <Typography variant="body1">
+                                Approve new members
+                            </Typography>
+                            <Typography variant="caption">
                                 When turned on, admins must approve anyone who wants to join this group.
                             </Typography>
                         </div>
+
                         <IOSSwitch
                             checked={permissions?.approveNewMembers ?? false}
-                            onChange={(e) => onPermissionChange('approveNewMembers', e.target.checked)}
+                            onChange={(e) =>
+                                onPermissionChange("approveNewMembers", e.target.checked)
+                            }
                         />
                     </div>
                 </div>
+
+                <Divider />
+
+                {/* ADMIN MANAGEMENT */}
+                <div className="permission_group">
+                    <Typography className="group_label">
+                        Group admin:
+                    </Typography>
+
+                    <Box className="permission_item clickable" onClick={onEditAdmins}>
+                        <UserStar className="item_icon" />
+
+                        <Box className="item_text">
+                            <Typography variant="body1">
+                                Edit group admins
+                            </Typography>
+
+                            {adminNames && (
+                                <Typography variant="caption" className="admin_names">
+                                    {adminNames}
+                                </Typography>
+                            )}
+                        </Box>
+
+                        <ChevronRight className="chevron_icon" />
+                    </Box>
+                </div>
+
             </div>
         </div>
     );

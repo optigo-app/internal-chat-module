@@ -1,123 +1,108 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Menu,
   MenuItem,
   ListItemIcon,
   ListItemText,
+  Divider,
 } from "@mui/material";
-import { styled } from "@mui/material/styles";
 import {
   Reply,
   Forward,
   Copy,
   Trash2,
-  Star,
-  Laugh,
   Info,
+  User,
+  Edit2,
 } from "lucide-react";
 import toast from "react-hot-toast";
-
-// Modern styled menu container
-const StyledMenu = styled(Menu)(({ theme }) => ({
-  "& .MuiPaper-root": {
-    borderRadius: "12px",
-    minWidth: 190,
-    backdropFilter: "blur(12px)",
-    background:
-      theme.palette.mode === "dark"
-        ? "rgba(30, 30, 30, 0.85)"
-        : "rgba(255, 255, 255, 0.9)",
-    boxShadow:
-      "0 4px 16px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.08)",
-    border:
-      theme.palette.mode === "dark"
-        ? "1px solid rgba(255,255,255,0.08)"
-        : "1px solid rgba(0,0,0,0.08)",
-    padding: "4px",
-  },
-}));
-
-// ✨ Each menu item
-const StyledMenuItem = styled(MenuItem)(({ theme }) => ({
-  borderRadius: "8px",
-  margin: "2px 0",
-  fontSize: "0.9rem",
-  fontWeight: 500,
-  color: theme.palette.text.primary,
-  transition: "all 0.2s ease",
-  "&:hover": {
-    backgroundColor:
-      theme.palette.mode === "dark"
-        ? "rgba(255,255,255,0.1)"
-        : "rgba(0,0,0,0.05)",
-    transform: "translateX(2px)",
-  },
-  "& .MuiListItemIcon-root": {
-    minWidth: "32px",
-    color:
-      theme.palette.mode === "dark"
-        ? "rgba(255,255,255,0.7)"
-        : "rgba(0,0,0,0.6)",
-  },
-  "& svg": {
-    width: 18,
-    height: 18,
-  },
-}));
+import { isMessageEditable } from "../../utils/globalFunc";
 
 const MessageContextMenu = ({
   open,
   onClose,
-  onReply,
-  onForward,
-  onCopy,
-  onDelete,
-  onStar,
-  onReact,
-  onMessageInfo,
   message,
   mouseX,
   mouseY,
+  onReply,
+  onForward,
+  onDelete,
+  onEdit,
+  onMessageInfo,
+  onMemberRedirect,
 }) => {
-  const handleMessageInfo = () => {
-    onMessageInfo?.(message);
-    onClose();
-  };
+  const timeLimit = parseInt(process.env.REACT_APP_MESSAGE_EDIT_TIME_LIMIT || "15", 10);
 
-  const handleReply = () => {
-    onReply?.(message);
-    onClose();
-  };
+  const isWithinTimeLimit = useMemo(() => {
+    return isMessageEditable(message, timeLimit);
+  }, [message, timeLimit]);
 
-  const handleForward = (e) => {
-    e.stopPropagation();
-    onForward?.(message, e);
-    onClose();
-  };
+  const isOutgoing = message?.Direction === 1;
+  const isText = message?.MessageType === 'text';
 
   const handleCopy = () => {
-    if (message?.Message) navigator.clipboard.writeText(message.Message);
-    toast.success("Text Copied !!")
-    onClose();
+    if (message?.Message) {
+      navigator.clipboard.writeText(message.Message);
+      toast.success("Text Copied");
+    }
   };
 
-  const handleDelete = () => {
-    onDelete?.(message);
-    onClose();
-  };
+  const items = useMemo(() => [
+    message?.Direction === 1 && {
+      label: "Message Info",
+      icon: <Info size={18} />,
+      action: () => onMessageInfo?.(message),
+    },
 
-  const handleStar = () => {
-    onStar?.(message);
-    onClose();
-  };
+    {
+      label: "Reply",
+      icon: <Reply size={18} />,
+      action: () => onReply?.(message),
+    },
 
-  const handleReact = () => {
-    onReact?.(message);
-    onClose();
+    message?.Direction === 0 && {
+      label: `Message ${message?.SenderInfo || "User"}`,
+      icon: <User size={18} />,
+      action: () => onMemberRedirect?.(message),
+    },
+
+    {
+      label: "Copy",
+      icon: <Copy size={17} />,
+      action: handleCopy,
+    },
+
+    {
+      label: "Forward",
+      icon: <Forward size={18} />,
+      action: () => onForward?.(message),
+    },
+
+    isOutgoing && isWithinTimeLimit && {
+      divider: true,
+    },
+
+    isOutgoing && isWithinTimeLimit && isText && {
+      label: "Edit",
+      icon: <Edit2 size={18} />,
+      action: () => onEdit?.(message),
+    },
+
+    {
+      label: "Delete",
+      icon: <Trash2 size={18} />,
+      danger: true,
+      action: () => onDelete?.(message),
+    },
+  ].filter(Boolean), [message, isWithinTimeLimit, isOutgoing, isText]);
+
+  const handleClick = (action) => {
+    action?.();
+    onClose?.();
   };
 
   return (
-    <StyledMenu
+    <Menu
       open={open}
       onClose={onClose}
       anchorReference="anchorPosition"
@@ -126,61 +111,61 @@ const MessageContextMenu = ({
           ? { top: mouseY, left: mouseX }
           : undefined
       }
+      onClick={(e) => e.stopPropagation()}
+      PaperProps={{
+        elevation: 0,
+        sx: {
+          minWidth: 180,
+          borderRadius: 2,
+          py: 0.5,
+          boxShadow:
+            "0px 6px 18px rgba(0,0,0,0.12), 0px 3px 6px rgba(0,0,0,0.08)",
+        },
+      }}
       transformOrigin={{ horizontal: "left", vertical: "top" }}
     >
+      {items?.map((item, index) =>
+        item.divider ? (
+          <Divider key={index} sx={{ my: 0.5 }} />
+        ) : (
+          <MenuItem
+            key={index}
+            onClick={() => handleClick(item.action)}
+            sx={{
+              py: 1.1,
+              px: 2,
+              mb: 0.5,
+              borderRadius: 1.5,
+              transition: "all 0.2s ease",
+              background: item.danger ? "error.main" : "text.primary",
+              "&:hover": {
+                backgroundColor: item.danger
+                  ? "rgba(255,0,0,0.08)"
+                  : "action.hover",
+                transform: "translateX(3px)",
+              },
+            }}
+          >
+            {item.icon && (
+              <ListItemIcon sx={{ minWidth: "30px !important" }}>
+                {item.icon}
+              </ListItemIcon>
+            )}
 
-      {/* Message Info - Outgoing only */}
-      {message?.Direction === 1 && (
-        <StyledMenuItem onClick={handleMessageInfo}>
-          <ListItemIcon>
-            <Info />
-          </ListItemIcon>
-          <ListItemText>Message Info</ListItemText>
-        </StyledMenuItem>
+            <ListItemText
+              primary={item.label}
+              sx={{
+                m: 0,
+                "& .MuiTypography-root": {
+                  fontSize: 14,
+                  fontWeight: 500,
+                },
+              }}
+            />
+          </MenuItem>
+        )
       )}
-
-      {/* Reply */}
-      <StyledMenuItem onClick={handleReply}>
-        <ListItemIcon>
-          <Reply />
-        </ListItemIcon>
-        <ListItemText>Reply</ListItemText>
-      </StyledMenuItem>
-
-      {/* Forward */}
-      <StyledMenuItem onClick={handleForward}>
-        <ListItemIcon>
-          <Forward />
-        </ListItemIcon>
-        <ListItemText>Forward</ListItemText>
-      </StyledMenuItem>
-
-
-      {/* Copy */}
-      <StyledMenuItem onClick={handleCopy}>
-        <ListItemIcon>
-          <Copy />
-        </ListItemIcon>
-        <ListItemText>Copy</ListItemText>
-      </StyledMenuItem>
-
-
-      {/* Delete (for sender only) */}
-      {message?.sender === "You" && (
-        <StyledMenuItem
-          onClick={handleDelete}
-          sx={{
-            color: "#e53935",
-            "& svg": { color: "#e53935" },
-          }}
-        >
-          <ListItemIcon>
-            <Trash2 />
-          </ListItemIcon>
-          <ListItemText>Delete</ListItemText>
-        </StyledMenuItem>
-      )}
-    </StyledMenu>
+    </Menu>
   );
 };
 

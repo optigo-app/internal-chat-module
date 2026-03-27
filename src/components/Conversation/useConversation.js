@@ -13,6 +13,8 @@ import { LoginContext } from '../../context/LoginData';
 import { formatDateHeader, formatTime12h } from '../../utils/DateFnc';
 import { forwardMessageApi } from '../../API/SendMessage/forwardMessageApi';
 import { replyToMessageApi } from '../../API/SendMessage/replyToMessageApi';
+import { editMessageApi } from '../../API/SendMessage/EditMessageApi';
+import { deleteMessageApi } from '../../API/SendMessage/DeleteMessageApi';
 import imageNotFound from '../../assets/image-not-found.jpg';
 import { generateMediaFolderName, validateMediaFiles } from '../../utils/globalFunc';
 import { showToast } from '../../utils/toastHelper';
@@ -788,7 +790,57 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         setShowMedia(false);
     }, []);
 
-    // ── Upload & send media ──────────────────────────────────────────────────
+    // ── Edit & Delete Message handlers ──────────────────────────────────────
+
+    const handleEditMessage = useCallback(async (messageId, newMessage) => {
+        if (!messageId || !newMessage.trim()) return;
+        try {
+            const response = await editMessageApi(auth, { messageId, newMessage });
+            if (response) {
+                setMessages(prev => {
+                    const prevData = normalizeMessagesList(prev);
+                    const updatedData = prevData.map(msg => {
+                        const msgId = msg.MessageId || msg.Id || msg.id;
+                        if (String(msgId) === String(messageId)) {
+                            return { ...msg, Message: newMessage, IsEdited: 1 };
+                        }
+                        return msg;
+                    });
+                    return Array.isArray(prev) ? updatedData : { ...prev, data: updatedData };
+                });
+                toast.success("Message edited successfully");
+            } else {
+                toast.error("Failed to edit message");
+            }
+        } catch (error) {
+            console.error("Error editing message:", error);
+            toast.error("Error editing message");
+        }
+    }, [auth]);
+
+    const handleDeleteMessage = useCallback(async (messageId, mode) => {
+        if (!messageId) return;
+        try {
+            const response = await deleteMessageApi(auth, messageId, mode);
+            if (response) {
+                setMessages(prev => {
+                    const prevData = normalizeMessagesList(prev);
+                    // Filter out the deleted message or mark as deleted
+                    const updatedData = prevData.filter(msg => {
+                        const msgId = msg.MessageId || msg.Id || msg.id;
+                        return String(msgId) !== String(messageId);
+                    });
+                    return Array.isArray(prev) ? updatedData : { ...prev, data: updatedData };
+                });
+                toast.success("Message deleted successfully");
+            } else {
+                toast.error("Failed to delete message");
+            }
+        } catch (error) {
+            console.error("Error deleting message:", error);
+            toast.error("Error deleting message");
+        }
+    }, [auth]);
 
     const uploadAndSendMedia = useCallback(async ({ files, caption, type, tempId, time, date, dateTime }) => {
         const safeFiles = Array.isArray(files) ? files.filter(f => f instanceof File) : [];
@@ -1589,6 +1641,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         getMessageStatusIcon,
         formatDateHeader,
         addUniqueMessage,
+        handleEditMessage,
+        handleDeleteMessage,
         refresh: () => loadConversation(1, true, true),
     };
 };

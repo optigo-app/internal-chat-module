@@ -26,7 +26,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import './CustomerLists.scss';
 import { fetchConversationLists } from '../../API/ConverLists/ConversationLists';
 import { formatChatTimestamp } from '../../utils/DateFnc';
-import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig, hasCustomerName } from '../../utils/globalFunc';
+import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig, hasCustomerName, highlightText } from '../../utils/globalFunc';
 import WhatsAppMenu from '../ReusableComponent/WhatsAppMenu';
 import { getMessagePreview, processApiResponse, getCustomerListMenuItems } from './CustomerListFunc';
 import { updateConversationApi } from '../../API/SendMessage/updateConversationApi';
@@ -514,10 +514,10 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     useEffect(() => {
         if (!auth?.token || !auth?.userId) return;
 
-        const { 
-            addGroupEventHandler, 
-            addGroupMemberHandler, 
-            addGroupPermissionHandler 
+        const {
+            addGroupEventHandler,
+            addGroupMemberHandler,
+            addGroupPermissionHandler
         } = require('../../socket');
 
         const currentUserId = auth?.id || auth?.userId;
@@ -531,9 +531,9 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 'group_created': 'GROUP_CREATED',
                 'group_updated': 'GROUP_UPDATED',
             };
-            
+
             const notificationTemplate = eventNotificationMap[data.eventType];
-            
+
             // Show browser notification if not in the conversation
             if (notificationTemplate && selectedCustomer?.ConversationId !== data.conversationId) {
                 notify(data, notificationTemplate, auth);
@@ -547,12 +547,12 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                         const prevData = Array.isArray(prev?.data) ? prev.data : [];
                         const updatedData = [...prevData];
                         const index = updatedData.findIndex(c => Number(c.ConversationId) === Number(data.conversationId));
-                        
+
                         if (index !== -1) {
                             // Safely merge: Don't overwrite valid name/desc with "Unknown" or null
                             const existing = updatedData[index];
                             const merged = { ...existing, ...normalized };
-                            
+
                             if (!normalized.ConversationName || normalized.name === 'Unknown') {
                                 merged.name = existing.name;
                                 merged.ConversationName = existing.ConversationName;
@@ -568,13 +568,13 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                         } else if (data.eventType === 'group_created') {
                             // Add new conversation (for group_created)
                             updatedData.push(normalized);
-                            return { 
-                                ...prev, 
+                            return {
+                                ...prev,
                                 data: updatedData.sort(conversationComparator),
-                                total: (prev?.total ?? 0) + 1 
+                                total: (prev?.total ?? 0) + 1
                             };
                         }
-                        
+
                         updatedData.sort(conversationComparator);
                         return { ...prev, data: updatedData };
                     });
@@ -589,7 +589,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         const handleMemberEvent = (data) => {
             if (!data || !data.conversationId) return;
 
-            const isCurrentUserRemoved = data.eventType === 'member_removed' && 
+            const isCurrentUserRemoved = data.eventType === 'member_removed' &&
                 Number(data.removedMemberId) === Number(currentUserId);
 
             // Map event types to notification templates
@@ -599,9 +599,9 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 'member_promoted': 'MEMBER_PROMOTED',
                 'member_demoted': 'MEMBER_DEMOTED'
             };
-            
+
             const notificationTemplate = eventNotificationMap[data.eventType];
-            
+
             // Show browser notification if not in the conversation
             if (notificationTemplate && selectedCustomer?.ConversationId !== data.conversationId) {
                 notify(data, notificationTemplate, auth);
@@ -615,11 +615,11 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                         const prevData = Array.isArray(prev?.data) ? prev.data : [];
                         const updatedData = [...prevData];
                         const index = updatedData.findIndex(c => Number(c.ConversationId) === Number(data.conversationId));
-                        
+
                         if (index !== -1) {
                             const existing = updatedData[index];
                             const merged = { ...existing, ...normalized };
-                            
+
                             // Safely preserve identity fields if missing in update
                             if (!normalized.ConversationName || normalized.name === 'Unknown') {
                                 merged.name = existing.name;
@@ -628,12 +628,12 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                             if (!normalized.GroupDesc) {
                                 merged.GroupDesc = existing.GroupDesc;
                             }
-                            
+
                             updatedData[index] = merged;
                         } else if (data.eventType === 'member_added') {
                             updatedData.push(normalized);
                         }
-                        
+
                         updatedData.sort(conversationComparator);
                         return { ...prev, data: updatedData };
                     });
@@ -703,7 +703,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
 
         window.addEventListener('REFRESH_CONVERSATION_LIST', handleRefresh);
         window.addEventListener('DELETE_CONVERSATION', handleDelete);
-        
+
         return () => {
             window.removeEventListener('REFRESH_CONVERSATION_LIST', handleRefresh);
             window.removeEventListener('DELETE_CONVERSATION', handleDelete);
@@ -886,7 +886,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 if (!prev?.data) return prev;
                 const index = prev.data.findIndex(m => Number(m.ConversationId) === Number(conversationId));
                 if (index === -1) return prev;
-                
+
                 // If it's already 0, skip to avoid unnecessary render
                 if (Number(prev.data[index].unreadCount) === 0) return prev;
 
@@ -1139,7 +1139,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                                                 variant="subtitle1"
                                                                 className={shouldShowUnreadBadge ? 'member-name-unread' : 'member-name'}
                                                             >
-                                                                {member.name}
+                                                                {highlightText(member.name, searchTerm)}
                                                             </Typography>
 
                                                             <Typography variant="caption" className="member-time">
@@ -1154,14 +1154,14 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                                                 style={{ display: 'flex', alignItems: 'center' }}
                                                             >
                                                                 {typingStates[member.ConversationId] ? (
-                                                                    <span style={{ color: '#25D366', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                    <span className='typing_indecator'>
                                                                         <div className="typing-dots-container sidebar-dots">
                                                                             <div className="typing-dot"></div>
                                                                             <div className="typing-dot"></div>
                                                                             <div className="typing-dot"></div>
                                                                         </div>
-                                                                        {member.IsGroup === 1 
-                                                                            ? `${typingStates[member.ConversationId].userName} is typing...` 
+                                                                        {member.IsGroup === 1
+                                                                            ? `${typingStates[member.ConversationId].userName} is typing...`
                                                                             : 'typing...'}
                                                                     </span>
                                                                 ) : (

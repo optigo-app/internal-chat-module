@@ -8,11 +8,12 @@ import { LoginContext } from '../../context/LoginData';
 import MessageContextMenu from '../MessageBubble/MessageContextMenu';
 import ForwardMessage from '../ForwardMessage/ForwardMessage';
 import MediaViewer from '../MediaViewer/MediaViewer';
-import { getCustomerDisplayName } from '../../utils/globalFunc';
+import { getCustomerDisplayName, isMessageEditable } from '../../utils/globalFunc';
 import ChatBox from './ChatBox';
 import MessageArea from './MessageArea';
 import ViewContext from './ViewContext';
 import { useConversation } from './useConversation';
+import EditMessageDialog from './EditMessageDialog';
 import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { addReactionApi } from '../../API/SendMessage/addReactionApi';
@@ -31,6 +32,7 @@ import { clearChatApi } from '../../API/ClearChat/ClearChatApi';
 import { deleteConversationApi } from '../../API/ConversationView/DeleteConversationApi';
 import { useFavorite } from '../../contexts/FavoriteContext';
 import { useRemoveInGroup } from '../../contexts/RemoveInGroupContext';
+import { useGroupAdminMode } from '../../contexts/GroupAdminModeContext';
 import { useGroupSocket } from '../../contexts/GroupSocketContext';
 import { notify } from '../../utils/notificationTemplates';
 import {
@@ -79,14 +81,14 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const messagesRef = useRef(null);
     const [typingStatus, setTypingStatus] = useState(null);
     const typingTimeoutRef = useRef(null);
+    const [selectedMessageForDelete, setSelectedMessageForDelete] = useState(null);
+    const [isCurrentUserAdmin, setIsCurrentUserAdmin] = useState(false);
 
     // Typing indicator handler
     useEffect(() => {
         const cleanup = addInternalTypingHandler((data) => {
             const incomingConvId = data.ConversationId;
             const currentConvId = selectedCustomer?.ConversationId;
-
-            // Strict ID matching: Number conversion handles string/number mismatch
             if (Number(incomingConvId) === Number(currentConvId)) {
                 const currentUserId = auth?.id || auth?.userId;
                 if (Number(data.SenderId) !== Number(currentUserId)) {
@@ -94,12 +96,10 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                         setTypingStatus(null);
                         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
                     } else {
-                        // For groups, ensure we have the member's name
                         setTypingStatus({
                             ...data,
                             UserName: data.UserName || data.senderName || 'Someone'
                         });
-                        
                         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
                         typingTimeoutRef.current = setTimeout(() => {
                             setTypingStatus(null);
@@ -115,37 +115,58 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         };
     }, [selectedCustomer?.ConversationId, auth]);
 
-    // Use Context for global favorite state management
     const { favoriteState, updateFavoriteStatus } = useFavorite();
 
-    // Use Context for RemoveInGroup state management
     const { updateRemoveInGroupStatus, isRemovedFromGroup } = useRemoveInGroup();
+    const { updateGroupAdminMode, isGroupOnlyAdminSend } = useGroupAdminMode();
 
-    // Use Context for group socket management
     const { registerListener, unregisterListener } = useGroupSocket();
 
-    // Get favorite status from Context state or fallback to selectedCustomer prop
     const isFavorite = favoriteState[selectedCustomer?.ConversationId]?.isStar ?? (selectedCustomer?.IsStar === 1);
 
-    // Get removed from group status from Context state or fallback to selectedCustomer prop
     const contextRemovedStatus = isRemovedFromGroup(selectedCustomer?.ConversationId);
-    // Use context value if it exists, otherwise fallback to prop
     const isRemovedFromCurrentGroup = contextRemovedStatus !== null && contextRemovedStatus !== undefined
         ? contextRemovedStatus
         : (selectedCustomer?.RemoveInGroup === 1);
 
-    // Update RemoveInGroup context when selectedCustomer data changes
+    // Get admin mode status from Context state or fallback to selectedCustomer prop
+    const contextAdminMode = isGroupOnlyAdminSend(selectedCustomer?.ConversationId);
+    const isOnlyAdminSend = contextAdminMode !== null && contextAdminMode !== undefined
+        ? contextAdminMode
+        : (selectedCustomer?.IsGroupAdmin === 1);
+
     useEffect(() => {
         if (selectedCustomer?.ConversationId && selectedCustomer?.RemoveInGroup !== undefined) {
             updateRemoveInGroupStatus(selectedCustomer.ConversationId, selectedCustomer.RemoveInGroup === 1);
         }
     }, [selectedCustomer?.ConversationId, selectedCustomer?.RemoveInGroup, updateRemoveInGroupStatus]);
 
-    // Close drawer when switching conversations
     useEffect(() => {
         setDrawerOpen(false);
         setDrawerViewState('info');
     }, [selectedCustomer?.ConversationId]);
+
+    useEffect(() => {
+        const fetchInitialGroupStatus = async () => {
+            if (selectedCustomer?.IsGroup === 1 && selectedCustomer?.ConversationId && auth) {
+                try {
+                    const groupData = await fetchGroupDetails(selectedCustomer.ConversationId, auth);
+                    if (groupData && groupData.groupDetails) {
+                        updateGroupAdminMode(selectedCustomer.ConversationId, groupData.groupDetails.SendNewMessage === 0);
+
+                        const currentUserId = auth?.id || auth?.userId;
+                        const currentUser = groupData.members?.find(m => Number(m.UserId) === Number(currentUserId));
+                        setIsCurrentUserAdmin(currentUser?.IsGroupAdmin === 1);
+                    }
+                } catch (error) {
+                    console.error('Error fetching initial group status:', error);
+                }
+            } else {
+                setIsCurrentUserAdmin(false);
+            }
+        };
+        fetchInitialGroupStatus();
+    }, [selectedCustomer?.ConversationId, selectedCustomer?.IsGroup, auth]);
 
     const handleOpenSearch = () => {
         setDrawerViewState('search');
@@ -213,6 +234,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         processFiles,
         refresh,
         addUniqueMessage,
+        handleEditMessage,
+        handleDeleteMessage,
         searchResults,
         isSearching,
     } = useConversation(selectedCustomer, onConversationRead, onViewConversationRead, drawerOpen);
@@ -311,10 +334,18 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     const isCurrentUserAdded = data.newMemberIds?.some(id => Number(id) === Number(currentUserId));
                     if (isCurrentUserAdded) {
                         updateRemoveInGroupStatus(conversationId, false);
+                        // Also re-check admin status or just wait for refresh
                         toast.success('You were added to the group');
                     } else {
                         toast(message);
                     }
+                } else if (data.eventType === 'member_promoted' || data.eventType === 'member_demoted') {
+                    // Update admin status if IT WAS US
+                    const isAffectedMember = Number(data.memberId) === Number(currentUserId);
+                    if (isAffectedMember) {
+                        setIsCurrentUserAdmin(data.eventType === 'member_promoted');
+                    }
+                    toast(message);
                 } else {
                     toast(message);
                 }
@@ -328,13 +359,20 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 }
             },
             onPermissionEvent: (data) => {
-                if (data.conversationId !== conversationId) return;
+                if (Number(data.conversationId) !== Number(conversationId)) return;
 
                 // Show browser notification
                 notify(data, 'PERMISSION_CHANGED', auth);
 
                 // Show toast notification
                 toast('Group permissions updated');
+
+                // Update local state if SendNewMessage changed
+                if (data.changedPermission && data.changedPermission.name === 'SendNewMessage') {
+                    updateGroupAdminMode(conversationId, data.changedPermission.value === 0);
+                } else if (data.permissions) {
+                    updateGroupAdminMode(conversationId, data.permissions.SendNewMessage === 0);
+                }
 
                 // Refresh conversation
                 if (refresh) {
@@ -855,6 +893,24 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         setContextMenu(null);
     }, []);
 
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [selectedMessageForEdit, setSelectedMessageForEdit] = useState(null);
+
+    const handleEditAction = useCallback((message) => {
+        setSelectedMessageForEdit(message);
+        setEditDialogOpen(true);
+        setMessageContextMenu(null);
+    }, []);
+
+    const handleDeleteAction = useCallback((message) => {
+        setSelectedMessageForDelete(message);
+        setConfirmationModal({
+            isOpen: true,
+            actionType: 'deleteMessage'
+        });
+        setMessageContextMenu(null);
+    }, []);
+
     const handleToggleFavorite = useCallback(async () => {
         const newIsStar = isFavorite ? 0 : 1;
 
@@ -1059,8 +1115,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
             action: 'clearChat',
             icon: <CircleMinus size={18} />
         },
-        ...(selectedCustomer?.IsGroup === 1 
-            ? (isRemovedFromCurrentGroup 
+        ...(selectedCustomer?.IsGroup === 1
+            ? (isRemovedFromCurrentGroup
                 ? [{
                     label: 'Delete group',
                     action: 'deleteGroup',
@@ -1139,6 +1195,29 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         setDrawerOpen(true);
     }, []);
 
+    const handleMemberRedirect = useCallback((member) => {
+        console.log("member", member)
+        if (member) {
+            if (member.ConversationId) {
+                window.dispatchEvent(new CustomEvent('SELECT_CONVERSATION', {
+                    detail: { conversationId: member.ConversationId }
+                }));
+            } else {
+                window.dispatchEvent(new CustomEvent('SELECT_NEW_CONVERSATION', {
+                    detail: {
+                        customer: {
+                            ...member,
+                            UserId: member.UserId,
+                            name: member.Name || member.MemberName,
+                            ProfileImageUrl: member.ProfileImageUrl || member.ProfileImage,
+                            IsGroup: 0
+                        }
+                    }
+                }));
+            }
+        }
+    }, []);
+
     if (!isOnline) {
         return (
             <div className="conversation-container">
@@ -1209,7 +1288,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                         {getCustomerDisplayName(selectedCustomer)}
                                     </Typography>
                                     {typingStatus ? (
-                                        <Typography variant="body2" className="typing-indicator" sx={{ color: '#25D366', fontWeight: 500 }}>
+                                        <Typography variant="body2" className="typing-indicator">
                                             {selectedCustomer?.IsGroup === 1 ? `${typingStatus.UserName} is typing...` : 'typing...'}
                                         </Typography>
                                     ) : (
@@ -1338,6 +1417,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                 handleSendMessage={handleSendMessageCallback}
                                 mediaFiles={mediaFiles}
                                 isRemovedFromGroup={isRemovedFromCurrentGroup}
+                                isOnlyAdminSend={isOnlyAdminSend}
+                                isCurrentUserAdmin={isCurrentUserAdmin}
                                 selectedCustomer={selectedCustomer}
                             />
                         </>
@@ -1399,6 +1480,9 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 onReply={handleReply}
                 onForward={handleForward}
                 onMessageInfo={handleMessageInfo}
+                onMemberRedirect={(handleMemberRedirect)}
+                onEdit={handleEditAction}
+                onDelete={handleDeleteAction}
                 message={messageContextMenu?.message}
                 mouseX={messageContextMenu?.mouseX}
                 mouseY={messageContextMenu?.mouseY}
@@ -1440,25 +1524,57 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                         ? handleConfirmDeleteChat
                         : confirmationModal.actionType === 'clearChat'
                             ? handleConfirmClearChat
-                            : handleConfirmExitGroup
+                            : confirmationModal.actionType === 'deleteMessage'
+                                ? null // Handled by actions
+                                : handleConfirmExitGroup
                 }
+                actions={confirmationModal.actionType === 'deleteMessage' ? [
+                    ...((() => {
+                        const msg = selectedMessageForDelete;
+                        const isOutgoing = msg?.Direction === 1;
+                        const timeLimit = parseInt(process.env.REACT_APP_MESSAGE_EDIT_TIME_LIMIT || "15", 10);
+                        const isWithinTimeLimit = isMessageEditable(msg, timeLimit);
+
+                        return isWithinTimeLimit && isOutgoing ? [{
+                            label: 'Delete for everyone',
+                            onClick: () => handleDeleteMessage(msg?.MessageId ?? msg?.Id, 2),
+                            danger: true,
+                            variant: 'btn-action'
+                        }] : [];
+                    })()),
+                    {
+                        label: 'Delete for me',
+                        onClick: () => handleDeleteMessage(selectedMessageForDelete?.MessageId ?? selectedMessageForDelete?.Id, 1),
+                        danger: true,
+                        variant: 'btn-action'
+                    },
+                    {
+                        label: 'Cancel',
+                        onClick: () => setConfirmationModal({ isOpen: false, actionType: null }),
+                        variant: 'btn-action'
+                    }
+                ] : []}
                 title={
                     confirmationModal.actionType === 'adminCannotLeave'
                         ? 'Cannot Leave Group'
-                        : (confirmationModal.actionType === 'deleteGroup' || confirmationModal.actionType === 'deleteChat')
-                            ? 'Delete Chat?'
-                            : confirmationModal.actionType === 'clearChat'
-                                ? 'Clear Chat?'
-                                : 'Exit Group?'
+                        : confirmationModal.actionType === 'deleteMessage'
+                            ? 'Delete message?'
+                            : (confirmationModal.actionType === 'deleteGroup' || confirmationModal.actionType === 'deleteChat')
+                                ? 'Delete Chat?'
+                                : confirmationModal.actionType === 'clearChat'
+                                    ? 'Clear Chat?'
+                                    : 'Exit Group?'
                 }
                 description={
                     confirmationModal.actionType === 'adminCannotLeave'
                         ? 'You cannot leave the group because you are the only administrator. Please assign another admin before leaving.'
-                        : (confirmationModal.actionType === 'deleteGroup' || confirmationModal.actionType === 'deleteChat')
-                            ? 'Are you sure you want to delete this conversation? This will remove it from your chat list.'
-                            : confirmationModal.actionType === 'clearChat'
-                                ? 'Are you sure you want to clear all messages in this chat?'
-                                : 'Are you sure you want to exit this group?'
+                        : confirmationModal.actionType === 'deleteMessage'
+                            ? ''
+                            : (confirmationModal.actionType === 'deleteGroup' || confirmationModal.actionType === 'deleteChat')
+                                ? 'Are you sure you want to delete this conversation? This will remove it from your chat list.'
+                                : confirmationModal.actionType === 'clearChat'
+                                    ? 'Are you sure you want to clear all messages in this chat?'
+                                    : 'Are you sure you want to exit this group?'
                 }
                 confirmText={
                     confirmationModal.actionType === 'adminCannotLeave'
@@ -1469,8 +1585,15 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                 ? 'Clear'
                                 : 'Exit'
                 }
-                variant={['exitGroup', 'deleteGroup', 'deleteChat', 'clearChat'].includes(confirmationModal.actionType) ? 'danger' : 'primary'}
-                showCancel={confirmationModal.actionType !== 'adminCannotLeave'}
+                variant={['exitGroup', 'deleteGroup', 'deleteChat', 'clearChat', 'deleteMessage'].includes(confirmationModal.actionType) ? 'danger' : 'primary'}
+                showCancel={!['adminCannotLeave', 'deleteMessage'].includes(confirmationModal.actionType)}
+            />
+
+            <EditMessageDialog
+                open={editDialogOpen}
+                onClose={() => setEditDialogOpen(false)}
+                onSave={handleEditMessage}
+                originalMessage={selectedMessageForEdit}
             />
         </Box>
     );

@@ -15,6 +15,13 @@ export const addGroupParticipantApi = async (auth, { conversationId, selectedMem
 
         // Emit socket event if members added successfully
         if (response?.Status === "200") {
+            const rd = response?.Data?.rd?.[0] || (Array.isArray(response?.rd) ? response.rd[0] : (response?.Data?.rd || response?.rd));
+
+            // Only emit socket and proceed if business logic succeeded (stat !== 0)
+            if (rd?.stat === 0) {
+                return response;
+            }
+
             const allMemberIds = await getGroupMemberIds(conversationId, auth);
             // Ensure both existing and new members are in the broadcast list
             const broadcastIds = Array.from(new Set([
@@ -22,7 +29,6 @@ export const addGroupParticipantApi = async (auth, { conversationId, selectedMem
                 ...selectedMembers.map(id => Number(id))
             ]));
             
-            const rd = response?.Data?.rd?.[0] || (Array.isArray(response?.rd) ? response.rd[0] : (response?.Data?.rd || response?.rd));
             
             // Enrich conversationData with necessary fields
             const enrichedRd = {

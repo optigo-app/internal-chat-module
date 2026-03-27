@@ -1,50 +1,74 @@
-import { Tooltip, IconButton } from '@mui/material';
-import { UserPlus, Search } from 'lucide-react';
+import { Tooltip, IconButton, Grid } from "@mui/material";
+import { UserPlus, Search } from "lucide-react";
 
 const ActionButtons = ({
     customer,
     isCurrentUserAdmin,
     onAddClick,
-    onSearchClick
+    onSearchClick,
+    groupPermissions
 }) => {
+    const canAddMembers = isCurrentUserAdmin || groupPermissions?.addOtherMembers;
+
+    const ActionItem = ({ icon, label, onClick, disabled, tooltip }) => (
+        <Tooltip title={tooltip || ""} placement="top" arrow>
+            <div
+                className={`action-block-item ${disabled ? "disabled" : ""}`}
+                onClick={!disabled ? onClick : undefined}
+            >
+                <IconButton className="action-circle" disabled={disabled}>
+                    {icon}
+                </IconButton>
+                <span className="action-label">{label}</span>
+            </div>
+        </Tooltip>
+    );
+
     if (customer?.IsGroup === 1) {
         return (
-            <div className="action-buttons group-block-actions">
-                <Tooltip
-                    title={isCurrentUserAdmin ? '' : 'Only group admins can add members'}
-                    placement="top"
-                    arrow
-                >
-                    <div
-                        className={`action-block-item ${!isCurrentUserAdmin ? 'disabled' : ''}`}
-                        onClick={isCurrentUserAdmin ? onAddClick : undefined}
-                        style={{ cursor: isCurrentUserAdmin ? 'pointer' : 'not-allowed' }}
-                    >
-                        <IconButton className="action-circle" disabled={!isCurrentUserAdmin} tabIndex={-1}>
-                            <UserPlus size={20} />
-                        </IconButton>
-                        <span>Add</span>
-                    </div>
-                </Tooltip>
-                <div className="action-block-item" onClick={onSearchClick}>
-                    <IconButton className="action-circle">
-                        <Search size={20} />
-                    </IconButton>
-                    <span>Search</span>
-                </div>
-            </div>
+            <Grid
+                container
+                spacing={2}
+                className="action-buttons group-block-actions"
+                justifyContent="center"
+            >
+                <Grid size={{ xs: 6, sm: 4 }}>
+                    <ActionItem
+                        icon={<UserPlus size={20} />}
+                        label="Add"
+                        onClick={onAddClick}
+                        disabled={!canAddMembers}
+                        tooltip={!canAddMembers ? "Only group admins can add members" : ""}
+                    />
+                </Grid>
+
+                <Grid size={{ xs: 6, sm: 4 }}>
+                    <ActionItem
+                        icon={<Search size={20} />}
+                        label="Search"
+                        onClick={onSearchClick}
+                    />
+                </Grid>
+            </Grid>
         );
     }
 
     return (
-        <div className="action-buttons group-block-actions" style={{ marginBottom: '15px' }}>
-            <div className="action-block-item" onClick={onSearchClick}>
-                <IconButton className="action-circle">
-                    <Search size={20} />
-                </IconButton>
-                <span>Search</span>
-            </div>
-        </div>
+        <Grid
+            container
+            spacing={2}
+            className="action-buttons group-block-actions"
+            justifyContent="center"
+            sx={{ mb: 2 }}
+        >
+            <Grid size={{ xs: 4 }}>
+                <ActionItem
+                    icon={<Search size={20} />}
+                    label="Search"
+                    onClick={onSearchClick}
+                />
+            </Grid>
+        </Grid>
     );
 };
 

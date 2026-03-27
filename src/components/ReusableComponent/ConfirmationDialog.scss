@@ -97,6 +97,11 @@
             gap: 12px;
             justify-content: center;
 
+            &.vertical {
+                flex-direction: column;
+                gap: 8px;
+            }
+
             button {
                 flex: 1;
                 padding: 12px 20px;
@@ -110,6 +115,23 @@
                 align-items: center;
                 justify-content: center;
                 gap: 8px;
+
+                &.btn-action {
+                    background: #f0f2f5;
+                    color: $primary-main;
+                    width: 100%;
+
+                    &.danger {
+                        color: #ea4335;
+                        &:hover {
+                            background: rgba(#ea4335, 0.08);
+                        }
+                    }
+
+                    &:hover {
+                        background: #e9edef;
+                    }
+                }
 
                 &.btn-cancel {
                     background: #f0f2f5;

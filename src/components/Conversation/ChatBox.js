@@ -33,6 +33,8 @@ const ChatBox = ({
     handleKeyPress,
     handleSendMessage,
     isRemovedFromGroup = false,
+    isOnlyAdminSend = false,
+    isCurrentUserAdmin = false,
     selectedCustomer
 }) => {
     const inputRef = useRef(null);
@@ -41,12 +43,13 @@ const ChatBox = ({
     const [emojiPickerPlacement, setEmojiPickerPlacement] = useState('top-start');
     const [emojiPickerHeight, setEmojiPickerHeight] = useState(400);
 
-    // ✅ Focus whenever replyToMessage becomes true
+    const showOnlyAdminNotice = isOnlyAdminSend && !isCurrentUserAdmin;
+
     useEffect(() => {
-        if (replyToMessage?.id !== "" && inputRef.current) {
+        if (replyToMessage?.id !== "" && inputRef.current && !showOnlyAdminNotice && !isRemovedFromGroup) {
             inputRef.current.focus();
         }
-    }, [replyToMessage]);
+    }, [replyToMessage, showOnlyAdminNotice, isRemovedFromGroup]);
 
     const [tempQuery, setTempQuery] = useState(inputValue || '')
     const prevInputValueRef = useRef(inputValue)
@@ -73,7 +76,7 @@ const ChatBox = ({
     const handleTyping = useCallback(async (isTyping) => {
         if (!selectedCustomer?.ConversationId || !auth) return;
         const senderId = auth?.id || auth?.userId;
-        const isGroup = selectedCustomer?.IsGroup === 1;
+        const isGroup = selectedCustomer?.IsGroup == 1;
         let receiverIdValue;
         if (isGroup) {
             if (Array.isArray(selectedCustomer.members) && selectedCustomer.members.length > 0) {
@@ -119,7 +122,7 @@ const ChatBox = ({
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
             typingTimeoutRef.current = setTimeout(() => {
                 handleTyping(false);
-            }, 3000);
+            }, 1000);
             return newVal;
         });
         if (inputRef.current) {
@@ -129,23 +132,18 @@ const ChatBox = ({
 
     useEffect(() => {
         if (!showPicker || !emojiButtonRef.current) return;
-
         const recompute = () => {
             if (!emojiButtonRef.current) return;
-
             const rect = emojiButtonRef.current.getBoundingClientRect();
             const vh = window.innerHeight || 0;
             const margin = 12;
             const chrome = 56;
             const maxH = 400;
             const minH = 200;
-
             const availableDown = Math.max(0, vh - rect.bottom - margin);
             const availableUp = Math.max(0, rect.top - margin);
-
             const fitDown = Math.max(0, Math.min(maxH, availableDown - chrome));
             const fitUp = Math.max(0, Math.min(maxH, availableUp - chrome));
-
             const openDown = fitDown >= fitUp;
             setEmojiPickerPlacement(openDown ? 'bottom-start' : 'top-start');
             setEmojiPickerHeight(Math.max(minH, openDown ? fitDown : fitUp));
@@ -153,7 +151,6 @@ const ChatBox = ({
 
         recompute();
         window.addEventListener('resize', recompute);
-        // capture scroll from any scroll parent
         window.addEventListener('scroll', recompute, true);
 
         return () => {
@@ -187,6 +184,27 @@ const ChatBox = ({
                         fontStyle: 'italic'
                     }}>
                         You can't send messages. You're no longer a participant in this group.
+                    </span>
+                </div>
+            ) : showOnlyAdminNotice ? (
+                <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '16px 20px',
+                    backgroundColor: '#f0f2f5',
+                    borderRadius: '12px',
+                    margin: '8px 16px',
+                    border: '1px solid #e4e6ea'
+                }}>
+                    <span style={{
+                        color: '#667781',
+                        fontSize: '14px',
+                        textAlign: 'center',
+                        fontStyle: 'italic'
+                    }}>
+                        Only admins can send messages.
                     </span>
                 </div>
             ) : (

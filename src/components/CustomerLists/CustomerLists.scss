@@ -297,6 +297,11 @@
                         .member-header,
                         .member-message {
                             transition: color 0.2s ease, opacity 0.2s ease;
+
+                            .typing_indecator {
+                                color: $primary-main;
+                                font-weight: 500 !important;
+                            }
                         }
 
                         .member-name,

@@ -10,8 +10,10 @@ const GroupDescription = ({
     setEditedDesc,
     handleSaveDesc,
     startEditingDesc,
-    setIsEditingDesc
+    setIsEditingDesc,
+    groupPermissions
 }) => {
+    const canEditGroup = isCurrentUserAdmin || groupPermissions?.editGroupSettings;
     const date = formatDate(localGroupData.entryDate);
     const time = formatTime12h(localGroupData.entryDate);
     return (
@@ -20,7 +22,7 @@ const GroupDescription = ({
                 <Typography className="block-label accent-label">
                     {localGroupData.description ? 'Group description' : 'Add group description'}
                 </Typography>
-                {!isEditingDesc && isCurrentUserAdmin && (
+                {!isEditingDesc && canEditGroup && (
                     <IconButton size="small" className="edit-icon-btn" onClick={startEditingDesc}>
                         <Pencil size={20} />
                     </IconButton>
@@ -33,21 +35,21 @@ const GroupDescription = ({
                         fullWidth
                         multiline
                         variant="standard"
-                        value={editedDesc}
+                        value={editedDesc || ""}
                         onChange={(e) => setEditedDesc(e.target.value.slice(0, 256))}
                         autoFocus
                         onKeyDown={(e) => {
                             if (e.key === 'Escape') {
-                                setEditedDesc(localGroupData.description);
+                                setEditedDesc(localGroupData?.description || "");
                                 setIsEditingDesc(false);
                             }
                         }}
-                        helperText={`${editedDesc.length}/256`}
+                        helperText={`${(editedDesc || "").length}/256`}
                         InputProps={{
                             endAdornment: (
                                 <InputAdornment position="end">
                                     <IconButton size="small" onClick={() => {
-                                        setEditedDesc(localGroupData.description);
+                                        setEditedDesc(localGroupData?.description || "");
                                         setIsEditingDesc(false);
                                     }} sx={{ color: '#7D7f85', mr: 0.5 }}>
                                         <X size={18} />
@@ -63,8 +65,8 @@ const GroupDescription = ({
             ) : (
                 <Typography
                     className="block-value"
-                    style={{ cursor: isCurrentUserAdmin ? 'pointer' : 'default' }}
-                    onClick={isCurrentUserAdmin ? startEditingDesc : undefined}
+                    style={{ cursor: canEditGroup ? 'pointer' : 'default' }}
+                    onClick={canEditGroup ? startEditingDesc : undefined}
                 >
                     {localGroupData.description || ''}
                 </Typography>

@@ -219,6 +219,11 @@
                     right: 0;
                 }
             }
+
+            .typing-indicator {
+                color: $primary-main;
+                font-weight: 500;
+            }
         }
 
         .header-right {

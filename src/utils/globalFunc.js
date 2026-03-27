@@ -123,12 +123,12 @@ export const getSoftAvatarColors = (seed) => {
 
 export const hasCustomerName = (customer) => {
     const name = (
-        customer?.MemberName ?? 
-        customer?.ConversationName ?? 
-        customer?.name ?? 
-        customer?.UserName ?? 
-        customer?.CustomerName ?? 
-        customer?.Name ?? 
+        customer?.MemberName ??
+        customer?.ConversationName ??
+        customer?.name ??
+        customer?.UserName ??
+        customer?.CustomerName ??
+        customer?.Name ??
         customer?.SenderInfo ??
         (customer?.FirstName || customer?.LastName ? `${customer?.FirstName || ''} ${customer?.LastName || ''}`.trim() : null)
     ) ?? '';
@@ -137,12 +137,12 @@ export const hasCustomerName = (customer) => {
 
 export const getCustomerDisplayName = (customer) => {
     const name = String(
-        customer?.MemberName ?? 
-        customer?.ConversationName ?? 
-        customer?.name ?? 
-        customer?.UserName ?? 
-        customer?.CustomerName ?? 
-        customer?.Name ?? 
+        customer?.MemberName ??
+        customer?.ConversationName ??
+        customer?.name ??
+        customer?.UserName ??
+        customer?.CustomerName ??
+        customer?.Name ??
         customer?.SenderInfo ??
         (customer?.FirstName || customer?.LastName ? `${customer?.FirstName || ''} ${customer?.LastName || ''}`.trim() : '')
     ).trim();
@@ -156,12 +156,12 @@ export const getCustomerDisplayName = (customer) => {
 
 export const getCustomerAvatarSeed = (customer) => {
     const name = String(
-        customer?.MemberName ?? 
-        customer?.ConversationName ?? 
-        customer?.name ?? 
-        customer?.UserName ?? 
-        customer?.CustomerName ?? 
-        customer?.Name ?? 
+        customer?.MemberName ??
+        customer?.ConversationName ??
+        customer?.name ??
+        customer?.UserName ??
+        customer?.CustomerName ??
+        customer?.Name ??
         customer?.SenderInfo ??
         (customer?.FirstName || customer?.LastName ? `${customer?.FirstName || ''} ${customer?.LastName || ''}`.trim() : '')
     ).trim();
@@ -410,4 +410,26 @@ export const getTimeLabel = (input) => {
     } else {
         return date.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' });
     }
+};
+
+
+export const highlightText = (text, query) => {
+    if (!query) return text;
+
+    const parts = text.split(new RegExp(`(${query})`, 'gi'));
+    return parts.map((part, i) =>
+        part.toLowerCase() === query.toLowerCase() ? (
+            <span key={i} style={{ color: '#685dd8', fontWeight: 600 }}>
+                {part}
+            </span>
+        ) : part
+    );
+};
+
+export const isMessageEditable = (message, timeLimit = 15) => {
+    if (!message?.Date || !message?.Time) return false;
+    const sentTime = new Date(`${message.Date} ${message.Time}`).getTime();
+    const currentTime = Date.now();
+    const diffInMinutes = (currentTime - sentTime) / (1000 * 60);
+    return diffInMinutes <= timeLimit;
 };

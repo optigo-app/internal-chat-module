@@ -1,5 +1,4 @@
 import { useState, useEffect, useContext, useCallback, useRef } from 'react';
-import { Typography, IconButton } from '@mui/material';
 import './CustomerDetails.scss';
 import { LoginContext } from '../../context/LoginData';
 import { fetchMediaLists } from '../../API/MediaLists/MediaLists';
@@ -21,6 +20,8 @@ import ConfirmationDialog from '../ReusableComponent/ConfirmationDialog';
 import { getCustomerAvatarSeed, getCustomerDisplayName } from '../../utils/globalFunc';
 import { useFavorite } from '../../contexts/FavoriteContext';
 import { useRemoveInGroup } from '../../contexts/RemoveInGroupContext';
+import { useGroupAdminMode } from '../../contexts/GroupAdminModeContext';
+import { addGroupPermissionHandler } from '../../socket';
 
 const CustomerDetails = ({
     customer,
@@ -49,6 +50,7 @@ const CustomerDetails = ({
         editGroupSettings: true,
         sendMessages: true,
         addOtherMembers: true,
+        inviteToGroup: false,
         approveNewMembers: false
     });
     const [pagination, setPagination] = useState({
@@ -62,7 +64,8 @@ const CustomerDetails = ({
         description: customer?.GroupDesc || '',
         name: customer?.ConversationName || '',
         createdBy: null,
-        entryDate: null
+        entryDate: null,
+        createdById: null
     });
 
     // Editing states
@@ -74,6 +77,7 @@ const CustomerDetails = ({
     // Add Member Dialog state
     const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
     const [isParticipantSearchOpen, setIsParticipantSearchOpen] = useState(false);
+    const [isEditAdminDialogOpen, setIsEditAdminDialogOpen] = useState(false);
 
     // Confirmation Modal state for Role Change / Member Removal
     const [confirmationModal, setConfirmationModal] = useState({
@@ -90,6 +94,9 @@ const CustomerDetails = ({
 
     // Use Context for RemoveInGroup state management
     const { updateRemoveInGroupStatus, isRemovedFromGroup } = useRemoveInGroup();
+
+    // Use Context for group admin mode state management
+    const { updateGroupAdminMode } = useGroupAdminMode();
 
     // Get favorite status from Context state or fallback to customer prop
     const isFavorite = favoriteState[customer?.ConversationId]?.isStar ?? (customer?.IsStar === 1);
@@ -230,24 +237,17 @@ const CustomerDetails = ({
 
     useEffect(() => {
         if (customer.ConversationId) {
-            // Reset state when customer changes
             setMediaItems({ images: [], videos: [], documents: [] });
             setPagination({
                 images: { page: 1, hasMore: true, isLoading: false },
                 videos: { page: 1, hasMore: true, isLoading: false },
                 documents: { page: 1, hasMore: true, isLoading: false }
             });
-
             inFlightRequestsRef.current.clear();
             fetchedPagesRef.current.clear();
-
-            // Initial fetch logic: 
-            // Load group metadata if applicable
             if (customer.IsGroup === 1) {
                 loadGroupInfo();
             }
-
-            // Always fetch media data using the unified fetchMediaLists API for the sidebar preview
             fetchMediaData('images', 1);
         }
     }, [customer.ConversationId]);
@@ -259,7 +259,52 @@ const CustomerDetails = ({
         }
     }, [currentViewState, customer.ConversationId, fetchMediaData]);
 
-    // Handle view state updates when prop changes (e.g. from header search button)
+    // Real-time group permission updates via socket
+    useEffect(() => {
+        if (!customer?.ConversationId || customer?.IsGroup !== 1) return;
+
+        const permissionMap = {
+            EditGroup: 'editGroupSettings',
+            SendNewMessage: 'sendMessages',
+            AddOtherMember: 'addOtherMembers',
+            ApproveNewMembers: 'approveNewMembers'
+        };
+
+        const unsubscribe = addGroupPermissionHandler((data) => {
+            if (Number(data?.conversationId) !== Number(customer.ConversationId)) return;
+            const { changedPermission, permissions } = data;
+            if (permissions) {
+                const updated = {};
+                Object.entries(permissions).forEach(([apiKey, value]) => {
+                    const stateKey = permissionMap[apiKey];
+                    if (stateKey) updated[stateKey] = value === 1 || value === true;
+                });
+                if (Object.keys(updated).length > 0) {
+                    setGroupPermissions(prev => ({ ...prev, ...updated }));
+                    if (updated.sendMessages !== undefined) {
+                        updateGroupAdminMode(customer.ConversationId, updated.sendMessages === false);
+                    }
+                }
+            } else if (changedPermission) {
+                const stateKey = permissionMap[changedPermission.name];
+                if (stateKey) {
+                    const isAllowed = changedPermission.value === 1 || changedPermission.value === true;
+                    setGroupPermissions(prev => ({
+                        ...prev,
+                        [stateKey]: isAllowed
+                    }));
+                    if (changedPermission.name === 'SendNewMessage') {
+                        updateGroupAdminMode(customer.ConversationId, !isAllowed);
+                    }
+                }
+            }
+        });
+
+        return () => {
+            if (typeof unsubscribe === 'function') unsubscribe();
+        };
+    }, [customer?.ConversationId, customer?.IsGroup]);
+
     useEffect(() => {
         if (open && initialViewState) {
             setCurrentViewState(prev => {
@@ -274,15 +319,15 @@ const CustomerDetails = ({
 
     const loadGroupInfo = async () => {
         const data = await fetchGroupDetails(customer.ConversationId, auth);
+        console.log("data", data)
         if (data) {
             // Update permissions
             if (data.groupDetails) {
                 setGroupPermissions({
-                    editGroupSettings: data.groupDetails.EditGroup === 1,
-                    sendMessages: data.groupDetails.SendNewMessage === 1,
-                    addOtherMembers: data.groupDetails.AddOtherMember === 1,
                     approveNewMembers: data.groupDetails.ApproveNewMembers === 1
                 });
+
+                updateGroupAdminMode(customer.ConversationId, data.groupDetails.SendNewMessage === 0);
 
                 // Update local group metadata state
                 setLocalGroupData(prev => ({
@@ -290,7 +335,8 @@ const CustomerDetails = ({
                     description: data.groupDetails.Description || data.groupDetails.GroupDesc,
                     name: data.groupDetails.Name || data.groupDetails.ConversationName,
                     createdBy: data.groupDetails.CreatedByName || data.groupDetails.CreatedBy,
-                    entryDate: data.groupDetails.EntryDate
+                    entryDate: data.groupDetails.EntryDate,
+                    createdById: data.groupDetails.CreatedBy
                 }));
             }
 
@@ -313,11 +359,17 @@ const CustomerDetails = ({
     };
 
     const handlePermissionChange = async (name, value) => {
+        console.log(name, value, 'jdhjsh')
+        if (name === 'inviteToGroup' || name === 'approveNewMembers') {
+            toast(`${name} — coming soon!`);
+            return;
+        }
         setGroupPermissions(prev => ({ ...prev, [name]: value }));
         const permissionMap = {
             editGroupSettings: 'EditGroup',
             sendMessages: 'SendNewMessage',
             addOtherMembers: 'AddOtherMember',
+            inviteToGroup: 'inviteToGroup',
             approveNewMembers: 'ApproveNewMembers'
         };
 
@@ -332,6 +384,15 @@ const CustomerDetails = ({
             });
 
             if (response?.Status === "200") {
+                if (response?.Data?.rd?.[0]?.stat === 0) {
+                    // Revert state on business logic failure
+                    setGroupPermissions(prev => ({ ...prev, [name]: !value }));
+                    toast.error(response?.Data?.rd?.[0]?.stat_msg || 'Only group admins can change permissions.');
+                    return;
+                }
+                if (name === 'sendMessages') {
+                    updateGroupAdminMode(customer.ConversationId, value === false);
+                }
                 toast.success('Permission updated successfully');
             } else {
                 // Revert state on failure
@@ -362,6 +423,10 @@ const CustomerDetails = ({
                 groupProfile: ""
             });
             if (response?.Status === "200") {
+                if (response?.Data?.rd?.[0]?.stat === 0) {
+                    toast.error(response?.Data?.rd?.[0]?.stat_msg || 'Only group admins can edit this group.');
+                    return;
+                }
                 setLocalGroupData(prev => ({ ...prev, name: editedName }));
                 setIsEditingName(false);
                 toast.success('Group name updated');
@@ -390,6 +455,10 @@ const CustomerDetails = ({
                 groupProfile: ""
             });
             if (response?.Status === "200") {
+                if (response?.Data?.rd?.[0]?.stat === 0) {
+                    toast.error(response?.Data?.rd?.[0]?.stat_msg || 'Only group admins can edit this group.');
+                    return;
+                }
                 setLocalGroupData(prev => ({ ...prev, description: editedDesc }));
                 setIsEditingDesc(false);
                 toast.success('Group description updated');
@@ -402,12 +471,12 @@ const CustomerDetails = ({
     };
 
     const startEditingName = () => {
-        setEditedName(customer?.IsGroup === 1 ? localGroupData.name : displayName);
+        setEditedName(customer?.IsGroup === 1 ? (localGroupData?.name || "") : (displayName || ""));
         setIsEditingName(true);
     };
 
     const startEditingDesc = () => {
-        setEditedDesc(localGroupData.description);
+        setEditedDesc(localGroupData?.description || "");
         setIsEditingDesc(true);
     };
 
@@ -424,6 +493,10 @@ const CustomerDetails = ({
             });
 
             if (response?.Status === "200") {
+                if (response?.Data?.rd?.[0]?.stat === 0) {
+                    toast.error(response?.Data?.rd?.[0]?.stat_msg || 'Failed to add members');
+                    return;
+                }
                 toast.success('Members added successfully');
                 setIsAddMemberDialogOpen(false);
                 loadGroupInfo();
@@ -432,6 +505,35 @@ const CustomerDetails = ({
             }
         } catch (error) {
             toast.error('Error adding members');
+        }
+    };
+
+    const handleEditAdminsSubmit = async (selectedIds) => {
+        if (!selectedIds || selectedIds.length === 0) return;
+        setIsEditAdminDialogOpen(false);
+        try {
+            let hasError = false;
+            for (const memberId of selectedIds) {
+                const response = await assignRoleApi(auth, {
+                    conversationId: customer.ConversationId,
+                    memberId: memberId
+                });
+                if (response?.Status === "200") {
+                    if (response?.Data?.rd?.[0]?.stat === 0) {
+                        toast.error(response?.Data?.rd?.[0]?.stat_msg || 'Failed to update admin role');
+                        hasError = true;
+                    }
+                } else {
+                    hasError = true;
+                }
+            }
+            if (!hasError) {
+                toast.success('Admins updated successfully');
+            }
+            loadGroupInfo();
+        } catch (error) {
+            console.error('Error updating admins:', error);
+            toast.error('Error updating admins');
         }
     };
 
@@ -534,22 +636,22 @@ const CustomerDetails = ({
                 });
                 if (response?.Status === "200" || response?.success === true) {
                     toast.success('Chat cleared successfully');
-                    
+
                     // Clear messages from sessionStorage (unified key)
                     const cacheKey = `chat_cache_${customer.ConversationId}`;
                     sessionStorage.removeItem(cacheKey);
-                    
+
                     // Clear other related state if necessary
                     const lastPageKey = `chat_last_page_${customer.ConversationId}`;
                     sessionStorage.removeItem(lastPageKey);
 
                     setConfirmationModal({ isOpen: false, member: null, actionType: null });
-                    
+
                     // Dispatch event to notify Conversation component to clear its state
                     window.dispatchEvent(new CustomEvent('CLEAR_CONVERSATION_MESSAGES', {
                         detail: { conversationId: customer.ConversationId }
                     }));
-                    
+
                     window.dispatchEvent(new CustomEvent('REFRESH_CONVERSATION_LIST'));
                 } else {
                     toast.error(response?.Message || 'Failed to clear chat');
@@ -626,6 +728,11 @@ const CustomerDetails = ({
                 });
             }
             if (response?.Status === "200") {
+                if (response?.Data?.rd?.[0]?.stat === 0) {
+                    toast.error(response?.Data?.rd?.[0]?.stat_msg || `Failed to ${actionType === 'roleUpdate' ? 'update role' : 'remove member'}`);
+                    setConfirmationModal({ isOpen: false, member: null, actionType: null });
+                    return;
+                }
                 const actionMsg = actionType === 'roleUpdate'
                     ? `${member.Name} is now ${member.IsAdmin ? 'no longer an admin' : 'an admin'}`
                     : `${member.Name} removed from group`;
@@ -721,6 +828,10 @@ const CustomerDetails = ({
             });
 
             if (response?.Status === "200") {
+                if (response?.Data?.rd?.[0]?.stat === 0) {
+                    toast.error(response?.Data?.rd?.[0]?.stat_msg || 'Only group admins can edit this group.');
+                    return;
+                }
                 toast.success('Group profile photo updated successfully');
                 if (customer) {
                     customer.ProfileImageUrl = imageUrl;
@@ -745,6 +856,10 @@ const CustomerDetails = ({
             });
 
             if (response?.Status === "200") {
+                if (response?.Data?.rd?.[0]?.stat === 0) {
+                    toast.error(response?.Data?.rd?.[0]?.stat_msg || 'Only group admins can edit this group.');
+                    return;
+                }
                 toast.success('Group profile photo removed successfully');
                 if (customer) {
                     customer.ProfileImageUrl = "";
@@ -841,6 +956,7 @@ const CustomerDetails = ({
                             scrollToMessage={scrollToMessage}
                             groupPermissions={groupPermissions}
                             handlePermissionChange={handlePermissionChange}
+                            onEditAdmins={() => setIsEditAdminDialogOpen(true)}
                             messageInfo={messageInfo}
                             onClose={onClose}
                             searchResults={searchResults}
@@ -859,6 +975,9 @@ const CustomerDetails = ({
                     isParticipantSearchOpen={isParticipantSearchOpen}
                     setIsParticipantSearchOpen={setIsParticipantSearchOpen}
                     handleMemberClick={handleMemberClick}
+                    isEditAdminDialogOpen={isEditAdminDialogOpen}
+                    setIsEditAdminDialogOpen={setIsEditAdminDialogOpen}
+                    handleEditAdminsSubmit={handleEditAdminsSubmit}
                 />
 
                 <MemberActions

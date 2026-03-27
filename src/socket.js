@@ -182,7 +182,7 @@ export function initializeSocket(token) {
     socketInstance.on('internal:member_removed', dispatchGroupMemberEvent);
     socketInstance.on('internal:member_promoted', dispatchGroupMemberEvent);
     socketInstance.on('internal:member_demoted', dispatchGroupMemberEvent);
-    socketInstance.on('internal:permission_changed', dispatchGroupPermissionEvent);
+    socketInstance.on('internal:group_permission', dispatchGroupPermissionEvent);
     socketInstance.on('internal:group_info_request', dispatchGroupEvent);
 
     return socketInstance;
@@ -374,9 +374,9 @@ export const emitMemberDemoted = (payload) => {
 
 export const emitPermissionChanged = (payload) => {
     if (!socketInstance) return false;
-    socketInstance.emit('internal:permission_changed', {
+    socketInstance.emit('internal:group_permission', {
         ...payload,
-        receiveEvent: 'internal:permission_changed'
+        receiveEvent: 'internal:group_permission'
     });
     return true;
 };

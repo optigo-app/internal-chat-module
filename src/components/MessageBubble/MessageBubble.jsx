@@ -6,27 +6,20 @@ const MessageBubble = ({ message, onReply, onForward }) => {
 
   const handleContextMenu = (event) => {
     event.preventDefault();
-    
-    // Get the message bubble element
     const messageBubble = event.currentTarget;
     const messageContent = messageBubble.querySelector('.message-content');
     const rect = messageContent.getBoundingClientRect();
-    
-    // Position menu based on message type
-    // Sent messages: menu appears on the left side
-    // Received messages: menu appears on the right side
     const isSentMessage = message.sender === 'You';
-    const menuX = isSentMessage 
-      ? rect.left - 8 // Left side for sent messages
-      : rect.right + 8; // Right side for received messages
-    const menuY = rect.top + (rect.height / 2); // Center vertically with the message
-    
+    const menuX = isSentMessage
+      ? rect.left - 8
+      : rect.right + 8;
+    const menuY = rect.top + (rect.height / 2);
     setContextMenu(
       contextMenu === null
         ? {
-            mouseX: menuX,
-            mouseY: menuY,
-          }
+          mouseX: menuX,
+          mouseY: menuY,
+        }
         : null,
     );
   };

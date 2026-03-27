@@ -11,14 +11,14 @@ const GroupMembersSection = ({
     onSearchClick,
     onMemberClick,
     showAllMembers,
-    setShowAllMembers
+    setShowAllMembers,
+    groupPermissions
 }) => {
     const [hoveredMemberId, setHoveredMemberId] = useState(null);
+    const canAddMembers = isCurrentUserAdmin || groupPermissions?.addOtherMembers;
 
     const visibleMembers = showAllMembers ? members : members.slice(0, 10);
     const hasMoreMembers = members.length > 10;
-
-    console.log('members', members);
 
     return (
         <div className="info-block members-block">
@@ -34,7 +34,7 @@ const GroupMembersSection = ({
             </div>
 
             <div className="settings-list members-list">
-                {isCurrentUserAdmin && (
+                {canAddMembers && (
                     <div className="setting-item no-border member-item add-member-row" onClick={onAddMemberClick}>
                         <div className="setting-left">
                             <div className="action-circle-small add-member-circle">

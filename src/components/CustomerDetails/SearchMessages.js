@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Typography, Box, TextField, InputAdornment, List, ListItem, ListItemText, useTheme, CircularProgress } from '@mui/material';
 import { Search, Calendar, Image as ImageIcon, Video, FileText, MessageSquare } from 'lucide-react';
 import { formatDateLocal, formatTime12h } from '../../utils/DateFnc';
+import { highlightText } from '../../utils/globalFunc';
 
 const SearchMessages = ({
     searchResults = [],
@@ -11,7 +12,6 @@ const SearchMessages = ({
     isSearching = false,
     onSearchMessages
 }) => {
-    const theme = useTheme();
     const [localQuery, setLocalQuery] = useState(searchQuery || "");
 
     // Debounced search
@@ -24,29 +24,6 @@ const SearchMessages = ({
         }, 500);
         return () => clearTimeout(timer);
     }, [localQuery, onSearchMessages, setSearchQuery]);
-
-    const getMessageIcon = (type) => {
-        switch (type) {
-            case 'image': return <ImageIcon size={16} />;
-            case 'video': return <Video size={16} />;
-            case 'document': return <FileText size={16} />;
-            default: return <MessageSquare size={16} />;
-        }
-    };
-
-    const highlightText = (text, query) => {
-        if (!query) return text;
-
-        const parts = text.split(new RegExp(`(${query})`, 'gi'));
-        return parts.map((part, i) =>
-            part.toLowerCase() === query.toLowerCase() ? (
-                <span key={i} style={{ color: '#685dd8', fontWeight: 600 }}>
-                    {part}
-                </span>
-            ) : part
-        );
-    };
-
 
     const formatDate = (dateStr) => formatDateLocal(dateStr);
     const formatTime = (dateStr) => formatTime12h(dateStr);

@@ -645,6 +645,19 @@ const MessageContent = ({
                                             ? msg?.Time || msg.dateTime
                                             : msg.DateTime && FormatDateIST(msg.DateTime, "dd-mm-yyyy").time}
                                     </Typography>
+                                    {msg?.IsEdited == 1 && (
+                                        <Typography
+                                            variant="caption"
+                                            sx={{
+                                                fontSize: 10,
+                                                fontStyle: 'italic',
+                                                color: alpha(theme.palette.text.primary, 0.5),
+                                                ml: 0.5
+                                            }}
+                                        >
+                                            (edited)
+                                        </Typography>
+                                    )}
                                     {msg.Direction == 1 && !msg.isUploading && (
                                         <Box sx={{ display: "flex", alignItems: "center", lineHeight: 1 }}>
                                             {(() => {
@@ -1351,6 +1364,20 @@ const MessageContent = ({
                                 ? msg?.Time || msg.dateTime
                                 : msg.DateTime && FormatDateIST(msg.DateTime, "dd-mm-yyyy").time}
                         </Typography>
+
+                        {msg?.IsEdited == 1 && (
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    fontSize: 10,
+                                    fontStyle: 'italic',
+                                    color: alpha(theme.palette.text.primary, 0.5),
+                                    ml: 0.5
+                                }}
+                            >
+                                (edited)
+                            </Typography>
+                        )}
 
                         {msg.Direction == 1 && !msg.isUploading && (
                             <Box sx={{ display: "flex", alignItems: "center", lineHeight: 1 }}>

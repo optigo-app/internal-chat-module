@@ -23,7 +23,7 @@ import { fetchCustomerLists } from '../../API/CustomerLists/CustomerLists';
 import { LoginContext } from '../../context/LoginData';
 import { getCustomerDisplayName, getWhatsAppAvatarConfig } from '../../utils/globalFunc';
 
-const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode = 'add', groupMembers = [], onMemberClick }) => {
+const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode = 'add', groupMembers = [], onMemberClick, preSelectedIds = [], disabledIds = [] }) => {
     const { auth } = useContext(LoginContext);
     const [searchTerm, setSearchTerm] = useState('');
     const [availableCustomers, setAvailableCustomers] = useState([]);
@@ -32,7 +32,8 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
 
     const fetchCustomers = async (search = '') => {
         setIsLoading(true);
-        if (mode === 'search') {
+        debugger
+        if (mode === 'search' || mode === 'editAdmins') {
             const lowerSearch = search.toLowerCase();
             const filtered = groupMembers.filter(m => {
                 const name = getCustomerDisplayName(m).toLowerCase();
@@ -43,6 +44,14 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
                 ...item,
                 UserId: item.UserId || item.Id || item.id
             }));
+            // Sort: admins (disabled/pre-selected) first
+            if (mode === 'editAdmins') {
+                transformed.sort((a, b) => {
+                    const aIsAdmin = disabledIds.includes(a.UserId) ? 1 : 0;
+                    const bIsAdmin = disabledIds.includes(b.UserId) ? 1 : 0;
+                    return bIsAdmin - aIsAdmin;
+                });
+            }
             setAvailableCustomers(transformed);
             setIsLoading(false);
             return;
@@ -72,16 +81,17 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
     useEffect(() => {
         if (open) {
             fetchCustomers();
-            setSelectedMembers([]);
+            setSelectedMembers(preSelectedIds || []);
             setSearchTerm('');
         }
     }, [open]);
 
     const handleToggleMember = React.useCallback((userId) => {
+        if (disabledIds.includes(userId)) return; // locked admin
         setSelectedMembers(prev =>
             prev.includes(userId) ? prev.filter(mid => mid !== userId) : [...prev, userId]
         );
-    }, []);
+    }, [disabledIds]);
 
     const handleSearchChange = (e) => {
         const val = e.target.value;
@@ -90,7 +100,9 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
     };
 
     const handleSubmit = () => {
-        onSubmit(selectedMembers);
+        // Only pass newly selected IDs (not the pre-selected/disabled ones)
+        const newlySelected = selectedMembers.filter(id => !disabledIds.includes(id));
+        onSubmit(newlySelected);
         onClose();
     };
 
@@ -109,7 +121,9 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
                 <IconButton onClick={onClose} size="small">
                     <Clear size={20} />
                 </IconButton>
-                <Typography variant="h6" fontWeight="600">{mode === 'search' ? 'Search participants' : 'Add member'}</Typography>
+                <Typography variant="h6" fontWeight="600">
+                    {mode === 'search' ? 'Search participants' : mode === 'editAdmins' ? 'Edit group admins' : 'Add member'}
+                </Typography>
             </DialogTitle>
             <DialogContent sx={{ p: '0 24px' }}>
                 <Box sx={{ mt: 1, mb: 2 }}>
@@ -145,9 +159,10 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
                 ) : (
                     <List sx={{ width: '100%' }}>
                         {availableCustomers
-                            .filter(cust => mode === 'search' ? true : !existingMemberIds.includes(cust.UserId))
+                            .filter(cust => mode === 'search' ? true : mode === 'editAdmins' ? true : !existingMemberIds.includes(cust.UserId))
                             .map((cust) => {
                                 const isSelected = selectedMembers.includes(cust.UserId);
+                                const isDisabled = disabledIds.includes(cust.UserId);
                                 return (
                                     <ListItem
                                         key={cust.UserId}
@@ -155,9 +170,10 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
                                         sx={{
                                             borderRadius: '8px',
                                             mb: 0.5,
-                                            cursor: 'pointer',
+                                            cursor: isDisabled ? 'default' : 'pointer',
+                                            opacity: isDisabled ? 0.7 : 1,
                                             '&:hover': {
-                                                backgroundColor: 'rgba(115, 103, 240, 0.04)',
+                                                backgroundColor: isDisabled ? 'transparent' : 'rgba(115, 103, 240, 0.04)',
                                                 borderRadius: 2
                                             }
                                         }}
@@ -166,11 +182,13 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
                                             <Checkbox
                                                 edge="start"
                                                 checked={isSelected}
+                                                disabled={isDisabled}
                                                 tabIndex={-1}
                                                 disableRipple
                                                 sx={{
                                                     color: '#d1d5db',
-                                                    '&.Mui-checked': { color: 'primary.main' }
+                                                    '&.Mui-checked': { color: 'primary.main' },
+                                                    '&.Mui-disabled': { color: '#b0bec5' }
                                                 }}
                                             />
                                         )}
@@ -179,7 +197,7 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
                                         </ListItemAvatar>
                                         <ListItemText
                                             primary={getCustomerDisplayName(cust)}
-                                            secondary={cust.UserEmail ?? ''}
+                                            secondary={(cust.UserEmail ?? cust.DisplayEmail) ?? ''}
                                         />
                                     </ListItem>
                                 );
@@ -188,7 +206,7 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
                 )}
             </DialogContent>
             <DialogActions sx={{ p: 2, justifyContent: 'center' }}>
-                {mode !== 'search' && selectedMembers.length > 0 && (
+                {mode !== 'search' && selectedMembers.filter(id => !disabledIds.includes(id)).length > 0 && (
                     <IconButton
                         onClick={handleSubmit}
                         sx={{

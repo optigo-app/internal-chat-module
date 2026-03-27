@@ -16,6 +16,13 @@ export const changeGroupPermissionApi = async (auth, { conversationId, permissio
 
         // Emit socket event if permission changed successfully
         if (response?.Status === "200") {
+            const rd = response?.Data?.rd?.[0] || (Array.isArray(response?.rd) ? response.rd[0] : (response?.Data?.rd || response?.rd));
+
+            // Only emit socket and proceed if business logic succeeded (stat !== 0)
+            if (rd?.stat === 0) {
+                return response;
+            }
+
             const allMemberIds = await getGroupMemberIds(conversationId, auth);
 
             emitPermissionChanged({
