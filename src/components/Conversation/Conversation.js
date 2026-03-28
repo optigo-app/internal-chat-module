@@ -83,6 +83,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const typingTimeoutRef = useRef(null);
     const [selectedMessageForDelete, setSelectedMessageForDelete] = useState(null);
     const [isCurrentUserAdmin, setIsCurrentUserAdmin] = useState(false);
+    const [infoMember, setInfoMember] = useState(null);
 
     // Typing indicator handler
     useEffect(() => {
@@ -108,7 +109,6 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 }
             }
         });
-
         return () => {
             cleanup();
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -118,7 +118,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const { favoriteState, updateFavoriteStatus } = useFavorite();
 
     const { updateRemoveInGroupStatus, isRemovedFromGroup } = useRemoveInGroup();
-    const { updateGroupAdminMode, isGroupOnlyAdminSend } = useGroupAdminMode();
+    const { updateGroupAdminMode, isGroupOnlyAdminSend, getGroupPermission } = useGroupAdminMode();
 
     const { registerListener, unregisterListener } = useGroupSocket();
 
@@ -240,107 +240,73 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         isSearching,
     } = useConversation(selectedCustomer, onConversationRead, onViewConversationRead, drawerOpen);
 
-    // Group socket event listeners with callback-based approach (no state updates in context)
     useEffect(() => {
         if (!selectedCustomer?.IsGroup || !selectedCustomer?.ConversationId) return;
-
         const conversationId = selectedCustomer.ConversationId;
         const currentUserId = auth?.id || auth?.userId;
-
-        // Define callbacks for socket events
         const callbacks = {
             onGroupEvent: (data) => {
                 if (data.conversationId !== conversationId) return;
-
-                // Insert system message if present
                 if (data.conversationData && addUniqueMessage) {
                     addUniqueMessage(data.conversationData);
                 }
-
-                // Map event types to notification templates
                 const eventNotificationMap = {
                     'group_created': 'GROUP_CREATED',
                     'group_updated': 'GROUP_UPDATED',
                 };
-
                 const notificationTemplate = eventNotificationMap[data.eventType];
-
-                // Show browser notification
                 if (notificationTemplate) {
                     notify(data, notificationTemplate, auth);
                 }
-
-                // Show toast notification
                 const eventMessages = {
                     'group_created': 'Group created',
                     'group_updated': 'Group updated',
                     'group_deleted': 'Group deleted',
                     'group_info_request': 'Group info requested'
                 };
-
                 const message = eventMessages[data.eventType] || 'Group event';
                 toast(message);
-
-                // Skip refresh for common updates as we now use addUniqueMessage
                 const shouldSkipRefresh = ['group_updated', 'group_created'].includes(data.eventType);
-
-                // Refresh conversation only if necessary
                 if (refresh && !shouldSkipRefresh) {
                     setTimeout(() => refresh(), 500);
                 }
             },
             onMemberEvent: (data) => {
                 if (data.conversationId !== conversationId) return;
-
-                // Insert system message if present
                 if (data.conversationData && addUniqueMessage) {
                     addUniqueMessage(data.conversationData);
                 }
-
-                // Check if current user was removed
                 const isCurrentUserRemoved = data.eventType === 'member_removed' &&
                     Number(data.removedMemberId) === Number(currentUserId);
-
-                // Map event types to notification templates
                 const eventNotificationMap = {
                     'member_added': 'MEMBER_ADDED',
                     'member_removed': isCurrentUserRemoved ? 'YOU_WERE_REMOVED' : 'MEMBER_REMOVED',
                     'member_promoted': 'MEMBER_PROMOTED',
                     'member_demoted': 'MEMBER_DEMOTED'
                 };
-
                 const notificationTemplate = eventNotificationMap[data.eventType];
-
-                // Show browser notification
                 if (notificationTemplate) {
                     notify(data, notificationTemplate, auth);
                 }
-
-                // Show toast notification
                 const eventMessages = {
                     'member_added': `${data.memberName || 'Member'} added to group`,
                     'member_removed': `${data.memberName || 'Member'} removed from group`,
                     'member_promoted': `${data.memberName || 'Member'} promoted to admin`,
                     'member_demoted': `${data.memberName || 'Member'} demoted from admin`
                 };
-
                 const message = eventMessages[data.eventType] || 'Member event';
-
                 if (isCurrentUserRemoved) {
                     updateRemoveInGroupStatus(conversationId, true);
                     toast.error('You were removed from this group');
                 } else if (data.eventType === 'member_added') {
-                    // Check if WE were added (or re-added)
                     const isCurrentUserAdded = data.newMemberIds?.some(id => Number(id) === Number(currentUserId));
                     if (isCurrentUserAdded) {
                         updateRemoveInGroupStatus(conversationId, false);
-                        // Also re-check admin status or just wait for refresh
                         toast.success('You were added to the group');
                     } else {
                         toast(message);
                     }
                 } else if (data.eventType === 'member_promoted' || data.eventType === 'member_demoted') {
-                    // Update admin status if IT WAS US
                     const isAffectedMember = Number(data.memberId) === Number(currentUserId);
                     if (isAffectedMember) {
                         setIsCurrentUserAdmin(data.eventType === 'member_promoted');
@@ -349,43 +315,27 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 } else {
                     toast(message);
                 }
-
-                // Skip refresh for standard member events as we now use addUniqueMessage
                 const shouldSkipRefresh = ['member_added', 'member_removed', 'member_promoted', 'member_demoted'].includes(data.eventType);
-
-                // Only refresh if necessary
                 if (refresh && !shouldSkipRefresh) {
                     setTimeout(() => refresh(), 500);
                 }
             },
             onPermissionEvent: (data) => {
                 if (Number(data.conversationId) !== Number(conversationId)) return;
-
-                // Show browser notification
                 notify(data, 'PERMISSION_CHANGED', auth);
-
-                // Show toast notification
                 toast('Group permissions updated');
-
-                // Update local state if SendNewMessage changed
                 if (data.changedPermission && data.changedPermission.name === 'SendNewMessage') {
                     updateGroupAdminMode(conversationId, data.changedPermission.value === 0);
                 } else if (data.permissions) {
                     updateGroupAdminMode(conversationId, data.permissions.SendNewMessage === 0);
                 }
-
-                // Refresh conversation
                 if (refresh) {
                     setTimeout(() => refresh(), 500);
                 }
             }
         };
-
-        // Register callbacks
         registerListener(conversationId, callbacks);
-
         return () => {
-            // Unregister when unmounting or conversation changes
             unregisterListener(conversationId);
         };
     }, [
@@ -402,17 +352,14 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
 
     const handleAddMembersSubmit = async (selectedIds) => {
         if (!selectedIds || selectedIds.length === 0) return;
-
         try {
             const response = await addGroupParticipantApi(auth, {
                 conversationId: selectedCustomer.ConversationId,
                 selectedMembers: selectedIds
             });
-
             if (response?.Status === "200") {
                 toast.success('Members added successfully');
                 setIsAddMemberDialogOpen(false);
-                // Optionally refresh if there's a way to notify the child components or local state
                 if (refresh) refresh();
             } else {
                 toast.error(response?.Message || 'Failed to add members');
@@ -446,31 +393,26 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         try {
             const emoji = emojiObject?.emoji || emojiObject;
             const unified = emojiObject?.unified;
-
             const messageIdToUse = message?.MessageId ?? message?.Id;
             if (!messageIdToUse) {
                 toast.error("Failed to send reaction: Message ID missing");
                 return;
             }
-
             const key = String(messageIdToUse);
             const now = Date.now();
             const prevState = reactionRequestStateRef.current.get(key) || { inFlight: false, lastSentAt: 0, lastEmoji: null };
             if (prevState.inFlight) return;
             if (now - (prevState.lastSentAt || 0) < 700) return;
-
             prevState.inFlight = true;
             prevState.lastSentAt = now;
             prevState.lastEmoji = emoji;
             reactionRequestStateRef.current.set(key, prevState);
-
             const processOnce = async ({ emoji: nextEmoji, unified: nextUnified }) => {
                 const snapshot = messagesRef.current;
                 const list = Array.isArray(snapshot) ? snapshot : (snapshot?.data || []);
                 const latestMsg = list.find(
                     (m) => String(m?.MessageId ?? m?.Id) === String(messageIdToUse)
                 ) || message;
-
                 let currentReactions = [];
                 if (latestMsg?.ReactionEmojis) {
                     if (typeof latestMsg.ReactionEmojis === "string") {
@@ -486,15 +428,12 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                         currentReactions = latestMsg.ReactionEmojis;
                     }
                 }
-
                 const existingIndex = currentReactions.findIndex(
                     r => r.Direction === 1 && r.Reaction === nextEmoji
                 );
-
                 let updatedReactions;
                 let reactionPayload;
                 let apiEmoji;
-
                 if (existingIndex >= 0) {
                     currentReactions.splice(existingIndex, 1);
                     updatedReactions = currentReactions;
@@ -513,15 +452,11 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     reactionPayload = JSON.stringify(updatedReactions);
                     apiEmoji = nextEmoji;
                 }
-
                 await addReactionApi(auth, { messageId: messageIdToUse, emoji: apiEmoji });
-
                 const senderId = auth?.id ?? auth?.userId;
                 const isGroup = selectedCustomer?.IsGroup === 1;
                 let receiverIdValue;
-
                 if (isGroup) {
-                    // For groups, ReceiverId is an array of all member IDs
                     try {
                         const groupData = await fetchGroupDetails(selectedCustomer.ConversationId, auth);
                         if (groupData && groupData.members) {
@@ -534,10 +469,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                         receiverIdValue = [selectedCustomer?.ReceiverId];
                     }
                 } else {
-                    // For 1-to-1, ReceiverId is a single value
                     receiverIdValue = selectedCustomer?.ReceiverId;
                 }
-
                 if (receiverIdValue && senderId && auth?.ufcc) {
                     const socketReactionEmojis = reactionPayload === ""
                         ? JSON.stringify([{ Reaction: "", Direction: 0, UserId: senderId }])
@@ -699,9 +632,9 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     }, []);
 
     const mediaFilesLength = mediaFiles?.length || 0;
+
     useEffect(() => {
         const prevLen = prevMediaFilesLenRef.current;
-
         if (prevLen === 0 && mediaFilesLength > 0) {
             const el = containerRef.current;
             if (el && !mediaPreviewScrollStateRef.current) {
@@ -711,10 +644,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 };
             }
         }
-
         if (prevLen > 0 && mediaFilesLength === 0) {
             const state = mediaPreviewScrollStateRef.current;
-
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                     const el = containerRef.current;
@@ -726,7 +657,6 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 });
             });
         }
-
         prevMediaFilesLenRef.current = mediaFilesLength;
     }, [mediaFilesLength]);
 
@@ -749,19 +679,16 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const scrollToBottom = useCallback((behavior = 'auto') => {
         if (containerRef.current) {
             isAutoScrollingRef.current = true;
-
             const normalizedBehavior =
                 behavior === 'instant'
                     ? 'auto'
                     : (behavior === 'smooth' || behavior === 'auto')
                         ? behavior
                         : 'auto';
-
             containerRef.current.scrollTo({
                 top: containerRef.current.scrollHeight,
                 behavior: normalizedBehavior
             });
-
             setShowScrollToBottom(false);
             setTimeout(() => {
                 isAutoScrollingRef.current = false;
@@ -774,9 +701,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         const container = containerRef.current;
         const { scrollTop, scrollHeight, clientHeight } = container;
         const isNearBottom = scrollHeight - clientHeight - scrollTop < 300;
-
         if (isNearBottom) {
-            // Need a slight delay to ensure DOM dimensions are updated after image/video render
             const timer = setTimeout(() => {
                 scrollToBottom('auto');
             }, 50);
@@ -800,12 +725,9 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                         containerRef.current.scrollTop = containerRef.current.scrollHeight;
                     }
                 };
-
                 scroll();
-                // A few micro-tasks later to ensure all components have rendered
                 const t1 = setTimeout(scroll, 0);
                 const t2 = setTimeout(scroll, 50);
-
                 if (messageList.length > 0) {
                     const lastMessage = messageList[messageList.length - 1];
                     lastMessageIdRef.current = lastMessage?.Id || lastMessage?.MessageId || lastMessage?.id;
@@ -913,10 +835,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
 
     const handleToggleFavorite = useCallback(async () => {
         const newIsStar = isFavorite ? 0 : 1;
-
-        // Optimistically update Context state
         updateFavoriteStatus(selectedCustomer?.ConversationId, newIsStar);
-
         try {
             const response = await updateConversationApi(auth, {
                 page: 1,
@@ -933,12 +852,10 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 }
                 if (refresh) refresh();
             } else {
-                // Revert on failure
                 updateFavoriteStatus(selectedCustomer?.ConversationId, isFavorite ? 1 : 0);
                 toast.error("Failed to update favorite status");
             }
         } catch (error) {
-            // Revert on error
             updateFavoriteStatus(selectedCustomer?.ConversationId, isFavorite ? 1 : 0);
             toast.error("Error updating favorite status");
         }
@@ -1196,7 +1113,6 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     }, []);
 
     const handleMemberRedirect = useCallback((member) => {
-        console.log("member", member)
         if (member) {
             if (member.ConversationId) {
                 window.dispatchEvent(new CustomEvent('SELECT_CONVERSATION', {
@@ -1216,6 +1132,17 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 }));
             }
         }
+    }, []);
+
+    useEffect(() => {
+        const handleShowInfo = (e) => {
+            const memberData = e.detail;
+            setDrawerOpen(true);
+            setDrawerViewState('info');
+            setInfoMember(memberData);
+        };
+        window.addEventListener('SHOW_MEMBER_INFO', handleShowInfo);
+        return () => window.removeEventListener('SHOW_MEMBER_INFO', handleShowInfo);
     }, []);
 
     if (!isOnline) {
@@ -1344,8 +1271,11 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     {showFullDetails ? (
                         <div className="conversation-details-full">
                             <CustomerDetails
-                                customer={selectedCustomer}
-                                onClose={() => setDrawerOpen(false)}
+                                customer={infoMember || selectedCustomer}
+                                onClose={() => {
+                                    setDrawerOpen(false);
+                                    setInfoMember(null); // Clear the member info when closing
+                                }}
                                 open={drawerOpen}
                                 variant="panel"
                                 initialViewState={drawerViewState}
@@ -1395,6 +1325,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                 processFiles={processFiles}
                                 captureMessageScrollState={captureMessageScrollState}
                                 typingStatus={typingStatus}
+                                setDrawerViewState={setDrawerViewState}
+                                setDrawerOpen={setDrawerOpen}
                             />
 
                             <ChatBox
@@ -1423,13 +1355,16 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                             />
                         </>
                     )}
-                </div>
+                </div>  
 
                 {drawerOpen === true && (
                     isNarrowScreen ? (
                         <CustomerDetails
-                            customer={selectedCustomer}
-                            onClose={() => setDrawerOpen(false)}
+                            customer={infoMember || selectedCustomer}
+                            onClose={() => {
+                                setDrawerOpen(false);
+                                setInfoMember(null);
+                            }}
                             open={drawerOpen}
                             variant="drawer"
                             initialViewState={drawerViewState}
@@ -1445,8 +1380,11 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                         !isTopPanelScreen ? (
                             <div className="conversation-right-panel">
                                 <CustomerDetails
-                                    customer={selectedCustomer}
-                                    onClose={() => setDrawerOpen(false)}
+                                    customer={infoMember || selectedCustomer}
+                                    onClose={() => {
+                                        setDrawerOpen(false);
+                                        setInfoMember(null);
+                                    }}
                                     open={drawerOpen}
                                     variant="panel"
                                     initialViewState={drawerViewState}
@@ -1483,6 +1421,13 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 onMemberRedirect={(handleMemberRedirect)}
                 onEdit={handleEditAction}
                 onDelete={handleDeleteAction}
+                canDelete={
+                    selectedCustomer?.IsGroup !== 1 ||
+                    isCurrentUserAdmin ||
+                    getGroupPermission(selectedCustomer?.ConversationId, 'AllowDeleteForAll') === 1 ||
+                    selectedCustomer?.AllowDeleteForAll === 1 ||
+                    selectedCustomer?.AllowDeleteForAll === true
+                }
                 message={messageContextMenu?.message}
                 mouseX={messageContextMenu?.mouseX}
                 mouseY={messageContextMenu?.mouseY}
@@ -1535,16 +1480,29 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                         const timeLimit = parseInt(process.env.REACT_APP_MESSAGE_EDIT_TIME_LIMIT || "15", 10);
                         const isWithinTimeLimit = isMessageEditable(msg, timeLimit);
 
-                        return isWithinTimeLimit && isOutgoing ? [{
+                        const canDeleteForAll =
+                            selectedCustomer?.IsGroup !== 1 ||
+                            isCurrentUserAdmin ||
+                            getGroupPermission(selectedCustomer?.ConversationId, 'AllowDeleteForAll') === 1 ||
+                            selectedCustomer?.AllowDeleteForAll === 1 ||
+                            selectedCustomer?.AllowDeleteForAll === true;
+
+                        return isWithinTimeLimit && isOutgoing && canDeleteForAll ? [{
                             label: 'Delete for everyone',
-                            onClick: () => handleDeleteMessage(msg?.MessageId ?? msg?.Id, 2),
+                            onClick: () => {
+                                handleDeleteMessage(msg?.MessageId ?? msg?.Id, 2);
+                                setConfirmationModal({ isOpen: false, actionType: null });
+                            },
                             danger: true,
                             variant: 'btn-action'
                         }] : [];
                     })()),
                     {
                         label: 'Delete for me',
-                        onClick: () => handleDeleteMessage(selectedMessageForDelete?.MessageId ?? selectedMessageForDelete?.Id, 1),
+                        onClick: () => {
+                            handleDeleteMessage(selectedMessageForDelete?.MessageId ?? selectedMessageForDelete?.Id, 1);
+                            setConfirmationModal({ isOpen: false, actionType: null });
+                        },
                         danger: true,
                         variant: 'btn-action'
                     },

@@ -90,49 +90,86 @@ const ProfileAvatar = () => {
                 open={open}
                 onClose={handleClose}
                 PaperProps={{
-                    className: 'profile-dropdown'
+                    sx: {
+                        borderRadius: '16px',
+                        minWidth: '220px',
+                        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.15)',
+                        backdropFilter: 'blur(12px)',
+                        bgcolor: 'rgba(255, 255, 255, 0.95)',
+                        border: '1px solid rgba(0, 0, 0, 0.08)',
+                        mt: 1.5,
+                        '& .MuiMenuItem-root': {
+                            px: 2,
+                            py: 1.5,
+                            mx: 1,
+                            my: 0.5,
+                            borderRadius: '10px',
+                            transition: 'all 0.2s ease',
+                            gap: '12px',
+                            '&:hover': {
+                                bgcolor: 'rgba(115, 103, 240, 0.08)',
+                                color: '#7367f0',
+                                '& .MuiListItemIcon-root': {
+                                    color: '#7367f0',
+                                    transform: 'scale(1.1)'
+                                }
+                            }
+                        },
+                        '& .MuiListItemIcon-root': {
+                            color: '#64748b',
+                            transition: 'all 0.2s ease',
+                            minWidth: 'auto !important'
+                        },
+                        '& .MuiTypography-root': {
+                            fontWeight: 500,
+                            fontSize: '0.95rem'
+                        }
+                    }
                 }}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                 transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-                <Box className="menu-header" sx={{ paddingLeft: "10px", paddingTop: "10px" }}>
-                    <Typography className="menu-section-title">My Account</Typography>
+                <Box sx={{ px: 3, pt: 2, pb: 1 }}>
+                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        My Account
+                    </Typography>
                 </Box>
 
-                <MenuItem onClick={handleClose} className="menu-item">
-                    <ListItemIcon className="menu-icon" sx={{ minWidth: "30px !important" }}>
+                <MenuItem onClick={() => {
+                    handleClose();
+                    navigate('/profile');
+                }}>
+                    <ListItemIcon>
                         <AccountCircleIcon fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText
-                        primary="Profile"
-                        primaryTypographyProps={{ className: 'menu-text' }}
-                    />
+                    <ListItemText primary="Profile" />
                 </MenuItem>
 
                 <MenuItem
                     onClick={handleDataSync}
-                    className="menu-item"
                     disabled={!startSync}
                 >
-                    <ListItemIcon className="menu-icon" sx={{ minWidth: "30px !important" }}>
+                    <ListItemIcon>
                         <SyncIcon fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText
-                        primary="Data Sync"
-                        primaryTypographyProps={{ className: 'menu-text' }}
-                    />
+                    <ListItemText primary="Data Sync" />
                 </MenuItem>
 
-                <Divider className="menu-divider" />
+                <Divider sx={{ my: 1, borderColor: 'rgba(0,0,0,0.06)' }} />
 
-                <MenuItem onClick={handleLogout} className="menu-item logout">
-                    <ListItemIcon className="menu-icon" sx={{ minWidth: "30px !important" }}>
+                <MenuItem onClick={handleLogout} sx={{
+                    '&:hover': {
+                        bgcolor: 'rgba(239, 68, 68, 0.08) !important',
+                        color: '#ef4444 !important',
+                        '& .MuiListItemIcon-root': {
+                            color: '#ef4444 !important',
+                        }
+                    }
+                }}>
+                    <ListItemIcon>
                         <LogoutIcon fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText
-                        primary="Log out"
-                        primaryTypographyProps={{ className: 'menu-text' }}
-                    />
+                    <ListItemText primary="Log out" />
                 </MenuItem>
             </Menu>
         </div>

@@ -338,7 +338,7 @@ function App() {
       <div className="app_mainDiv">
         <Routes>
           <Route path="/login" element={<RedirectIfAuthenticated><LoginPage1 /></RedirectIfAuthenticated>} />
-          <Route path="/session-check" element={<LoginExists />} />
+          {/* <Route path="/session-check" element={<LoginExists />} /> */}
           <Route
             path="*"
             element={
@@ -376,6 +376,7 @@ function App() {
                     <Route path="/add-conversation" element={<Customers />} />
                     <Route path="/notification" element={<Customers />} />
                     <Route path="/archieve" element={<Customers />} />
+                    <Route path="/profile" element={<Customers />} />
                     <Route path="*" element={<PagenotFound />} />
                   </Routes>
                 </Layout>

@@ -181,6 +181,7 @@ export const normalizeServerMessages = (messagesArray, auth) => {
             Direction: isMyMessage ? 1 : (typeof msg.Direction === 'number' ? (msg.Direction === 1 || msg.Direction === 2 ? 0 : msg.Direction) : 0),
             MessageType: resolvedMessageType,
             Message: msg.Message ?? msg.LastMessage,
+            Message1: msg.Message1,
             Status: normalizedStatus,
             SystemMsg: normalizedSystemMsg,
             DateTime: dateTime,

@@ -12,7 +12,8 @@ import {
     UserCheck,
     ChevronRight,
     UserStar,
-    Link2
+    Link2,
+    Trash
 } from "lucide-react";
 
 const IOSSwitch = styled((props) => (
@@ -118,6 +119,22 @@ const GroupPermissions = ({
                             checked={permissions?.addOtherMembers ?? true}
                             onChange={(e) =>
                                 onPermissionChange("addOtherMembers", e.target.checked)
+                            }
+                        />
+                    </div>
+
+                    <div className="permission_item">
+                        <Trash className="item_icon" />
+                        <div className="item_text">
+                            <Typography variant="body1">
+                                Delete messages
+                            </Typography>
+                        </div>
+
+                        <IOSSwitch
+                            checked={permissions?.deleteMessages ?? true}
+                            onChange={(e) =>
+                                onPermissionChange("deleteMessages", e.target.checked)
                             }
                         />
                     </div>

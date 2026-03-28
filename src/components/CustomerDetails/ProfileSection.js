@@ -157,7 +157,7 @@ const ProfileSection = ({
                 </Typography>
             ) : (
                 <Typography className="customer-phone">
-                    {customer?.DisplayEmail || ''}
+                    {(customer?.DisplayEmail || customer?.UserId) || ''}
                 </Typography>
             )}
         </div>

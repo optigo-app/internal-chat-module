@@ -10,6 +10,7 @@ import SearchMessages from './SearchMessages';
 import GroupPermissions from './GroupPermissions';
 import MessageInfo from './MessageInfo';
 import ContactInfo from './ContactInfo';
+import CommonGroupsSection from './CommonGroupsSection';
 import { Box, Typography } from '@mui/material';
 
 const DetailsViews = ({
@@ -38,6 +39,8 @@ const DetailsViews = ({
     startEditingDesc,
     setIsEditingDesc,
     mediaItems,
+    contactInfoData,
+    contactInfoLoading,
     isRemovedFromCurrentGroup,
     auth,
     setIsParticipantSearchOpen,
@@ -64,12 +67,14 @@ const DetailsViews = ({
     groupPermissions,
     handlePermissionChange,
     onEditAdmins,
+    onPastParticipantsClick,
     messageInfo,
     onClose,
     searchResults = [],
     isSearching = false,
     onSearchMessages,
-    containerRef
+    containerRef,
+    open
 }) => {
     return (
         <div className={`views-container view-${currentViewState} direction-${direction}`}>
@@ -125,7 +130,8 @@ const DetailsViews = ({
 
                             {customer?.IsGroup !== 1 && (
                                 <>
-                                    <ContactInfo customer={customer} />
+                                    <ContactInfo customer={customer} contactInfo={contactInfoData} loading={contactInfoLoading} />
+                                    <CommonGroupsSection customer={customer} auth={auth} open={open} />
                                     <div className="section-divider" style={{ height: '1px', backgroundColor: '#f0f2f5', margin: '0 -24px' }} />
                                 </>
                             )}
@@ -159,6 +165,7 @@ const DetailsViews = ({
                                         showAllMembers={showAllMembers}
                                         setShowAllMembers={setShowAllMembers}
                                         groupPermissions={groupPermissions}
+                                        onPastParticipantsClick={onPastParticipantsClick}
                                     />
                                 </>
                             )}

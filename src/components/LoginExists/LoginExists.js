@@ -13,6 +13,7 @@ const LoginExists = () => {
     const { setAuth } = useContext(LoginContext);
     const [loading, setLoading] = useState(false);
     const getId = JSON.parse(sessionStorage.getItem("hasSocketId"));
+    console.log(getId, "getId");
     const navigate = useNavigate();
 
     const handleStayLoggedIn = async () => {
@@ -27,8 +28,7 @@ const LoginExists = () => {
                 ukey: getId?.ukey,
                 token: getId?.token,
                 id: getId?.id,
-                whatsappKey: getId?.whatsappKey,
-                whatsappNumber: getId?.whatsappNumber,
+                designation: getId?.designation,
                 SocketId: socket?.id || "",
             });
 

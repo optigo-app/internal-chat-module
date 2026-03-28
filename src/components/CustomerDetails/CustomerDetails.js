@@ -7,10 +7,12 @@ import { changeGroupPermissionApi } from '../../API/Groups/ChangeGroupPermission
 import { editGroupApi } from '../../API/Groups/EditGroupApi';
 import { addGroupParticipantApi } from '../../API/Groups/AddGroupParticipantApi';
 import { assignRoleApi } from '../../API/Groups/AssignRoleApi';
+import { multiAssignRoleApi } from '../../API/Groups/MultiAssignRoleApi';
 import { removeMemberApi } from '../../API/Groups/RemoveMemberApi';
 import { updateConversationApi } from '../../API/SendMessage/updateConversationApi';
 import { clearChatApi } from '../../API/ClearChat/ClearChatApi';
 import { deleteConversationApi } from '../../API/ConversationView/DeleteConversationApi';
+import { contactInfoApi } from '../../API/SendMessage/ContactInfoApi';
 import toast from 'react-hot-toast';
 import DetailsHeader from './DetailsHeader';
 import DetailsViews from './DetailsViews';
@@ -21,7 +23,7 @@ import { getCustomerAvatarSeed, getCustomerDisplayName } from '../../utils/globa
 import { useFavorite } from '../../contexts/FavoriteContext';
 import { useRemoveInGroup } from '../../contexts/RemoveInGroupContext';
 import { useGroupAdminMode } from '../../contexts/GroupAdminModeContext';
-import { addGroupPermissionHandler } from '../../socket';
+import AddMemberDialog from '../ReusableComponent/AddMemberDialog';
 
 const CustomerDetails = ({
     customer,
@@ -51,7 +53,8 @@ const CustomerDetails = ({
         sendMessages: true,
         addOtherMembers: true,
         inviteToGroup: false,
-        approveNewMembers: false
+        approveNewMembers: false,
+        deleteMessages: true
     });
     const [pagination, setPagination] = useState({
         images: { page: 1, hasMore: true, isLoading: false },
@@ -59,6 +62,8 @@ const CustomerDetails = ({
         documents: { page: 1, hasMore: true, isLoading: false }
     });
     const [showAllMembers, setShowAllMembers] = useState(false);
+    const [contactInfoData, setContactInfoData] = useState(null);
+    const [contactInfoLoading, setContactInfoLoading] = useState(false);
     const [localGroupData, setLocalGroupData] = useState({
         members: customer?.GroupMembers || [],
         description: customer?.GroupDesc || '',
@@ -78,6 +83,7 @@ const CustomerDetails = ({
     const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
     const [isParticipantSearchOpen, setIsParticipantSearchOpen] = useState(false);
     const [isEditAdminDialogOpen, setIsEditAdminDialogOpen] = useState(false);
+    const [isPastParticipantsOpen, setIsPastParticipantsOpen] = useState(false);
 
     // Confirmation Modal state for Role Change / Member Removal
     const [confirmationModal, setConfirmationModal] = useState({
@@ -96,7 +102,7 @@ const CustomerDetails = ({
     const { updateRemoveInGroupStatus, isRemovedFromGroup } = useRemoveInGroup();
 
     // Use Context for group admin mode state management
-    const { updateGroupAdminMode } = useGroupAdminMode();
+    const { updateGroupAdminMode, groupSettingsState, updateGroupSettings } = useGroupAdminMode();
 
     // Get favorite status from Context state or fallback to customer prop
     const isFavorite = favoriteState[customer?.ConversationId]?.isStar ?? (customer?.IsStar === 1);
@@ -110,6 +116,21 @@ const CustomerDetails = ({
             updateRemoveInGroupStatus(customer.ConversationId, customer.RemoveInGroup === 1);
         }
     }, [customer?.ConversationId, customer?.RemoveInGroup, updateRemoveInGroupStatus]);
+
+    // Initialize/Sync permissions when customer prop changes or global state updates
+    useEffect(() => {
+        if (customer && customer.IsGroup === 1) {
+            const globalSettings = groupSettingsState[customer.ConversationId] || {};
+            setGroupPermissions({
+                editGroupSettings: globalSettings.EditGroup !== undefined ? globalSettings.EditGroup === 1 : (customer.EditGroup === 1 || customer.EditGroup === true),
+                sendMessages: globalSettings.SendNewMessage !== undefined ? globalSettings.SendNewMessage === 1 : (customer.SendNewMessage === 1 || customer.SendNewMessage === true),
+                addOtherMembers: globalSettings.AddOtherMember !== undefined ? globalSettings.AddOtherMember === 1 : (customer.AddOtherMember === 1 || customer.AddOtherMember === true),
+                inviteToGroup: globalSettings.InviteToGroup !== undefined ? globalSettings.InviteToGroup === 1 : (customer.InviteToGroup === 1 || customer.InviteToGroup === true),
+                approveNewMembers: globalSettings.ApproveNewMembers !== undefined ? globalSettings.ApproveNewMembers === 1 : (customer.ApproveNewMembers === 1 || customer.ApproveNewMembers === true),
+                deleteMessages: globalSettings.AllowDeleteForAll !== undefined ? globalSettings.AllowDeleteForAll === 1 : (customer.AllowDeleteForAll === 1 || customer.AllowDeleteForAll === true)
+            });
+        }
+    }, [customer, groupSettingsState]);
 
     const { auth } = useContext(LoginContext);
     const pageSize = 6;
@@ -184,7 +205,6 @@ const CustomerDetails = ({
                     videos: page === 1 ? categorized.videos : mergeUniqueByKey(prev.videos, categorized.videos),
                     documents: page === 1 ? categorized.documents : mergeUniqueByKey(prev.documents, categorized.documents)
                 }));
-
                 const hasMoreItems = response.data.length === pageSize;
                 setPagination(prev => ({
                     images: {
@@ -206,7 +226,6 @@ const CustomerDetails = ({
                         isLoading: false
                     }
                 }));
-
                 fetchedPagesRef.current.add(requestKey);
             }
         } catch (error) {
@@ -245,65 +264,36 @@ const CustomerDetails = ({
             });
             inFlightRequestsRef.current.clear();
             fetchedPagesRef.current.clear();
+        }
+    }, [customer.ConversationId]);
+
+    // Fetch group details and initial media only when the drawer is actually opened
+    useEffect(() => {
+        if (open && customer.ConversationId) {
             if (customer.IsGroup === 1) {
                 loadGroupInfo();
             }
             fetchMediaData('images', 1);
         }
-    }, [customer.ConversationId]);
+    }, [open, customer.ConversationId]);
+
+    // Fetch contact info when viewing a non-group contact or a member's profile
+    useEffect(() => {
+        if (open && customer.ConversationId && customer.IsGroup !== 1) {
+            setContactInfoData(null);
+            setContactInfoLoading(true);
+            loadContactInfo();
+        }
+    }, [open, customer.ConversationId, customer.ReceiverId, customer.UserId, customer.id]);
 
     // Optimize: Fetch full media list only when user navigates to media view
     useEffect(() => {
-        if (currentViewState === 'media' && customer.ConversationId) {
+        if (open && currentViewState === 'media' && customer.ConversationId) {
             fetchMediaData('images', 1);
         }
-    }, [currentViewState, customer.ConversationId, fetchMediaData]);
+    }, [open, currentViewState, customer.ConversationId, fetchMediaData]);
 
-    // Real-time group permission updates via socket
-    useEffect(() => {
-        if (!customer?.ConversationId || customer?.IsGroup !== 1) return;
 
-        const permissionMap = {
-            EditGroup: 'editGroupSettings',
-            SendNewMessage: 'sendMessages',
-            AddOtherMember: 'addOtherMembers',
-            ApproveNewMembers: 'approveNewMembers'
-        };
-
-        const unsubscribe = addGroupPermissionHandler((data) => {
-            if (Number(data?.conversationId) !== Number(customer.ConversationId)) return;
-            const { changedPermission, permissions } = data;
-            if (permissions) {
-                const updated = {};
-                Object.entries(permissions).forEach(([apiKey, value]) => {
-                    const stateKey = permissionMap[apiKey];
-                    if (stateKey) updated[stateKey] = value === 1 || value === true;
-                });
-                if (Object.keys(updated).length > 0) {
-                    setGroupPermissions(prev => ({ ...prev, ...updated }));
-                    if (updated.sendMessages !== undefined) {
-                        updateGroupAdminMode(customer.ConversationId, updated.sendMessages === false);
-                    }
-                }
-            } else if (changedPermission) {
-                const stateKey = permissionMap[changedPermission.name];
-                if (stateKey) {
-                    const isAllowed = changedPermission.value === 1 || changedPermission.value === true;
-                    setGroupPermissions(prev => ({
-                        ...prev,
-                        [stateKey]: isAllowed
-                    }));
-                    if (changedPermission.name === 'SendNewMessage') {
-                        updateGroupAdminMode(customer.ConversationId, !isAllowed);
-                    }
-                }
-            }
-        });
-
-        return () => {
-            if (typeof unsubscribe === 'function') unsubscribe();
-        };
-    }, [customer?.ConversationId, customer?.IsGroup]);
 
     useEffect(() => {
         if (open && initialViewState) {
@@ -319,12 +309,16 @@ const CustomerDetails = ({
 
     const loadGroupInfo = async () => {
         const data = await fetchGroupDetails(customer.ConversationId, auth);
-        console.log("data", data)
         if (data) {
             // Update permissions
             if (data.groupDetails) {
-                setGroupPermissions({
-                    approveNewMembers: data.groupDetails.ApproveNewMembers === 1
+                updateGroupSettings(customer.ConversationId, {
+                    EditGroup: data.groupDetails.EditGroup,
+                    SendNewMessage: data.groupDetails.SendNewMessage,
+                    AddOtherMember: data.groupDetails.AddOtherMember,
+                    InviteToGroup: data.groupDetails.InviteToGroup,
+                    ApproveNewMembers: data.groupDetails.ApproveNewMembers,
+                    AllowDeleteForAll: data.groupDetails.AllowDeleteForAll
                 });
 
                 updateGroupAdminMode(customer.ConversationId, data.groupDetails.SendNewMessage === 0);
@@ -358,6 +352,27 @@ const CustomerDetails = ({
         }
     };
 
+    const loadContactInfo = async () => {
+        try {
+            const contactUserId = customer?.ReceiverId || customer?.UserId || customer?.id;
+            const response = await contactInfoApi(auth, {
+                contactUserId,
+                conversationId: customer?.ConversationId
+            });
+            if (response?.Status === "200" || response?.success) {
+                const contactData = response?.Data?.rd?.[0] || response?.Data || null;
+                setContactInfoData(contactData);
+            } else {
+                setContactInfoData(null);
+            }
+        } catch (error) {
+            console.error('Error fetching contact info:', error);
+            setContactInfoData(null);
+        } finally {
+            setContactInfoLoading(false);
+        }
+    };
+
     const handlePermissionChange = async (name, value) => {
         console.log(name, value, 'jdhjsh')
         if (name === 'inviteToGroup' || name === 'approveNewMembers') {
@@ -370,7 +385,8 @@ const CustomerDetails = ({
             sendMessages: 'SendNewMessage',
             addOtherMembers: 'AddOtherMember',
             inviteToGroup: 'inviteToGroup',
-            approveNewMembers: 'ApproveNewMembers'
+            approveNewMembers: 'ApproveNewMembers',
+            deleteMessages: 'AllowDeleteForAll'
         };
 
         const apiPermissionName = permissionMap[name];
@@ -382,25 +398,21 @@ const CustomerDetails = ({
                 permissionName: apiPermissionName,
                 permissionValue: value
             });
-
             if (response?.Status === "200") {
                 if (response?.Data?.rd?.[0]?.stat === 0) {
-                    // Revert state on business logic failure
-                    setGroupPermissions(prev => ({ ...prev, [name]: !value }));
                     toast.error(response?.Data?.rd?.[0]?.stat_msg || 'Only group admins can change permissions.');
                     return;
                 }
+                updateGroupSettings(customer.ConversationId, { [apiPermissionName]: value ? 1 : 0 });
                 if (name === 'sendMessages') {
                     updateGroupAdminMode(customer.ConversationId, value === false);
                 }
                 toast.success('Permission updated successfully');
             } else {
-                // Revert state on failure
                 setGroupPermissions(prev => ({ ...prev, [name]: !value }));
                 toast.error(response?.Message || 'Failed to update permission');
             }
         } catch (error) {
-            // Revert state on error
             setGroupPermissions(prev => ({ ...prev, [name]: !value }));
             toast.error('Internal server error occurred');
         }
@@ -509,36 +521,41 @@ const CustomerDetails = ({
     };
 
     const handleEditAdminsSubmit = async (selectedIds) => {
-        if (!selectedIds || selectedIds.length === 0) return;
         setIsEditAdminDialogOpen(false);
+        if (!selectedIds) return;
+
         try {
-            let hasError = false;
-            for (const memberId of selectedIds) {
-                const response = await assignRoleApi(auth, {
-                    conversationId: customer.ConversationId,
-                    memberId: memberId
-                });
-                if (response?.Status === "200") {
-                    if (response?.Data?.rd?.[0]?.stat === 0) {
-                        toast.error(response?.Data?.rd?.[0]?.stat_msg || 'Failed to update admin role');
-                        hasError = true;
-                    }
-                } else {
-                    hasError = true;
+            const currentAdmins = localGroupData.members.filter(m => m.IsAdmin === 1 || m.IsAdmin === true).map(m => m.UserId);
+            const changes = [];
+            selectedIds.forEach(id => {
+                if (!currentAdmins.includes(id)) {
+                    changes.push({ UserId: id, IsGroupAdmin: 1 });
                 }
+            });
+            currentAdmins.forEach(id => {
+                if (!selectedIds.includes(id) && id !== localGroupData.createdById) {
+                    changes.push({ UserId: id, IsGroupAdmin: 0 });
+                }
+            });
+            if (changes.length === 0) {
+                return; // Nothing to change
             }
-            if (!hasError) {
+            const response = await multiAssignRoleApi(auth, {
+                conversationId: customer.ConversationId,
+                adminChanges: changes
+            });
+            if (response?.Status === "200") {
                 toast.success('Admins updated successfully');
+                loadGroupInfo(); // Refresh to ensure UI stays in sync
+            } else {
+                toast.error(response?.Message || 'Failed to update admins');
             }
-            loadGroupInfo();
         } catch (error) {
             console.error('Error updating admins:', error);
             toast.error('Error updating admins');
         }
     };
-
     const isCurrentUserAdmin = localGroupData.members.find(m => m.UserId === (auth?.id || auth?.userId))?.IsAdmin;
-
     const handleMemberClick = (event, member) => {
         if (member.UserId === (auth?.id || auth?.userId)) return;
         event.preventDefault();
@@ -906,6 +923,7 @@ const CustomerDetails = ({
 
                     <div className="content-scroll">
                         <DetailsViews
+                            open={open}
                             currentViewState={currentViewState}
                             direction={direction}
                             customer={customer}
@@ -931,6 +949,8 @@ const CustomerDetails = ({
                             startEditingDesc={startEditingDesc}
                             setIsEditingDesc={setIsEditingDesc}
                             mediaItems={mediaItems}
+                            contactInfoData={contactInfoData}
+                            contactInfoLoading={contactInfoLoading}
                             isRemovedFromCurrentGroup={isRemovedFromCurrentGroup}
                             auth={auth}
                             setIsParticipantSearchOpen={setIsParticipantSearchOpen}
@@ -957,6 +977,7 @@ const CustomerDetails = ({
                             groupPermissions={groupPermissions}
                             handlePermissionChange={handlePermissionChange}
                             onEditAdmins={() => setIsEditAdminDialogOpen(true)}
+                            onPastParticipantsClick={() => setIsPastParticipantsOpen(true)}
                             messageInfo={messageInfo}
                             onClose={onClose}
                             searchResults={searchResults}
@@ -978,6 +999,13 @@ const CustomerDetails = ({
                     isEditAdminDialogOpen={isEditAdminDialogOpen}
                     setIsEditAdminDialogOpen={setIsEditAdminDialogOpen}
                     handleEditAdminsSubmit={handleEditAdminsSubmit}
+                />
+
+                <AddMemberDialog
+                    open={isPastParticipantsOpen}
+                    onClose={() => setIsPastParticipantsOpen(false)}
+                    mode="viewPastParticipants"
+                    conversationId={customer?.ConversationId}
                 />
 
                 <MemberActions

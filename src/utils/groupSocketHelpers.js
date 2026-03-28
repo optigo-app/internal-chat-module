@@ -27,24 +27,24 @@ export const getGroupMemberIds = async (conversationId, auth) => {
  */
 export const formatGroupReadReceipt = (message, groupMembers) => {
     if (!message.ReadBy) return { icon: '✓', count: 0, text: 'Sent' };
-    
-    const readCount = Array.isArray(message.ReadBy) 
-        ? message.ReadBy.length 
+
+    const readCount = Array.isArray(message.ReadBy)
+        ? message.ReadBy.length
         : 0;
-    
+
     const totalMembers = groupMembers.length - 1; // Exclude sender
-    
+
     if (readCount === 0) return { icon: '✓', count: 0, text: 'Sent' };
-    if (readCount === totalMembers) return { 
-        icon: '✓✓', 
-        count: readCount, 
+    if (readCount === totalMembers) return {
+        icon: '✓✓',
+        count: readCount,
         text: 'Read by all',
         color: '#53bdeb'
     };
-    
-    return { 
-        icon: '✓✓', 
-        count: readCount, 
+
+    return {
+        icon: '✓✓',
+        count: readCount,
         text: `Read by ${readCount}`,
         color: '#53bdeb'
     };
@@ -93,7 +93,7 @@ export const formatGroupNotification = (eventType, data) => {
     switch (eventType) {
         case 'group_created':
             return `${data.createdBy?.name || 'Someone'} created the group`;
-        
+
         case 'group_updated':
             if (data.changes?.groupName) {
                 return `${data.updatedBy?.name || 'Someone'} changed the group name`;
@@ -105,26 +105,26 @@ export const formatGroupNotification = (eventType, data) => {
                 return `${data.updatedBy?.name || 'Someone'} changed the group photo`;
             }
             return `${data.updatedBy?.name || 'Someone'} updated the group`;
-        
+
         case 'member_added':
             const addedNames = data.newMembers?.map(m => m.name).join(', ') || 'Someone';
             return `${data.addedBy?.name || 'Someone'} added ${addedNames}`;
-        
+
         case 'member_removed':
             if (data.reason === 'left') {
                 return `${data.removedMember?.name || 'Someone'} left the group`;
             }
             return `${data.removedBy?.name || 'Someone'} removed ${data.removedMember?.name || 'someone'}`;
-        
+
         case 'member_promoted':
             return `${data.changedBy?.name || 'Someone'} promoted ${data.targetMember?.name || 'someone'} to admin`;
-        
+
         case 'member_demoted':
             return `${data.changedBy?.name || 'Someone'} removed ${data.targetMember?.name || 'someone'} as admin`;
-        
+
         case 'permission_changed':
             return `${data.changedBy?.name || 'Someone'} changed group permissions`;
-        
+
         default:
             return 'Group updated';
     }
@@ -146,7 +146,7 @@ export const getNotificationPriority = (eventType) => {
         'group_updated': 4,       // Low
         'group_created': 4        // Low
     };
-    
+
     return priorities[eventType] || 5;
 };
 
@@ -157,14 +157,14 @@ export const getNotificationPriority = (eventType) => {
  */
 export const groupNotifications = (notifications) => {
     if (!notifications || notifications.length === 0) return [];
-    
+
     const grouped = [];
     const timeWindow = 5000; // 5 seconds
-    
+
     notifications.forEach(notification => {
         const lastGroup = grouped[grouped.length - 1];
-        
-        if (lastGroup && 
+
+        if (lastGroup &&
             lastGroup.type === notification.type &&
             lastGroup.conversationId === notification.conversationId &&
             (notification.timestamp - lastGroup.timestamp) < timeWindow) {
@@ -180,7 +180,7 @@ export const groupNotifications = (notifications) => {
             });
         }
     });
-    
+
     return grouped;
 };
 
@@ -197,27 +197,38 @@ export const buildGroupMessagePayload = (params) => {
         message,
         messageType = 1,
         replyTo = 0,
-        attachments = null
+        attachments = null,
+        direction = 1,
+        messageId = null,
+        isEdited = 0,
+        dateTime,
     } = params;
-    
+
+    const messageText = typeof message === 'string' ? message : (message?.Message || message?.message || "");
+    const finalMessageId = messageId || message?.MessageId || message?.Id || message?.id || null;
+    const finalIsEdited = isEdited || message?.IsEdited || 0;
+
     return {
         ufcc: auth?.ufcc,
         SenderId: auth?.id || auth?.userId,
         ReceiverId: receiverIds, // Array for groups
         ConversationId: conversationId,
-        Message: message,
+        Message: messageText,
         MessageType: messageType,
-        Direction: 1,
+        Direction: direction,
         IsGroup: 1,
         SenderName: auth?.username || auth?.name,
+        RecieverName: auth?.username || auth?.name, // From user's example
         SenderEmail: auth?.email,
         FirstName: auth?.firstName,
         LastName: auth?.lastName,
         SenderProfilePicture: auth?.profilePicture,
         ReplyTo: replyTo,
+        IsEdited: finalIsEdited,
+        MessageId: finalMessageId,
         Attachments: attachments,
-        SentAt: new Date().toISOString(),
-        DateTime: new Date().toISOString()
+        SentAt: message?.SentAt || new Date().toISOString(),
+        DateTime: dateTime ?? new Date().toISOString()
     };
 };
 
@@ -236,7 +247,7 @@ export const buildGroupReactionPayload = (params) => {
         unified,
         direction = 0
     } = params;
-    
+
     return {
         ufcc: auth?.ufcc,
         SenderId: auth?.id || auth?.userId,

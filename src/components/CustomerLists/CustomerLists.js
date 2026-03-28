@@ -22,7 +22,6 @@ import { alpha } from '@mui/material/styles';
 import { Clear, Search } from '@mui/icons-material';
 import MapsUgcIcon from '@mui/icons-material/MapsUgc';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
-import PersonIcon from '@mui/icons-material/Person';
 import './CustomerLists.scss';
 import { fetchConversationLists } from '../../API/ConverLists/ConversationLists';
 import { formatChatTimestamp } from '../../utils/DateFnc';
@@ -41,6 +40,7 @@ import useOnlineStatus from '../../utils/internetCheck';
 import useFaviconBadge from '../../hooks/useFaviconBadge';
 import { useFavorite } from '../../contexts/FavoriteContext';
 import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
+import ProfilePanel from '../ProfileAvatar/ProfilePanel';
 
 const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, selectedStatus = 'All', selectedTag = 'All', isConversationRead = false, viewConversationRead = false, onConversationList = () => { } }) => {
     const isOnline = useOnlineStatus();
@@ -52,12 +52,11 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const [chatMembers, setChatMembers] = useState([]);
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
-    const [tempConversationId, setTempConversationId] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [anchorEl, setAnchorEl] = useState(null);
     const [selectMember, setSelectMember] = useState({});
     const [hoveredId, setHoveredId] = useState(null);
-    const [typingStates, setTypingStates] = useState({}); // { conversationId: { isTyping, userName } }
+    const [typingStates, setTypingStates] = useState({});
     const typingTimeoutsRef = useRef({});
     const [showNewChat, setShowNewChat] = useState(false);
     const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -118,26 +117,34 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             const searchToUse = search !== null ? search : searchTerm;
             const response = await fetchConversationLists(page, pageSize, auth, searchToUse, controller.signal);
 
-            // Process both rd and rd1 data
+            // Process rd data (existing conversations)
             const currentConversations = processApiResponse(response.data?.rd || []);
-            const searchResults = response.data?.rd1?.map(customer => ({
-                ...customer,
-                ConversationId: customer.CustomerId,
-                Id: customer.CustomerId,
-                ReceiverId: customer.ReceiverId,
-                name: customer.CustomerName || customer.CustomerPhone,
+
+            // Process rd1 data (new potential conversations from API)
+            const searchResults = response.data?.rd1?.map(user => ({
+                ...user,
+                ConversationId: null, // No conversation ID yet for new users
+                Id: user.UserId || user.CustomerId || user.id,
+                ReceiverId: user.UserId || user.CustomerId,
+                name: user.UserName || user.CustomerName || user.CustomerPhone || user.name || 'Unknown',
+                email: user.UserEmail || user.DisplayEmail || '',
                 lastMessage: '',
                 lastMessageText: '',
-                lastMessageTimeValue: customer?.LastMessageDate || customer?.LastUpdatedDate || new Date().toISOString(),
-                lastMessageTime: formatChatTimestamp(customer?.LastMessageDate || customer?.LastUpdatedDate || new Date().toISOString()),
+                lastMessageTimeValue: new Date().toISOString(),
+                lastMessageTime: '',
                 unreadCount: 0,
                 isSearchResult: true
             })) || [];
 
-            // Combine both, but keep them separate for rendering
+            // Combine both, but filter out search results that already have a conversation in currentConversations
             const mergedConversations = searchToUse
                 ? [
-                    ...searchResults,
+                    ...searchResults.filter(sr =>
+                        !currentConversations.some(cc =>
+                            (sr.ReceiverId && cc.ReceiverId && Number(cc.ReceiverId) === Number(sr.ReceiverId)) ||
+                            (sr.Id && cc.CustomerId && Number(cc.CustomerId) === Number(sr.Id))
+                        )
+                    ).sort((a, b) => a.name.localeCompare(b.name)),
                     ...currentConversations
                 ]
                 : currentConversations;
@@ -790,6 +797,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     };
 
     const isArchiveOpen = location.pathname === '/archieve';
+    const isProfileOpen = location.pathname === '/profile';
     const filteredMembers = getFilteredMembers(isArchiveOpen);
 
     const archivedCount = chatMembers?.data?.filter(m => m.IsArchived === 1)?.length || 0;
@@ -894,7 +902,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 updatedData[index] = { ...updatedData[index], unreadCount: 0 };
                 return { ...prev, data: updatedData };
             });
-            setTempConversationId(conversationId);
         }
     }, [isConversationRead, viewConversationRead, selectedCustomer?.ConversationId]);
 
@@ -926,15 +933,26 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                         {isArchiveOpen ? 'Archived Chats' : 'Chats'}
                     </Typography>
                 </Box>
-
                 {!isArchiveOpen && (
                     <Box className="add_conv_box">
-                        <IconButton onClick={() => setShowNewChat(true)} size="small" className='add_conv'>
-                            <MapsUgcIcon />
-                        </IconButton>
-                        <IconButton onClick={() => setShowCreateGroup(true)} size="small" className='add_conv group_add'>
-                            <GroupAddIcon />
-                        </IconButton>
+                        <Tooltip title="New Chat" arrow>
+                            <IconButton
+                                onClick={() => setShowNewChat(true)}
+                                size="small"
+                                className="add_conv"
+                            >
+                                <MapsUgcIcon />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Create Group" arrow>
+                            <IconButton
+                                onClick={() => setShowCreateGroup(true)}
+                                size="small"
+                                className="add_conv group_add"
+                            >
+                                <GroupAddIcon />
+                            </IconButton>
+                        </Tooltip>
                     </Box>
                 )}
             </Box>
@@ -991,13 +1009,21 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     <CreateGroup
                         onBack={() => setShowCreateGroup(false)}
                         onClose={() => setShowCreateGroup(false)}
-                        onContinue={() => {
+                        onContinue={(result) => {
                             setShowCreateGroup(false);
-                            // Refresh list to show the new group immediately
+                            const rd = result?.response?.Data?.rd?.[0] || result?.response?.rd?.[0];
+                            const newConvId = rd?.ConversationId || result?.response?.Data?.rd?.ConversationId;
+                            if (newConvId) {
+                                pendingSelectConversationIdRef.current = newConvId;
+                            }
                             loadMembers(1, true, searchTerm);
                         }}
                     />
                 </Box>
+            )}
+
+            {isProfileOpen && (
+                <ProfilePanel onBack={() => navigate('/')} />
             )}
 
 
@@ -1111,15 +1137,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                         const shouldShowUnreadBadge =
                                             member.unreadCount > 0 && !isSelectedAndReading;
 
-                                        let lastMessageData = [];
-                                        if (member.LastMessage) {
-                                            try {
-                                                const parsed = JSON.parse(member.LastMessage);
-                                                lastMessageData = Array.isArray(parsed) ? parsed : [parsed];
-                                            } catch (e) {
-                                                lastMessageData = [];
-                                            }
-                                        }
+
                                         return (
                                             <li
                                                 key={member.ConversationId}
@@ -1282,10 +1300,15 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                                     <div className="member-avatar">
                                                         <ConversationAvatar member={member} />
                                                     </div>
-                                                    <div className="member-details">
-                                                        <div className="member-name">
-                                                            {member.name}
+                                                    <div className="member-info">
+                                                        <div className="member-name" style={{ fontWeight: 500, fontSize: '15px', color: '#111827' }}>
+                                                            {highlightText(member.name, searchTerm)}
                                                         </div>
+                                                        {(member.email || member.UserEmail) && (
+                                                            <div className="member-email" style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>
+                                                                {highlightText(member.email || member.UserEmail, searchTerm)}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </li>
                                             ))}

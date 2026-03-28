@@ -4,7 +4,7 @@ export const fetchMediaLists = async (page = 1, pageSize = 6, conversationId, us
     try {
         const body = {
             "con": `{\"id\":\"\",\"mode\":\"FilesList\",\"appuserid\":\"${userId}\"}`,
-            "p": `{\"ConversationId\": ${conversationId},\"Page\": ${page}, \"PageSize\": ${pageSize}}`,
+            "p": `{\"ConversationId\": ${conversationId}}`,
             "f": "Chat ( File list )"
         }
 

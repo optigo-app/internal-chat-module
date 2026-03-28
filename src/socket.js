@@ -21,6 +21,7 @@ let sessionLogout = new Set();
 let groupEventHandlers = new Set();
 let groupMemberHandlers = new Set();
 let groupPermissionHandlers = new Set();
+let internalMessageDeletionHandlers = new Set();
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
@@ -143,6 +144,15 @@ export function initializeSocket(token) {
         });
     });
 
+    socketInstance.on('internal:delete_message', (data) => {
+        internalMessageDeletionHandlers.forEach(handler => {
+            try {
+                handler(data);
+            } catch (error) {
+            }
+        });
+    });
+
     // Group event handlers
     const dispatchGroupEvent = (data) => {
         groupEventHandlers.forEach((handler) => {
@@ -247,6 +257,13 @@ export const addInternalTypingHandler = (handler) => {
     internalTypingHandlers.add(handler);
     return () => {
         internalTypingHandlers.delete(handler);
+    };
+};
+
+export const addInternalMessageDeletionHandler = (handler) => {
+    internalMessageDeletionHandlers.add(handler);
+    return () => {
+        internalMessageDeletionHandlers.delete(handler);
     };
 };
 
@@ -387,6 +404,12 @@ export const emitInternalTyping = (payload) => {
     return true;
 };
 
+export const emitInternalMessageDelete = (payload) => {
+    if (!socketInstance) return false;
+    socketInstance.emit('internal:delete_message', { ...payload, receiveEvent: "internal:delete_message" });
+    return true;
+};
+
 export const emitGroupInfoRequest = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:group_info_request', {
@@ -406,6 +429,7 @@ export const disconnectSocket = (permanent = false) => {
         internalMessageHandlers.clear();
         internalStatusHandlers.clear();
         internalTypingHandlers.clear();
+        internalMessageDeletionHandlers.clear();
         groupEventHandlers.clear();
         groupMemberHandlers.clear();
         groupPermissionHandlers.clear();

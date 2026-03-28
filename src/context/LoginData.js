@@ -34,6 +34,7 @@ export const LoginData = ({ children }) => {
             if (sessionData) {
                 const parsed = JSON.parse(sessionData);
                 return {
+                    ...parsed,
                     userId: parsed?.userId || "",
                     username: parsed?.username || "",
                     ukey: parsed?.ukey || "",

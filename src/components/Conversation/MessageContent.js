@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, CircularProgress, IconButton, Skeleton, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import { ChevronDown, FileText, Check, CheckCheck, Image as ImageIcon, Video as VideoIcon, Play, FileType, FileSpreadsheet, FileArchive, FileCode, Forward, ArrowBigDownDash, ArrowBigDown, Download } from 'lucide-react';
+import { ChevronDown, FileText, Check, CheckCheck, Image as ImageIcon, Video as VideoIcon, Play, FileType, FileSpreadsheet, FileArchive, FileCode, Forward, ArrowBigDownDash, ArrowBigDown, Download, CircleMinus } from 'lucide-react';
 import { Emoji } from 'emoji-picker-react';
 import { FormatDateIST } from '../../utils/DateFnc';
 import QuickReactionMenu from './QuickReactionMenu';
@@ -41,7 +41,6 @@ const MessageContent = ({
     handleContextMenu,
     scrollToMessage,
     containerRef,
-    parseTemplateData,
     getMediaKey,
     getMediaSrcForMessage,
     loadedMedia,
@@ -50,7 +49,9 @@ const MessageContent = ({
     getMessageStatusIcon,
     getMessageById,
     handleForward,
-    selectedCustomer
+    selectedCustomer,
+    setDrawerViewState,
+    setDrawerOpen,
 }) => {
 
     const theme = useTheme();
@@ -191,19 +192,18 @@ const MessageContent = ({
                             marginRight: '0px !important',
                             transform: `translate(${isOutgoing ? '-110%' : '110%'}, -50%) !important`,
                             display: 'flex',
-                            // Reverse order for outgoing so Forward button stays closest to the bubble
                             flexDirection: isOutgoing ? 'row-reverse' : 'row',
                             alignItems: 'center',
-                            gap: '6px', // Increased gap for separated bubbles
+                            gap: '6px',
                             zIndex: '6 !important',
-                            pointerEvents: 'none !important', // Let clicks pass through the container gap
-                            opacity: '1 !important', // Override CSS opacity: 0
+                            pointerEvents: 'none !important',
+                            opacity: '1 !important',
                             boxShadow: 'none'
                         },
                     }}
                 >
                     {/* Forward Action: Always Visible */}
-                    {['image', 'video', 'document'].includes(msg?.MessageType) && (
+                    {['image', 'video', 'document'].includes(msg?.MessageType) && !msg.IsDeletedForEveryone && (
                         <Box
                             sx={{
                                 display: 'flex',
@@ -239,71 +239,75 @@ const MessageContent = ({
                     )}
 
                     {/* Reaction Menu: Visible on Hover */}
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '2px',
-                            borderRadius: '999px',
-                            backgroundColor: alpha(theme.palette.background.paper, 0.92),
-                            border: `1px solid ${theme.palette.borderColor?.extraLight || theme.palette.divider}`,
-                            boxShadow: `0 6px 14px ${alpha('#000', 0.12)}`,
-                            opacity: shouldShowActions ? 1 : 0,
-                            pointerEvents: shouldShowActions ? 'auto' : 'none',
-                            transition: 'opacity 160ms ease, transform 160ms ease',
-                            transform: shouldShowActions ? 'scale(1)' : 'scale(0.8)', // Subtle pop animation
-                        }}
-                    >
-                        <QuickReactionMenu
-                            open={isReactionMenuOpenForCurrent}
-                            anchorEl={reactionMenuAnchorEl}
-                            onOpen={(e) => {
-                                e.stopPropagation();
-                                setHoveredMessageId(currentHoverId);
-                                setReactionMenuAnchorEl(e.currentTarget);
-                                setReactionMenuMessageId(currentHoverId);
+                    {!msg.IsDeletedForEveryone && (
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '2px',
+                                borderRadius: '999px',
+                                backgroundColor: alpha(theme.palette.background.paper, 0.92),
+                                border: `1px solid ${theme.palette.borderColor?.extraLight || theme.palette.divider}`,
+                                boxShadow: `0 6px 14px ${alpha('#000', 0.12)}`,
+                                opacity: shouldShowActions ? 1 : 0,
+                                pointerEvents: shouldShowActions ? 'auto' : 'none',
+                                transition: 'opacity 160ms ease, transform 160ms ease',
+                                transform: shouldShowActions ? 'scale(1)' : 'scale(0.8)', // Subtle pop animation
                             }}
-                            onClose={(e) => {
-                                e?.stopPropagation?.();
-                                closeReactionMenu();
-                            }}
-                            onSelectEmoji={(emoji) => {
-                                if (typeof handleMessageEmojiClick === 'function') {
-                                    handleMessageEmojiClick(emoji, msg);
-                                }
-                                closeReactionMenu();
-                            }}
-                        />
-                    </Box>
+                        >
+                            <QuickReactionMenu
+                                open={isReactionMenuOpenForCurrent}
+                                anchorEl={reactionMenuAnchorEl}
+                                onOpen={(e) => {
+                                    e.stopPropagation();
+                                    setHoveredMessageId(currentHoverId);
+                                    setReactionMenuAnchorEl(e.currentTarget);
+                                    setReactionMenuMessageId(currentHoverId);
+                                }}
+                                onClose={(e) => {
+                                    e?.stopPropagation?.();
+                                    closeReactionMenu();
+                                }}
+                                onSelectEmoji={(emoji) => {
+                                    if (typeof handleMessageEmojiClick === 'function') {
+                                        handleMessageEmojiClick(emoji, msg);
+                                    }
+                                    closeReactionMenu();
+                                }}
+                            />
+                        </Box>
+                    )}
 
                 </Box>
 
-                <IconButton
-                    className="menu-btn"
-                    size="small"
-                    onClick={(e) => {
-                        handleMenuClick(e, msg);
-                        handleContextMenu(e, msg);
-                    }}
-                    sx={{
-                        '&&': {
-                            position: 'absolute !important',
-                            top: '3px !important',
-                            right: '3px !important',
-                            left: 'auto !important',
-                            padding: '0px !important',
-                            color: theme.palette.text.secondary + ' !important',
-                            opacity: shouldShowActions ? 1 : 0,
-                            pointerEvents: shouldShowActions ? 'auto' : 'none',
-                            backgroundColor: alpha(theme.palette.primary.main, 0.10),
-                            boxShadow: '0 6px 14px ' + alpha('#000', 0.12),
-                            transition: 'opacity 160ms ease',
-                            zIndex: 3,
-                        },
-                    }}
-                >
-                    <ChevronDown size={24} />
-                </IconButton>
+                {!msg.IsDeletedForEveryone && (
+                    <IconButton
+                        className="menu-btn"
+                        size="small"
+                        onClick={(e) => {
+                            handleMenuClick(e, msg);
+                            handleContextMenu(e, msg);
+                        }}
+                        sx={{
+                            '&&': {
+                                position: 'absolute !important',
+                                top: '3px !important',
+                                right: '3px !important',
+                                left: 'auto !important',
+                                padding: '0px !important',
+                                color: theme.palette.text.secondary + ' !important',
+                                opacity: shouldShowActions ? 1 : 0,
+                                pointerEvents: shouldShowActions ? 'auto' : 'none',
+                                backgroundColor: alpha(theme.palette.primary.main, 0.10),
+                                boxShadow: '0 6px 14px ' + alpha('#000', 0.12),
+                                transition: 'opacity 160ms ease',
+                                zIndex: 3,
+                            },
+                        }}
+                    >
+                        <ChevronDown size={24} />
+                    </IconButton>
+                )}
                 {/* Forwarded Indicator */}
                 {(!!msg?.ForwardedFrom && msg?.ForwardedFrom !== "0") && (
                     <Box
@@ -345,6 +349,25 @@ const MessageContent = ({
                             cursor: 'pointer',
                             '&:hover': { textDecoration: 'underline' }
                         }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const memberData = {
+                                id: msg?.SenderId,
+                                UserId: msg.SenderEmail,
+                                UserName: msg.SenderInfo || msg.Sender,
+                                FirstName: msg.FirstName,
+                                LastName: msg.LastName,
+                                ProfileImageUrl: msg.SenderProfilePicture,
+                                IsGroup: 0,
+                                ConversationId: selectedCustomer?.ConversationId
+                            };
+                            window.dispatchEvent(new CustomEvent('SHOW_MEMBER_INFO', {
+                                detail: memberData
+                            }));
+                            if (setDrawerViewState) setDrawerViewState('info');
+                            if (setDrawerOpen) setDrawerOpen(true);
+                        }}
+
                     >
                         {msg.SenderInfo || (msg.FirstName ? `${msg.FirstName} ${msg.LastName || ''}` : msg.Sender) || 'Member'}
                     </Typography>
@@ -641,23 +664,22 @@ const MessageContent = ({
                                             fontSize: 11,
                                         }}
                                     >
+                                        {msg?.IsEdited == 1 && (
+                                            <Typography
+                                                variant="caption"
+                                                sx={{
+                                                    fontSize: 11,
+                                                    color: alpha(theme.palette.text.primary, 0.65) + ' !important',
+                                                    ml: 0.5
+                                                }}
+                                            >
+                                                Edited
+                                            </Typography>
+                                        )}
                                         {msg?.Time || msg.dateTime
                                             ? msg?.Time || msg.dateTime
                                             : msg.DateTime && FormatDateIST(msg.DateTime, "dd-mm-yyyy").time}
                                     </Typography>
-                                    {msg?.IsEdited == 1 && (
-                                        <Typography
-                                            variant="caption"
-                                            sx={{
-                                                fontSize: 10,
-                                                fontStyle: 'italic',
-                                                color: alpha(theme.palette.text.primary, 0.5),
-                                                ml: 0.5
-                                            }}
-                                        >
-                                            (edited)
-                                        </Typography>
-                                    )}
                                     {msg.Direction == 1 && !msg.isUploading && (
                                         <Box sx={{ display: "flex", alignItems: "center", lineHeight: 1 }}>
                                             {(() => {
@@ -686,22 +708,30 @@ const MessageContent = ({
                     </div>
                 )}
 
-                {/* Text - Only show when NOT a reply (ContextType !== 2) */}
                 {msg.ContextType !== 2 && msg?.MessageType === "text" && (
-                    <Typography
-                        variant="body2"
-                        className="message-text"
-                        sx={{
-                            '&&': {
-                                color: theme.palette.text.primary + ' !important',
-                            },
-                            fontSize: 14,
-                            lineHeight: 1.45,
-                            pr: 1,
-                        }}
-                    >
-                        {linkifyText(msg.Message)}
-                    </Typography>
+                    msg.IsDeletedForEveryone === 1 ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.6, fontStyle: 'italic', pr: 1 }}>
+                            <CircleMinus size={16} />
+                            <Typography variant="body2" sx={{ fontSize: 13.5 }}>
+                                {msg.IsMyMessage ? (msg.Message1 || msg.Message) : msg.Message}
+                            </Typography>
+                        </Box>
+                    ) : (
+                        <Typography
+                            variant="body2"
+                            className="message-text"
+                            sx={{
+                                '&&': {
+                                    color: theme.palette.text.primary + ' !important',
+                                },
+                                fontSize: 14,
+                                lineHeight: 1.45,
+                                pr: 1,
+                            }}
+                        >
+                            {linkifyText(msg.Message)}
+                        </Typography>
+                    )
                 )}
 
                 {/* Image */}
@@ -1346,6 +1376,18 @@ const MessageContent = ({
                             whiteSpace: 'nowrap',
                         }}
                     >
+                        {msg?.IsEdited == 1 && (
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    fontSize: 11,
+                                    color: alpha(theme.palette.text.primary, 0.65) + ' !important',
+                                    ml: 0.5
+                                }}
+                            >
+                                Edited
+                            </Typography>
+                        )}
                         <Typography
                             variant="caption"
                             className="message-time"
@@ -1365,19 +1407,6 @@ const MessageContent = ({
                                 : msg.DateTime && FormatDateIST(msg.DateTime, "dd-mm-yyyy").time}
                         </Typography>
 
-                        {msg?.IsEdited == 1 && (
-                            <Typography
-                                variant="caption"
-                                sx={{
-                                    fontSize: 10,
-                                    fontStyle: 'italic',
-                                    color: alpha(theme.palette.text.primary, 0.5),
-                                    ml: 0.5
-                                }}
-                            >
-                                (edited)
-                            </Typography>
-                        )}
 
                         {msg.Direction == 1 && !msg.isUploading && (
                             <Box sx={{ display: "flex", alignItems: "center", lineHeight: 1 }}>

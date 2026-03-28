@@ -409,7 +409,7 @@
 
             .permission_item {
                 display: flex;
-                align-items: flex-start;
+                align-items: center;
                 padding: 14px 24px;
                 gap: 18px;
                 transition: background-color 0.2s ease;
@@ -420,8 +420,8 @@
 
                 .item_icon {
                     color: #54656f;
-                    min-width: 22px;
-                    margin-top: 3px;
+                    width: 20px;
+                    height: 20px;
                 }
 
                 .item_text {

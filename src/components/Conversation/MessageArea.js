@@ -40,7 +40,9 @@ const MessageArea = ({
     handleForward,
     processFiles,
     captureMessageScrollState,
-    typingStatus
+    typingStatus,
+    setDrawerViewState,
+    setDrawerOpen
 }) => {
     const [hoveredMessageId, setHoveredMessageId] = useState(null);
     const [reactionMenuAnchorEl, setReactionMenuAnchorEl] = useState(null);
@@ -271,6 +273,8 @@ const MessageArea = ({
                                         handleRemoveReaction={handleRemoveReaction}
                                         messageById={messageById}
                                         handleForward={handleForward}
+                                        setDrawerViewState={setDrawerViewState}
+                                        setDrawerOpen={setDrawerOpen}
                                     />
                                 ))}
                             </div>

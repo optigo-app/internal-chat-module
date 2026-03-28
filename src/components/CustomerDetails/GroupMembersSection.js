@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Typography, Avatar } from '@mui/material';
-import { Search, UserPlus, ChevronDown } from 'lucide-react';
+import { Search, UserPlus, ChevronDown, Clock } from 'lucide-react';
 import { getWhatsAppAvatarConfig } from '../../utils/globalFunc';
 
 const GroupMembersSection = ({
@@ -12,7 +12,8 @@ const GroupMembersSection = ({
     onMemberClick,
     showAllMembers,
     setShowAllMembers,
-    groupPermissions
+    groupPermissions,
+    onPastParticipantsClick
 }) => {
     const [hoveredMemberId, setHoveredMemberId] = useState(null);
     const canAddMembers = isCurrentUserAdmin || groupPermissions?.addOtherMembers;
@@ -102,6 +103,15 @@ const GroupMembersSection = ({
                         </div>
                     </div>
                 )}
+
+                <div className="setting-item no-border member-item add-member-row" onClick={onPastParticipantsClick} style={{ marginTop: '5px' }}>
+                    <div className="setting-left">
+                        <div className="action-circle-small" style={{ backgroundColor: '#f0f2f5', color: '#54656f' }}>
+                            <Clock size={20} />
+                        </div>
+                        <span className="member-name action-text" style={{ color: '#54656f' }}>Past participants</span>
+                    </div>
+                </div>
             </div>
         </div>
     );

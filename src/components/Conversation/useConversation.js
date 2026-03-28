@@ -3,7 +3,7 @@ import { conversationView } from '../../API/ConversationView/ConversationView';
 import { sendDocumentMessage, sendImageMessage, sendTextMessage, sendVideoMessage } from '../../API/SendMessage/SendMessageApi';
 import { normalizeServerMessages as normalizeServerMessagesHelper, groupMessagesByDateHelper, saveConversationToCache } from './conversationUtils';
 
-import { addMessageReactionHandler, addInternalMessageHandler, emitInternalMessageSend, addInternalStatusHandler, emitInternalMessageRead } from '../../socket';
+import { addMessageReactionHandler, addInternalMessageHandler, emitInternalMessageSend, addInternalStatusHandler, emitInternalMessageRead, addInternalMessageDeletionHandler, emitInternalMessageDelete } from '../../socket';
 import { buildGroupMessagePayload } from '../../utils/groupSocketHelpers';
 import { fetchGroupDetails } from '../../API/Groups/FetchGroupDetails';
 import { readMessageApi } from '../../API/SendMessage/ReadMessageApi';
@@ -37,8 +37,6 @@ const normalizeMessagesList = (prev) =>
 /** Return current time components (consistent with backend local-as-UTC pattern). */
 const getISTTime = () => {
     const now = new Date();
-    // Offset-adjusted ISO string provides local time numbers with a 'Z' suffix, 
-    // matching the backend's behavior for correct sorting and display.
     const offset = now.getTimezoneOffset() * 60000;
     const localISO = new Date(now.getTime() - offset).toISOString();
 
@@ -172,9 +170,10 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         const incomingId = getMessageId(normalizedWithDirection);
         if (!incomingId) return;
 
-        // Fast-path guard: skip if already processed
-        if (processedMessageIds.current.has(incomingId)) return;
-        processedMessageIds.current.add(incomingId);
+        // Fast-path guard: skip if already processed (unless it's an edit)
+        const isEdit = rawData?.IsEdited === 1 || rawData?.isEdited === 1;
+        if (!isEdit && processedMessageIds.current.has(incomingId)) return;
+        if (!isEdit) processedMessageIds.current.add(incomingId);
 
         setMessages((prevMessages) => {
             const prevData = normalizeMessagesList(prevMessages);
@@ -203,7 +202,6 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     }, [auth]);
 
     // ── Read receipt ─────────────────────────────────────────────────────────
-
     const handleReadMessage = useCallback(async (custConverId, signal = null, force = false, skipDrawerCheck = false) => {
         if (!custConverId) return;
         if (document.visibilityState !== 'visible') return;
@@ -438,14 +436,45 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             }
         };
 
+        const handleDeleteMessageSocket = (data) => {
+            const myId = Number(auth?.id ?? auth?.userId);
+            const senderId = Number(data?.UserId ?? data?.SenderId ?? data?.senderId);
+            if (myId && senderId && myId === senderId) return;
+
+            setMessages((prevMessages) => {
+                const prevData = normalizeMessagesList(prevMessages);
+                const updatedData = prevData.map(msg => {
+                    const msgId = msg.MessageId || msg.Id || msg.id;
+                    if (String(msgId) === String(data.MessageId)) {
+                        return {
+                            ...msg,
+                            Message: data.Message || "This message was deleted.",
+                            Message1: data.Message1 || "You deleted this message.",
+                            IsDeletedForEveryone: 1,
+                            DeletedAt: data.DeletedAt || new Date().toISOString(),
+                            Attachments: null,
+                            attachments: null,
+                            MediaUrl: null,
+                            mediaItems: null,
+                            MessageType: 'text',
+                        };
+                    }
+                    return msg;
+                });
+                return Array.isArray(prevMessages) ? updatedData : { ...prevMessages, data: updatedData };
+            });
+        };
+
         const removeMessageReactionHandler = addMessageReactionHandler(handleReactionMessage);
         const removeStatusHandler = addInternalStatusHandler(handleChangeStatus);
         const removeInternalMessageHandler = addInternalMessageHandler(handleInternalMessage);
+        const removeDeleteHandler = addInternalMessageDeletionHandler(handleDeleteMessageSocket);
 
         return () => {
             removeMessageReactionHandler();
             removeStatusHandler();
             removeInternalMessageHandler();
+            removeDeleteHandler();
         };
     }, [auth?.token, auth?.userId, addUniqueMessage, handleReadMessage]);
 
@@ -716,7 +745,6 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     }, [messages, selectedCustomer?.ConversationId]);
 
     // ── File/media handlers ──────────────────────────────────────────────────
-
     const handleAttachClick = useCallback(() => {
         setShowMedia(prev => !prev);
     }, []);
@@ -790,65 +818,175 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
         setShowMedia(false);
     }, []);
 
-    // ── Edit & Delete Message handlers ──────────────────────────────────────
+    const emitSocketMessage = useCallback(async ({ messageId, message, isEdited = 0, extra = {} }) => {
+        if (!selectedCustomer?.ConversationId || !auth?.ufcc) return;
+        const { dateTime } = getISTTime();
+
+        const isGroup = selectedCustomer?.IsGroup === 1;
+        let receiverIdValue;
+        if (isGroup) {
+            try {
+                const groupData = await fetchGroupDetails(selectedCustomer.ConversationId, auth);
+                receiverIdValue = groupData?.members
+                    ? groupData.members.map(m => m.UserId)
+                    : [selectedCustomer?.ReceiverId || selectedCustomer?.UserId];
+            } catch (error) {
+                console.error('Error fetching group members for socket emit:', error);
+                receiverIdValue = [selectedCustomer?.ReceiverId || selectedCustomer?.UserId];
+            }
+        } else {
+            receiverIdValue = selectedCustomer?.ReceiverId || selectedCustomer?.UserId;
+        }
+
+        const payload = buildGroupMessagePayload({
+            message,
+            conversationId: selectedCustomer.ConversationId,
+            receiverIds: receiverIdValue,
+            auth,
+            attachments: null,
+            replyTo: 0,
+            direction: 0,
+            messageId,
+            isEdited,
+            dateTime,
+        });
+
+        emitInternalMessageSend({
+            ...payload,
+            ...extra,
+            receiveEvent: 'internal:msg_receive',
+        });
+    }, [auth, selectedCustomer]);
 
     const handleEditMessage = useCallback(async (messageId, newMessage) => {
         if (!messageId || !newMessage.trim()) return;
+        const { time, date, dateTime } = getISTTime();
         try {
             const response = await editMessageApi(auth, { messageId, newMessage });
-            if (response) {
+            if (response?.Data?.rd?.[0]?.stat == 1) {
+                const editedMessage = response.Data.rd[0];
                 setMessages(prev => {
                     const prevData = normalizeMessagesList(prev);
                     const updatedData = prevData.map(msg => {
                         const msgId = msg.MessageId || msg.Id || msg.id;
                         if (String(msgId) === String(messageId)) {
-                            return { ...msg, Message: newMessage, IsEdited: 1 };
+                            return {
+                                ...msg,
+                                Message: editedMessage.Message,
+                                IsEdited: 1,
+                                Direction: 1,
+                                Time: time,
+                                Date: date,
+                            };
                         }
                         return msg;
                     });
                     return Array.isArray(prev) ? updatedData : { ...prev, data: updatedData };
                 });
+                await emitSocketMessage({ messageId, message: editedMessage.Message, isEdited: 1 });
                 toast.success("Message edited successfully");
             } else {
-                toast.error("Failed to edit message");
+                toast.error(response?.Message || "Failed to edit message");
             }
         } catch (error) {
             console.error("Error editing message:", error);
             toast.error("Error editing message");
         }
-    }, [auth]);
+    }, [auth, addUniqueMessage, emitSocketMessage]);
 
     const handleDeleteMessage = useCallback(async (messageId, mode) => {
         if (!messageId) return;
         try {
-            const response = await deleteMessageApi(auth, messageId, mode);
-            if (response) {
+            const response = await deleteMessageApi(auth, messageId, mode, selectedCustomer?.ConversationId);
+            const deletedInfo = response?.Data?.rd?.[0] || response?.rd?.[0];
+
+            if (deletedInfo?.stat != 0) {
                 setMessages(prev => {
                     const prevData = normalizeMessagesList(prev);
-                    // Filter out the deleted message or mark as deleted
-                    const updatedData = prevData.filter(msg => {
-                        const msgId = msg.MessageId || msg.Id || msg.id;
-                        return String(msgId) !== String(messageId);
-                    });
-                    return Array.isArray(prev) ? updatedData : { ...prev, data: updatedData };
+
+                    if (Number(mode) === 2) {
+                        // mode 2: Delete for Everyone -> Update message content
+                        const updatedData = prevData.map(msg => {
+                            const msgId = msg.MessageId || msg.Id || msg.id;
+                            if (String(msgId) === String(messageId)) {
+                                return {
+                                    ...msg,
+                                    Message: deletedInfo.Message || "This message was deleted.",
+                                    Message1: deletedInfo.Message1 || "You deleted this message.",
+                                    IsDeletedForEveryone: 1,
+                                    DeletedAt: deletedInfo.DeletedAt || new Date().toISOString(),
+                                    // Clear all media/attachments
+                                    Attachments: null,
+                                    attachments: null,
+                                    MediaUrl: null,
+                                    mediaId: null,
+                                    mediaItems: null,
+                                    AttachmentCount: 0,
+                                    MessageType: 'text', // Reset to text
+                                };
+                            }
+                            return msg;
+                        });
+                        
+                        // Socket emit for Delete for Everyone
+                        if (Number(mode) === 2) {
+                            (async () => {
+                                const senderId = auth?.id ?? auth?.userId;
+                                const isGroup = selectedCustomer?.IsGroup === 1;
+                                let receiverIdValue;
+
+                                if (isGroup) {
+                                    try {
+                                        const groupData = await fetchGroupDetails(selectedCustomer.ConversationId, auth);
+                                        receiverIdValue = groupData?.members ? groupData.members.map(m => m.UserId) : [selectedCustomer?.ReceiverId];
+                                    } catch {
+                                        receiverIdValue = [selectedCustomer?.ReceiverId];
+                                    }
+                                } else {
+                                    receiverIdValue = selectedCustomer?.ReceiverId;
+                                }
+
+                                emitInternalMessageDelete({
+                                    ufcc: auth?.ufcc,
+                                    UserId: senderId,
+                                    SenderId: senderId,
+                                    ReceiverId: receiverIdValue,
+                                    ConversationId: selectedCustomer?.ConversationId,
+                                    MessageId: messageId,
+                                    Message: deletedInfo.Message || "This message was deleted.",
+                                    Message1: deletedInfo.Message1 || "You deleted this message.",
+                                    MessageType: 1,
+                                    IsDeletedForEveryone: 1,
+                                    DeletedAt: deletedInfo.DeletedAt || new Date().toISOString(),
+                                });
+                            })();
+                        }
+                        
+                        return Array.isArray(prev) ? updatedData : { ...prev, data: updatedData };
+                    } else {
+                        // mode 1: Delete for Me -> Remove from list
+                        const updatedData = prevData.filter(msg => {
+                            const msgId = msg.MessageId || msg.Id || msg.id;
+                            return String(msgId) !== String(messageId);
+                        });
+                        return Array.isArray(prev) ? updatedData : { ...prev, data: updatedData };
+                    }
                 });
                 toast.success("Message deleted successfully");
             } else {
-                toast.error("Failed to delete message");
+                toast.error(response?.Message || "Failed to delete message");
             }
         } catch (error) {
             console.error("Error deleting message:", error);
             toast.error("Error deleting message");
         }
-    }, [auth]);
+    }, [auth, selectedCustomer]);
 
     const uploadAndSendMedia = useCallback(async ({ files, caption, type, tempId, time, date, dateTime }) => {
         const safeFiles = Array.isArray(files) ? files.filter(f => f instanceof File) : [];
         if (!safeFiles.length) return;
-
         const getUrl = u => u?.url ?? u?.Url ?? u?.fileUrl ?? u?.fileURL ?? u?.FileUrl ?? u?.FileURL ?? u?.path ?? u?.Path ?? null;
         const getName = u => u?.fileName ?? u?.filename ?? u?.FileName ?? u?.name ?? u?.originalName ?? u?.originalname ?? null;
-
         try {
             const convIdForFolder = selectedCustomer?.ConversationId || tempConversationId || null;
             const folderCategory = type === 'image' ? 'images' : type === 'video' ? 'videos' : 'docs';
@@ -1060,7 +1198,6 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     }, [auth, selectedCustomer, tempConversationId]);
 
     // ── Send message ─────────────────────────────────────────────────────────
-
     const handleSendMessage = useCallback(async (containerRef, scrollToBottom, messageOverride = null) => {
         const caption = (messageOverride !== null ? messageOverride : inputValue).trim();
         const { time, date, dateTime } = getISTTime();
@@ -1113,7 +1250,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
         const replySnapshot = replyToMessage;
         const replyToMessageId = storeMessData?.messageId;
-        const tempId = Date.now();
+        const tempId = `${Date.now()}-${Math.random()}`;
 
         setMessages(prev => ({
             data: [
@@ -1160,50 +1297,20 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             const conversationId = resp?.Data?.rd?.[0]?.ConversationId || selectedCustomer?.ConversationId;
 
             if (sentId) {
-                const isGroup = selectedCustomer?.IsGroup === 1;
-                let receiverIdValue;
-
-                if (isGroup) {
-                    // For groups, ReceiverId is an array of all member IDs
-                    try {
-                        const groupData = await fetchGroupDetails(selectedCustomer.ConversationId, auth);
-                        if (groupData && groupData.members) {
-                            receiverIdValue = groupData.members.map(m => m.UserId);
-                        } else {
-                            receiverIdValue = [selectedCustomer?.ReceiverId || selectedCustomer?.UserId];
-                        }
-                    } catch (error) {
-                        console.error('Error fetching group members for message:', error);
-                        receiverIdValue = [selectedCustomer?.ReceiverId || selectedCustomer?.UserId];
-                    }
-                } else {
-                    // For 1-to-1, ReceiverId is a single value
-                    receiverIdValue = selectedCustomer?.ReceiverId || selectedCustomer?.UserId;
-                }
-
-                if (receiverIdValue) {
-                    if (!isGroup && Number(receiverIdValue) === Number(auth?.id)) {
-                        console.warn('⚠️ Warning: Sending message to SELF (ReceiverId === SenderId).');
-                    }
-
-                    let messagePayload = {
-                        ufcc: auth?.ufcc,
-                        ReceiverId: receiverIdValue, // Array for groups, single value for 1-to-1
+                await emitSocketMessage({
+                    messageId: sentId,
+                    message: caption,
+                    isEdited: 0,
+                    extra: {
                         Id: auth.SocketId,
-                        MessageId: sentId,
-                        SenderId: auth?.id,
-                        Direction: 0,
                         Status: 1,
                         MessageStatus: 1,
                         MessageType: 'text',
-                        Message: caption,
                         Time: time,
                         Date: date,
                         DateTime: dateTime,
                         ConversationId: conversationId || tempConversationId,
                         ...(!selectedCustomer?.ReceiverId ? { ConversationName: auth?.username || auth?.userId } : {}),
-                        SenderName: auth?.username || auth?.userId || auth?.name,
-                        RecieverName: auth?.username || auth?.userId || auth?.name,
                         ...(replySnapshot && replyToMessageId ? {
                             ContextType: 2,
                             ContextId: replyToMessageId,
@@ -1211,19 +1318,8 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                             SenderInfo: replySnapshot?.sender || '',
                             Sender: replySnapshot?.sender || '',
                         } : {}),
-                    };
-
-                    // Add group-specific fields if it's a group
-                    if (isGroup) {
-                        messagePayload.IsGroup = 1;
-                        messagePayload.FirstName = auth?.firstName || auth?.FirstName;
-                        messagePayload.LastName = auth?.lastName || auth?.LastName;
-                        messagePayload.SenderEmail = auth?.email;
-                        messagePayload.SenderProfilePicture = auth?.profilePicture;
-                    }
-
-                    emitInternalMessageSend(messagePayload);
-                }
+                    },
+                });
 
                 setMessages(prev => ({
                     data: normalizeMessagesList(prev).map(m =>
@@ -1317,24 +1413,18 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     }, []);
 
     const handleSendForward = useCallback(async (selectedContactsArr = []) => {
-        debugger
-        console.log("selectedContactsArr", selectedContactsArr);
         if (!selectedContactsArr.length || !forwardMessage) {
             toast.error('Please select at least one contact to forward message.');
             return;
         }
-
         const conversationIdsArr = [];
         const userIdsArr = [];
         const orderedRecipients = [];
-
         for (const contact of selectedContactsArr) {
             if (contact?.ConversationId) {
-                // Has a ConversationId — forward to existing conversation
                 conversationIdsArr.push(contact.ConversationId);
                 orderedRecipients.push(contact);
             } else if (contact?.UserId || contact?.id) {
-                // No ConversationId — forward to individual user (will create new conversation)
                 userIdsArr.push(contact.UserId || contact.id);
                 orderedRecipients.push(contact);
             }
@@ -1350,20 +1440,15 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
             ConversationIds: conversationIdsArr.join(',') || null,
             UserIds: userIdsArr.join(',') || null,
             ForwardedAttachmentIds: (() => {
-                // 1. If specific attachment IDs are set (from media viewer reply/forward), use them
                 if (forwardMessage?.ReplyToAttachmentId) {
                     return String(forwardMessage.ReplyToAttachmentId);
                 }
-
-                // 2. Try normalized mediaItems (already parsed by conversationUtils)
                 if (Array.isArray(forwardMessage?.mediaItems) && forwardMessage.mediaItems.length > 0) {
                     const ids = forwardMessage.mediaItems
                         .map(a => a?.attachmentId || a?.AttachmentId || a?.Id || a?.id)
                         .filter(Boolean);
                     if (ids.length) return ids.join(',');
                 }
-
-                // 3. Try raw Attachments field (string JSON or array)
                 let attachments = forwardMessage?.Attachments;
                 if (attachments) {
                     if (typeof attachments === 'string') {
@@ -1374,7 +1459,6 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
                         if (ids.length) return ids.join(',');
                     }
                 }
-
                 return null;
             })(),
         };

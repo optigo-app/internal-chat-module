@@ -136,6 +136,7 @@ const LoginPage1 = () => {
                 .filter(namePart => namePart)
                 .join(' ');
             const userData = {
+                ...userInfo,
                 userId: userInfo.userid,
                 username: username,
                 ukey: userInfo.ukey,

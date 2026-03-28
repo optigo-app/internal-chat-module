@@ -30,6 +30,7 @@ const MessageContextMenu = ({
   onEdit,
   onMessageInfo,
   onMemberRedirect,
+  canDelete = true,
 }) => {
   const timeLimit = parseInt(process.env.REACT_APP_MESSAGE_EDIT_TIME_LIMIT || "15", 10);
 
@@ -88,7 +89,7 @@ const MessageContextMenu = ({
       action: () => onEdit?.(message),
     },
 
-    {
+    canDelete && {
       label: "Delete",
       icon: <Trash2 size={18} />,
       danger: true,

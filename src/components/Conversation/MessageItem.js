@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import MessageContent from './MessageContent';
 import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
 
@@ -29,7 +29,9 @@ const MessageItem = ({
     getMessageStatusIcon,
     handleRemoveReaction,
     messageById,
-    handleForward
+    handleForward,
+    setDrawerViewState,
+    setDrawerOpen
 }) => {
     const hoverHideTimeoutRef = useRef(null);
     const messageDomId = msg.Id ?? msg.fileName;
@@ -157,6 +159,8 @@ const MessageItem = ({
                 handleRemoveReaction={handleRemoveReaction}
                 getMessageById={(id) => messageById.get(id)}
                 handleForward={handleForward}
+                setDrawerViewState={setDrawerViewState}
+                setDrawerOpen={setDrawerOpen}
             />
         </div>
     );

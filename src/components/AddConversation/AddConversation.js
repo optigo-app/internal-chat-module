@@ -33,14 +33,15 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
 
     const transformMemberData = useCallback((items) => {
         return items?.map((item) => {
-            const name = item.UserName || getCustomerDisplayName(item);
+            const name = item.UserName || item.CustomerName || getCustomerDisplayName(item);
             return {
                 ...item,
-                UserId: item.UserId,
+                UserId: item.UserId || item.CustomerId || item.Id,
+                ConversationId: item.ConversationId || null,
                 ConversationName: item.ConversationName || item.UserName || item.CustomerName || item.name || '',
                 CustomerPhone: item.CustomerPhone || item.UserPhone || item.MobileNo || item.Phone || '',
                 name,
-                email: item.UserEmail || '',
+                email: item.UserEmail || item.email || '',
                 avatar: null,
                 avatarConfig: getWhatsAppAvatarConfig(getCustomerAvatarSeed(item)),
             };
@@ -54,7 +55,6 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
             console.log('⚠️ No auth token available, skipping conversation load');
             return;
         }
-
         setLoading(true);
         try {
             const searchToUse = search !== null ? search : searchTerm;
