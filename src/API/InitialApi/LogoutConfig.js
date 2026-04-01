@@ -3,8 +3,6 @@ import { getHeaders, LOGOUTAPI } from "./Config";
 
 export const logoutApi = async (body, whatsappNumber) => {
     try {
-        // const init = JSON.parse(sessionStorage.getItem("taskInit")) || {};
-        // const headers = getHeaders(init); 
         const headers = getHeaders(whatsappNumber);
 
         const { data } = await axios.post(LOGOUTAPI, body, { headers });

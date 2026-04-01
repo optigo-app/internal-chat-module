@@ -4,7 +4,7 @@ import { CheckCheck } from "lucide-react";
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LoginContext } from '../../context/LoginData';
 import { useArchieveContext } from '../../contexts/ArchieveContext';
-import React, { useEffect, useState, useCallback, useRef, useContext } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useContext, useMemo } from 'react';
 import {
     Avatar,
     Badge,
@@ -58,6 +58,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const [hoveredId, setHoveredId] = useState(null);
     const [typingStates, setTypingStates] = useState({});
     const typingTimeoutsRef = useRef({});
+    const [selectedIndex, setSelectedIndex] = useState(-1);
     const [showNewChat, setShowNewChat] = useState(false);
     const [showCreateGroup, setShowCreateGroup] = useState(false);
     const containerRef = useRef(null);
@@ -116,14 +117,10 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         try {
             const searchToUse = search !== null ? search : searchTerm;
             const response = await fetchConversationLists(page, pageSize, auth, searchToUse, controller.signal);
-
-            // Process rd data (existing conversations)
             const currentConversations = processApiResponse(response.data?.rd || []);
-
-            // Process rd1 data (new potential conversations from API)
             const searchResults = response.data?.rd1?.map(user => ({
                 ...user,
-                ConversationId: null, // No conversation ID yet for new users
+                ConversationId: null,
                 Id: user.UserId || user.CustomerId || user.id,
                 ReceiverId: user.UserId || user.CustomerId,
                 name: user.UserName || user.CustomerName || user.CustomerPhone || user.name || 'Unknown',
@@ -136,7 +133,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 isSearchResult: true
             })) || [];
 
-            // Combine both, but filter out search results that already have a conversation in currentConversations
             const mergedConversations = searchToUse
                 ? [
                     ...searchResults.filter(sr =>
@@ -192,97 +188,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         isConversationReadingRef.current = Boolean(isConversationRead || viewConversationRead);
     }, [selectedCustomer, isConversationRead, viewConversationRead]);
 
-    useEffect(() => {
-        const list = Array.isArray(chatMembers?.data) ? chatMembers.data : [];
-        onConversationList(list);
-
-        const pendingId = pendingSelectConversationIdRef.current;
-        if (pendingId) {
-            pendingSelectConversationIdRef.current = null;
-            setTimeout(() => {
-                window.dispatchEvent(
-                    new CustomEvent('SELECT_CONVERSATION', {
-                        detail: { conversationId: pendingId }
-                    })
-                );
-            }, 0);
-        }
-    }, [chatMembers, onConversationList]);
-
-    useEffect(() => {
-        if (!auth?.token || !auth?.userId) return;
-
-        const cleanup = addInternalTypingHandler((data) => {
-            const conversationId = Number(data.ConversationId);
-            const senderId = Number(data.SenderId);
-            const currentUserId = Number(auth?.id || auth?.userId);
-
-            if (senderId === currentUserId) return;
-
-            if (data.isTyping === false) {
-                setTypingStates(prev => {
-                    const newState = { ...prev };
-                    delete newState[conversationId];
-                    return newState;
-                });
-                if (typingTimeoutsRef.current[conversationId]) {
-                    clearTimeout(typingTimeoutsRef.current[conversationId]);
-                    delete typingTimeoutsRef.current[conversationId];
-                }
-            } else {
-                setTypingStates(prev => ({
-                    ...prev,
-                    [conversationId]: {
-                        isTyping: true,
-                        userName: data.UserName
-                    }
-                }));
-
-                if (typingTimeoutsRef.current[conversationId]) {
-                    clearTimeout(typingTimeoutsRef.current[conversationId]);
-                }
-
-                typingTimeoutsRef.current[conversationId] = setTimeout(() => {
-                    setTypingStates(prev => {
-                        const newState = { ...prev };
-                        delete newState[conversationId];
-                        return newState;
-                    });
-                    delete typingTimeoutsRef.current[conversationId];
-                }, 5000);
-            }
-        });
-
-        return () => {
-            cleanup();
-            Object.values(typingTimeoutsRef.current).forEach(clearTimeout);
-            typingTimeoutsRef.current = {};
-        };
-    }, [auth?.id, auth?.userId, auth?.token]);
-
-    const normalizeMessageType = (type) => {
-        if (typeof type === 'string') return type;
-        switch (Number(type)) {
-            case 1: return 'text';
-            case 2: return 'image';
-            case 3: return 'video';
-            case 4: return 'document';
-            case 5: return 'file';
-            default: return 'text';
-        }
-    };
-
-    const mapMessageTypeToCode = (type) => {
-        const t = normalizeMessageType(type);
-        switch (t) {
-            case 'text': return 1;
-            case 'image': return 2;
-            case 'video': return 3;
-            case 'document': return 4;
-            case 'file': return 5;
-            default: return 1;
-        }
-    };
 
     const handleSocketUpdate = useCallback((incoming, isStatusChange = false) => {
         setChatMembers((prev) => {
@@ -496,6 +401,131 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             return { ...prev, data: updatedData };
         });
     }, [auth?.id, auth?.userId, auth, conversationComparator]);
+
+
+    const handleRemoveItem = useCallback((conversationId) => {
+        setChatMembers(prev => {
+            if (!prev?.data) return prev;
+            const updatedData = prev.data.filter(it => Number(it.ConversationId) !== Number(conversationId));
+            return { ...prev, data: updatedData };
+        });
+    }, []);
+
+    useEffect(() => {
+        const handleUpdateItem = (event) => {
+            if (event.detail) {
+                handleSocketUpdate(event.detail, Boolean(event.detail.isStatusChange));
+            }
+        };
+        const handleRemoveEvent = (event) => {
+            if (event.detail?.conversationId) {
+                handleRemoveItem(event.detail.conversationId);
+            }
+        };
+
+        window.addEventListener('UPDATE_CONVERSATION_ITEM', handleUpdateItem);
+        window.addEventListener('DELETE_CONVERSATION_ITEM', handleRemoveEvent);
+        // Also support older DELETE_CONVERSATION event from CustomerDetails
+        window.addEventListener('DELETE_CONVERSATION', handleRemoveEvent);
+
+        return () => {
+            window.removeEventListener('UPDATE_CONVERSATION_ITEM', handleUpdateItem);
+            window.removeEventListener('DELETE_CONVERSATION_ITEM', handleRemoveEvent);
+            window.removeEventListener('DELETE_CONVERSATION', handleRemoveEvent);
+        };
+    }, [handleSocketUpdate, handleRemoveItem]);
+
+    useEffect(() => {
+        const list = Array.isArray(chatMembers?.data) ? chatMembers.data : [];
+        onConversationList(list);
+
+        const pendingId = pendingSelectConversationIdRef.current;
+        if (pendingId) {
+            pendingSelectConversationIdRef.current = null;
+            setTimeout(() => {
+                window.dispatchEvent(
+                    new CustomEvent('SELECT_CONVERSATION', {
+                        detail: { conversationId: pendingId }
+                    })
+                );
+            }, 0);
+        }
+    }, [chatMembers, onConversationList]);
+
+    useEffect(() => {
+        if (!auth?.token || !auth?.userId) return;
+
+        const cleanup = addInternalTypingHandler((data) => {
+            const conversationId = Number(data.ConversationId);
+            const senderId = Number(data.SenderId);
+            const currentUserId = Number(auth?.id || auth?.userId);
+
+            if (senderId === currentUserId) return;
+
+            if (data.isTyping === false) {
+                setTypingStates(prev => {
+                    const newState = { ...prev };
+                    delete newState[conversationId];
+                    return newState;
+                });
+                if (typingTimeoutsRef.current[conversationId]) {
+                    clearTimeout(typingTimeoutsRef.current[conversationId]);
+                    delete typingTimeoutsRef.current[conversationId];
+                }
+            } else {
+                setTypingStates(prev => ({
+                    ...prev,
+                    [conversationId]: {
+                        isTyping: true,
+                        userName: data.UserName
+                    }
+                }));
+
+                if (typingTimeoutsRef.current[conversationId]) {
+                    clearTimeout(typingTimeoutsRef.current[conversationId]);
+                }
+
+                typingTimeoutsRef.current[conversationId] = setTimeout(() => {
+                    setTypingStates(prev => {
+                        const newState = { ...prev };
+                        delete newState[conversationId];
+                        return newState;
+                    });
+                    delete typingTimeoutsRef.current[conversationId];
+                }, 5000);
+            }
+        });
+
+        return () => {
+            cleanup();
+            Object.values(typingTimeoutsRef.current).forEach(clearTimeout);
+            typingTimeoutsRef.current = {};
+        };
+    }, [auth?.id, auth?.userId, auth?.token]);
+
+    const normalizeMessageType = (type) => {
+        if (typeof type === 'string') return type;
+        switch (Number(type)) {
+            case 1: return 'text';
+            case 2: return 'image';
+            case 3: return 'video';
+            case 4: return 'document';
+            case 5: return 'file';
+            default: return 'text';
+        }
+    };
+
+    const mapMessageTypeToCode = (type) => {
+        const t = normalizeMessageType(type);
+        switch (t) {
+            case 'text': return 1;
+            case 'image': return 2;
+            case 'video': return 3;
+            case 'document': return 4;
+            case 'file': return 5;
+            default: return 1;
+        }
+    };
 
     useEffect(() => {
         if (!auth?.token || !auth?.userId) return;
@@ -762,7 +792,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         setTabValue(newValue);
     };
 
-    const getFilteredMembers = (isForArchiveOverlay) => {
+    const getFilteredMembers = useCallback((isForArchiveOverlay) => {
         return chatMembers?.data
             ?.filter((member) => {
                 if (isForArchiveOverlay) {
@@ -777,9 +807,9 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             })
             ?.filter((member) => {
                 // Check Context state first, fallback to member.IsStar
-                const isFavorite = (favoriteState[member.ConversationId]?.isStar ?? member.IsStar) === 1;
+                const isFavoriteStatus = (favoriteState[member.ConversationId]?.isStar ?? member.IsStar) === 1;
                 switch (tabValue) {
-                    case 2: return isFavorite && tabValue === 2;
+                    case 2: return isFavoriteStatus && tabValue === 2;
                     default: return true;
                 }
             })
@@ -787,13 +817,61 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 if (!selectedStatus || selectedStatus === 'All') return true;
                 const statusKey = selectedStatus.toLowerCase();
                 // Check Context state first, fallback to member.IsStar
-                const isFavorite = (favoriteState[member.ConversationId]?.isStar ?? member.IsStar) === 1;
-                return member.ticketStatus === statusKey || (isFavorite && statusKey === 'favorite');
+                const isFavoriteStatus = (favoriteState[member.ConversationId]?.isStar ?? member.IsStar) === 1;
+                return member.ticketStatus === statusKey || (isFavoriteStatus && statusKey === 'favorite');
             })
             ?.filter((member) => {
                 if (!selectedTag || selectedTag === 'All') return true;
                 return member.tags && member.tags.some(tag => tag.TagId === selectedTag.Id);
+            }) || [];
+    }, [chatMembers, favoriteState, searchTerm, tabValue, selectedStatus, selectedTag]);
+
+    const mainFilteredMembers = React.useMemo(() => getFilteredMembers(false), [getFilteredMembers]);
+
+    useEffect(() => {
+        setSelectedIndex(-1);
+    }, [searchTerm, tabValue, selectedStatus, selectedTag]);
+
+    const scrollToSelectedIndex = useCallback((index) => {
+        if (containerRef.current && index >= 0) {
+            const container = containerRef.current;
+            const items = container.querySelectorAll('.customer-item-wrapper');
+            const targetItem = items[index];
+            if (targetItem) {
+                const containerRect = container.getBoundingClientRect();
+                const itemRect = targetItem.getBoundingClientRect();
+
+                if (itemRect.bottom > containerRect.bottom) {
+                    container.scrollTop += (itemRect.bottom - containerRect.bottom);
+                } else if (itemRect.top < containerRect.top) {
+                    container.scrollTop -= (containerRect.top - itemRect.top);
+                }
+            }
+        }
+    }, []);
+
+    const handleKeyDown = (e) => {
+        if (!mainFilteredMembers?.length) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedIndex(prev => {
+                const next = prev < mainFilteredMembers.length - 1 ? prev + 1 : prev;
+                scrollToSelectedIndex(next);
+                return next;
             });
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedIndex(prev => {
+                const next = prev > 0 ? prev - 1 : 0;
+                scrollToSelectedIndex(next);
+                return next;
+            });
+        } else if (e.key === 'Enter') {
+            if (selectedIndex >= 0 && selectedIndex < mainFilteredMembers.length) {
+                handleCustomerClick(mainFilteredMembers[selectedIndex]);
+            }
+        }
     };
 
     const isArchiveOpen = location.pathname === '/archieve';
@@ -805,9 +883,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const getMessageStatusIcon = (member) => {
         const direction = Number(member?.LastMessageDirection ?? member?.lastMessageDirection);
         if (direction !== 1) return null;
-
         const raw = member?.LastMessageStatus ?? member?.lastMessageStatus ?? member?.Status;
-
         let statusKey = null;
         if (typeof raw === 'string') {
             const lowered = raw.toLowerCase();
@@ -818,9 +894,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             if (parsed === 3) statusKey = 'read';
             if (parsed === 1 || parsed === 0) statusKey = 'sent';
         }
-
         if (!statusKey) return null;
-
         return (
             <CheckCheck
                 size={16}
@@ -873,7 +947,32 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             });
             if (response?.Status === "200" || response?.success === true) {
                 toast.success("Conversation updated");
-                loadMembers(currentPage, true);
+
+                // Silent push: Update local state directly
+                setChatMembers(prev => {
+                    if (!prev?.data) return prev;
+                    const index = prev.data.findIndex(m => Number(m.ConversationId) === Number(member.ConversationId));
+                    if (index === -1) return prev;
+
+                    const updatedData = [...prev.data];
+                    // If archiving, we might want to remove it from the current view unless it's the archive view
+                    if (action === "Archive" && !isArchiveOpen) {
+                        updatedData.splice(index, 1);
+                    } else if (action === "UnArchive" && isArchiveOpen) {
+                        updatedData.splice(index, 1);
+                    } else {
+                        updatedData[index] = {
+                            ...updatedData[index],
+                            IsPin: isPin,
+                            IsStar: isStar,
+                            IsArchived: isArchived
+                        };
+                    }
+
+                    // Re-sort based on new pin/status
+                    updatedData.sort(conversationComparator);
+                    return { ...prev, data: updatedData };
+                });
             } else {
                 toast.error("Failed to update conversation");
             }
@@ -886,10 +985,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
 
     useEffect(() => {
         const conversationId = selectedCustomer?.ConversationId;
-
         if ((isConversationRead || viewConversationRead) && conversationId) {
-            // Optimization: Instead of reloading the entire list (GetConversationList API),
-            // we update the unread count locally for the active conversation.
             setChatMembers(prev => {
                 if (!prev?.data) return prev;
                 const index = prev.data.findIndex(m => Number(m.ConversationId) === Number(conversationId));
@@ -905,10 +1001,12 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         }
     }, [isConversationRead, viewConversationRead, selectedCustomer?.ConversationId]);
 
-    const totalUnread = chatMembers?.data?.reduce((acc, curr) => {
-        const count = Number(curr.unreadCount ?? curr.UnreadCount ?? 0);
-        return acc + (count > 0 ? 1 : 0);
-    }, 0) || 0;
+    const totalUnread = useMemo(() => {
+        return chatMembers?.data?.reduce((acc, curr) => {
+            const count = Number(curr.unreadCount ?? curr.UnreadCount ?? 0);
+            return acc + (count > 0 ? 1 : 0);
+        }, 0) || 0;
+    }, [chatMembers?.data]);
 
     useFaviconBadge(totalUnread);
 
@@ -968,6 +1066,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     size="small"
                     value={searchTerm}
                     onChange={handleSearchChange}
+                    onKeyDown={handleKeyDown}
                     InputProps={{
                         startAdornment: (
                             <InputAdornment position="start">
@@ -1013,10 +1112,33 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                             setShowCreateGroup(false);
                             const rd = result?.response?.Data?.rd?.[0] || result?.response?.rd?.[0];
                             const newConvId = rd?.ConversationId || result?.response?.Data?.rd?.ConversationId;
+
                             if (newConvId) {
                                 pendingSelectConversationIdRef.current = newConvId;
+
+                                // Silent push: Create a dummy "new group" item for the list
+                                const now = new Date().toISOString();
+                                const newGroupItem = {
+                                    ConversationId: newConvId,
+                                    ConversationName: result.name || "New Group",
+                                    name: result.name || "New Group",
+                                    IsGroup: 1,
+                                    LastMessage: "Group created",
+                                    LastMessageType: 1, // Text
+                                    LastMessageDate: now,
+                                    LastUpdatedDate: now,
+                                    DateTime: now,
+                                    UnreadCount: 0,
+                                    unreadCount: 0,
+                                    IsAdmin: 1, // Creator is admin
+                                    GroupMembers: result.members || [],
+                                    isStatusChange: false // We want it to show as a message
+                                };
+
+                                window.dispatchEvent(new CustomEvent('UPDATE_CONVERSATION_ITEM', {
+                                    detail: newGroupItem
+                                }));
                             }
-                            loadMembers(1, true, searchTerm);
                         }}
                     />
                 </Box>
@@ -1125,14 +1247,15 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     ) : (
                         filteredMembers?.length > 0 ? (
                             <>
-                                {filteredMembers
+                                {mainFilteredMembers
                                     .filter(member => !member.isSearchResult)
-                                    .map((member) => {
+                                    .map((member, index) => {
                                         const isSelectedAndReading =
                                             selectedCustomer?.ConversationId === member.ConversationId &&
                                             ((isConversationRead || viewConversationRead) ||
                                                 (isConversationRead && viewConversationRead));
                                         const isSelected = selectedCustomer?.ConversationId === member.ConversationId;
+                                        const isKeyboardSelected = index === selectedIndex;
                                         const isMenuOpen = Boolean(anchorEl) && selectMember?.ConversationId === member.ConversationId;
                                         const shouldShowUnreadBadge =
                                             member.unreadCount > 0 && !isSelectedAndReading;
@@ -1141,7 +1264,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                         return (
                                             <li
                                                 key={member.ConversationId}
-                                                className={`member-item ${isSelected ? 'active' : ''} ${isSelectedAndReading ? 'reading' : ''} ${isMenuOpen ? 'menu-open' : ''}`}
+                                                className={`member-item ${isSelected ? 'active' : ''} ${isSelectedAndReading ? 'reading' : ''} ${isMenuOpen ? 'menu-open' : ''} ${isKeyboardSelected ? 'keyboard-selected' : ''}`}
                                                 onClick={() => handleCustomerClick(member)}
                                                 onMouseEnter={() => setHoveredId(member.ConversationId)}
                                                 onMouseLeave={() => setHoveredId(null)}
@@ -1288,30 +1411,33 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                 {/* Search Results Group */}
                                 {searchTerm && filteredMembers.some(m => m.isSearchResult) && (
                                     <div className="search-results-group">
-                                        <div className="group-header">Start New Conversation</div>
-                                        {filteredMembers
+                                        {mainFilteredMembers
                                             .filter(member => member.isSearchResult)
-                                            .map((member) => (
-                                                <li
-                                                    key={`search-${member.Id}`}
-                                                    className="member-item search-result"
-                                                    onClick={() => onCustomerSelect(member)}
-                                                >
-                                                    <div className="member-avatar">
-                                                        <ConversationAvatar member={member} />
-                                                    </div>
-                                                    <div className="member-info">
-                                                        <div className="member-name" style={{ fontWeight: 500, fontSize: '15px', color: '#111827' }}>
-                                                            {highlightText(member.name, searchTerm)}
+                                            .map((member) => {
+                                                const memberIdx = mainFilteredMembers.indexOf(member);
+                                                const isKeyboardSelectedResult = memberIdx === selectedIndex;
+                                                return (
+                                                    <li
+                                                        key={`search-${member.Id}`}
+                                                        className={`member-item search-result ${isKeyboardSelectedResult ? 'keyboard-selected' : ''}`}
+                                                        onClick={() => onCustomerSelect(member)}
+                                                    >
+                                                        <div className="member-avatar">
+                                                            <ConversationAvatar member={member} />
                                                         </div>
-                                                        {(member.email || member.UserEmail) && (
-                                                            <div className="member-email" style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>
-                                                                {highlightText(member.email || member.UserEmail, searchTerm)}
+                                                        <div className="member-info">
+                                                            <div className="member-name" style={{ fontWeight: 500, fontSize: '15px', color: '#111827' }}>
+                                                                {highlightText(member.name, searchTerm)}
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                </li>
-                                            ))}
+                                                            {(member.email || member.UserEmail) && (
+                                                                <div className="member-email" style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>
+                                                                    {highlightText(member.email || member.UserEmail, searchTerm)}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </li>
+                                                );
+                                            })}
                                     </div>
                                 )}
                             </>

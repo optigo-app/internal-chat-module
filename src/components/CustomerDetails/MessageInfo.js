@@ -11,17 +11,17 @@ const formatTimeStatus = (dateStr) => {
     const formatted = FormatDateIST(dateStr);
     const date = new Date(dateStr);
     const now = new Date();
-    
+
     // Simple today/yesterday check using UTC dates to be safe
-    const isToday = date.getUTCDate() === now.getUTCDate() && 
-                    date.getUTCMonth() === now.getUTCMonth() && 
-                    date.getUTCFullYear() === now.getUTCFullYear();
-                    
+    const isToday = date.getUTCDate() === now.getUTCDate() &&
+        date.getUTCMonth() === now.getUTCMonth() &&
+        date.getUTCFullYear() === now.getUTCFullYear();
+
     const yesterday = new Date(now);
     yesterday.setUTCDate(now.getUTCDate() - 1);
-    const isYesterday = date.getUTCDate() === yesterday.getUTCDate() && 
-                        date.getUTCMonth() === yesterday.getUTCMonth() && 
-                        date.getUTCFullYear() === yesterday.getUTCFullYear();
+    const isYesterday = date.getUTCDate() === yesterday.getUTCDate() &&
+        date.getUTCMonth() === yesterday.getUTCMonth() &&
+        date.getUTCFullYear() === yesterday.getUTCFullYear();
 
     if (isToday) return formatted.time;
     if (isYesterday) return "Yesterday";
@@ -129,7 +129,7 @@ const MessageInfo = ({ messageInfo, localGroupData, auth, selectedCustomer, mess
                     {messageInfo.ContextType === 2 && (
                         <div className="reply-preview-wrapper" style={{ marginBottom: '8px' }}>
                             {(() => {
-                                const original = messages.find(m => (m.MessageId || m.id) === messageInfo.ContextId);
+                                const original = messages?.find(m => (m.MessageId || m.id) === messageInfo.ContextId);
                                 const isGenericReply = !messageInfo?.ReplyContextMsg || String(messageInfo.ReplyContextMsg).trim() === '' || String(messageInfo.ReplyContextMsg).trim().toLowerCase() === 'media';
                                 const mediaCount = Array.isArray(original?.mediaItems) ? original.mediaItems.length : 0;
                                 const originalType = original?.MessageType;

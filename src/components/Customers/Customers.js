@@ -20,7 +20,6 @@ const Customers = ({ selectedStatus, selectedTag }) => {
             const targetId = Number(customer?.ReceiverId || customer?.CustomerId || customer?.UserId);
             return cId === targetId;
         });
-
         if (existing) {
             setSelectedCustomer(existing);
         } else {
@@ -47,26 +46,20 @@ const Customers = ({ selectedStatus, selectedTag }) => {
         const handleSelectConversation = (event) => {
             const { conversationId } = event.detail;
             if (!conversationId) return;
-
-            // Find the customer in the list and select them
             const list = converListRef.current || [];
             const customer = list.find(c => Number(c.ConversationId) === Number(conversationId));
             if (customer) {
                 handleCustomerSelect(customer);
             }
         };
-
         window.addEventListener('SELECT_CONVERSATION', handleSelectConversation);
-
         const handleSelectNewConversation = (event) => {
             const { customer } = event.detail;
             if (customer) {
                 handleCustomerSelect(customer);
             }
         };
-
         window.addEventListener('SELECT_NEW_CONVERSATION', handleSelectNewConversation);
-
         return () => {
             window.removeEventListener('SELECT_CONVERSATION', handleSelectConversation);
             window.removeEventListener('SELECT_NEW_CONVERSATION', handleSelectNewConversation);

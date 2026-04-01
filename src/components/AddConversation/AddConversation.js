@@ -30,6 +30,7 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
     const pageSize = 100;
     const searchTimeoutRef = useRef(null);
     const { auth } = useContext(LoginContext);
+    const [selectedIndex, setSelectedIndex] = useState(-1);
 
     const transformMemberData = useCallback((items) => {
         return items?.map((item) => {
@@ -163,7 +164,53 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
             ?.filter((member) => {
                 if (!selectedTag || selectedTag === 'All') return true;
                 return member.tags && member.tags.some(tag => tag.TagId === selectedTag.Id);
-            })
+            }) || [];
+
+    useEffect(() => {
+        setSelectedIndex(-1);
+    }, [searchTerm, tabValue, chatMembers]);
+
+    const scrollToSelectedIndex = useCallback((index) => {
+        if (containerRef.current && index >= 0) {
+            const container = containerRef.current;
+            const items = container.querySelectorAll('.member-item');
+            const targetItem = items[index];
+            if (targetItem) {
+                const containerRect = container.getBoundingClientRect();
+                const itemRect = targetItem.getBoundingClientRect();
+
+                if (itemRect.bottom > containerRect.bottom) {
+                    container.scrollTop += (itemRect.bottom - containerRect.bottom);
+                } else if (itemRect.top < containerRect.top) {
+                    container.scrollTop -= (containerRect.top - itemRect.top);
+                }
+            }
+        }
+    }, []);
+
+    const handleKeyDown = (e) => {
+        if (!filteredMembers?.length) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedIndex(prev => {
+                const next = prev < filteredMembers.length - 1 ? prev + 1 : prev;
+                scrollToSelectedIndex(next);
+                return next;
+            });
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedIndex(prev => {
+                const next = prev > 0 ? prev - 1 : 0;
+                scrollToSelectedIndex(next);
+                return next;
+            });
+        } else if (e.key === 'Enter') {
+            if (selectedIndex >= 0 && selectedIndex < filteredMembers.length) {
+                onCustomerSelect(filteredMembers[selectedIndex]);
+            }
+        }
+    };
 
     return (
         <div className="customer_lists_mainDiv_2">
@@ -192,6 +239,7 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
                     size="small"
                     value={searchTerm}
                     onChange={handleSearchChange}
+                    onKeyDown={handleKeyDown}
                     InputProps={{
                         startAdornment: (
                             <InputAdornment position="start">
@@ -287,7 +335,7 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
                                 return (
                                     <li key={member.UserId}>
                                         <div
-                                            className={`member-item ${isSelected ? 'active' : ''}`}
+                                            className={`member-item ${isSelected ? 'active' : ''} ${selectedIndex === filteredMembers.indexOf(member) ? 'keyboard-selected' : ''}`}
                                             onClick={() => onCustomerSelect(member)}
                                         >
                                             <div className="member-avatar">

@@ -1,4 +1,4 @@
-const isLocal = ["localhost", "nzen", 'tecochat.web', 'web','5svsmvp4-4000.inc1.devtunnels.ms'].includes(window.location.hostname);
+const isLocal = ["localhost", "nzen", 'tecochat.web', 'web', '5svsmvp4-4000.inc1.devtunnels.ms'].includes(window.location.hostname);
 
 // Base URLs
 const API_BASE_URL = isLocal
@@ -9,12 +9,7 @@ const WHATSAPP_BASE_URL = isLocal
     ? "http://newnextjs.web/api"
     : "https://apilx.optigoapps.com/api";
 
-const MEDIA_BASE_URL =
-    "https://crmapp.mpillarapi.com/api/meta/v19.0/622385334300738/Media/";
-
 // Media
-export const MEDIAAPIURL = MEDIA_BASE_URL;
-export const UPLOADMEDIA = MEDIA_BASE_URL;
 export const UPLOAD_URL = `${API_BASE_URL}/upload`;
 export const REMOVE_FILE_URL = `${API_BASE_URL}/removefile`;
 

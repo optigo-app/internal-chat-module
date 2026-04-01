@@ -1,10 +1,10 @@
 import { CommonAPI } from "../InitialApi/CommonApi";
 
-export const fetchMediaLists = async (page = 1, pageSize = 6, conversationId, userId) => {
+export const fetchMediaLists = async (page = 1, pageSize = 6, conversationId, auth, userId) => {
     try {
         const body = {
-            "con": `{\"id\":\"\",\"mode\":\"FilesList\",\"appuserid\":\"${userId}\"}`,
-            "p": `{\"ConversationId\": ${conversationId}}`,
+            "con": `{\"id\":\"\",\"mode\":\"FilesList\",\"appuserid\":\"${auth?.userId}\"}`,
+            "p": `{\"ConversationId\": ${conversationId},\"UserId\":${userId ?? 0}}`,
             "f": "Chat ( File list )"
         }
 
@@ -16,7 +16,7 @@ export const fetchMediaLists = async (page = 1, pageSize = 6, conversationId, us
                 currentPage: page,
                 hasMore: response?.Data?.rd?.length === pageSize
             };
-        } else {                 
+        } else {
             return {
                 data: [],
                 total: 0,

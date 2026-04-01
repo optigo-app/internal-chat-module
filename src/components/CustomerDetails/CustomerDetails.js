@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useCallback, useRef } from 'react';
+import { useState, useEffect, useContext, useRef } from 'react';
 import './CustomerDetails.scss';
 import { LoginContext } from '../../context/LoginData';
 import { fetchMediaLists } from '../../API/MediaLists/MediaLists';
@@ -195,9 +195,8 @@ const CustomerDetails = ({
             ...prev,
             [type]: { ...prev[type], isLoading: true }
         }));
-
         try {
-            const response = await fetchMediaLists(page, pageSize, customer.ConversationId, auth.userId);
+            const response = await fetchMediaLists(page, pageSize, customer.ConversationId, auth, customer.id);
             if (response?.data) {
                 const categorized = processMediaItems(response.data);
                 setMediaItems(prev => ({
@@ -293,8 +292,6 @@ const CustomerDetails = ({
         }
     }, [open, currentViewState, customer.ConversationId, fetchMediaData]);
 
-
-
     useEffect(() => {
         if (open && initialViewState) {
             setCurrentViewState(prev => {
@@ -354,7 +351,7 @@ const CustomerDetails = ({
 
     const loadContactInfo = async () => {
         try {
-            const contactUserId = customer?.ReceiverId || customer?.UserId || customer?.id;
+            const contactUserId = customer?.id;
             const response = await contactInfoApi(auth, {
                 contactUserId,
                 conversationId: customer?.ConversationId
@@ -374,7 +371,6 @@ const CustomerDetails = ({
     };
 
     const handlePermissionChange = async (name, value) => {
-        console.log(name, value, 'jdhjsh')
         if (name === 'inviteToGroup' || name === 'approveNewMembers') {
             toast(`${name} — coming soon!`);
             return;
@@ -669,7 +665,16 @@ const CustomerDetails = ({
                         detail: { conversationId: customer.ConversationId }
                     }));
 
-                    window.dispatchEvent(new CustomEvent('REFRESH_CONVERSATION_LIST'));
+                    window.dispatchEvent(new CustomEvent('UPDATE_CONVERSATION_ITEM', {
+                        detail: {
+                            ConversationId: customer.ConversationId,
+                            Message: "",
+                            lastMessageText: "",
+                            lastMessageTime: "",
+                            unreadCount: 0,
+                            isStatusChange: true
+                        }
+                    }));
                 } else {
                     toast.error(response?.Message || 'Failed to clear chat');
                 }
@@ -697,7 +702,9 @@ const CustomerDetails = ({
                     toast.success('You have left the group');
                     setConfirmationModal({ isOpen: false, member: null, actionType: null });
                     onClose?.();
-                    window.dispatchEvent(new CustomEvent('REFRESH_CONVERSATION_LIST'));
+                    window.dispatchEvent(new CustomEvent('DELETE_CONVERSATION_ITEM', {
+                        detail: { conversationId: customer.ConversationId }
+                    }));
                 } else {
                     toast.error(response?.Message || 'Failed to exit group');
                 }
@@ -718,7 +725,7 @@ const CustomerDetails = ({
                     toast.success(actionType === 'deleteChat' ? 'Chat deleted successfully' : 'Group conversation deleted');
                     setConfirmationModal({ isOpen: false, member: null, actionType: null });
                     onClose?.();
-                    window.dispatchEvent(new CustomEvent('DELETE_CONVERSATION', {
+                    window.dispatchEvent(new CustomEvent('DELETE_CONVERSATION_ITEM', {
                         detail: { conversationId: customer.ConversationId }
                     }));
                 } else {
@@ -824,7 +831,13 @@ const CustomerDetails = ({
                 if (customer) {
                     customer.IsStar = newIsStar;
                 }
-                window.dispatchEvent(new CustomEvent('REFRESH_CONVERSATION_LIST'));
+                window.dispatchEvent(new CustomEvent('UPDATE_CONVERSATION_ITEM', {
+                    detail: {
+                        ConversationId: customer.ConversationId,
+                        IsStar: newIsStar,
+                        isStatusChange: true
+                    }
+                }));
             } else {
                 updateFavoriteStatus(customer?.ConversationId, isFavorite ? 1 : 0);
                 toast.error("Failed to update favorite status");

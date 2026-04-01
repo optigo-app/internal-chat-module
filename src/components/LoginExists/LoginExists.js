@@ -13,7 +13,6 @@ const LoginExists = () => {
     const { setAuth } = useContext(LoginContext);
     const [loading, setLoading] = useState(false);
     const getId = JSON.parse(sessionStorage.getItem("hasSocketId"));
-    console.log(getId, "getId");
     const navigate = useNavigate();
 
     const handleStayLoggedIn = async () => {

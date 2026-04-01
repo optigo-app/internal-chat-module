@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import MessageContent from './MessageContent';
 import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
+import SystemMessage from '../chat/messages/SystemMessage';
 
 const MessageItem = ({
     msg,
@@ -79,35 +80,7 @@ const MessageItem = ({
     }, []);
 
     if (msg.SystemMsg === 1) {
-        return (
-            <div
-                className="system-message-container"
-                data-message-id={messageDomId}
-                style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    margin: '16px auto',
-                    width: '100%',
-                    padding: '0 20px'
-                }}
-            >
-                <div className="system-message-text" style={{
-                    backgroundColor: '#f1f1f1',
-                    padding: '4px 12px',
-                    borderRadius: '16px',
-                    fontSize: '10px',
-                    color: '#667781',
-                    boxShadow: '0 1px 0.5px rgba(0,0,0,0.06)',
-                    maxWidth: '85%',
-                    textAlign: 'center',
-                    lineHeight: '1.4',
-                    textTransform: 'capitalize',
-                    letterSpacing: '0.1px',
-                }}>
-                    {msg.Message}
-                </div>
-            </div>
-        );
+        return <SystemMessage message={msg.Message} />;
     }
 
     return (

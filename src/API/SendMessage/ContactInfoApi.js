@@ -1,6 +1,6 @@
 import { CommonAPI, buildCommonBody } from "../InitialApi/CommonApi";
 
-export const contactInfoApi = async (auth, { contactUserId, conversationId } = {}) => {
+export const contactInfoApi = async (auth, { contactUserId } = {}) => {
     try {
         if (!auth) {
             throw new Error("auth is required for contactInfoApi");

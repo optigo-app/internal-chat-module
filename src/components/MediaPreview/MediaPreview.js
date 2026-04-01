@@ -10,7 +10,7 @@ import 'swiper/css/navigation';
 import 'swiper/css/thumbs';
 import 'swiper/css/free-mode';
 
-const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, handleClosePreview }) => {
+const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, handleClosePreview, handleSendMessage }) => {
     const fileInputRef = useRef(null);
     const mainSwiperRef = useRef(null);
     const [thumbsSwiper, setThumbsSwiper] = useState(null);
@@ -198,12 +198,20 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                 } else {
                     setCurrentIndex(nextIndex);
                 }
+                return;
+            }
+
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (typeof handleSendMessage === 'function') {
+                    handleSendMessage();
+                }
             }
         };
 
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [currentIndex, handleClose, mediaItems.length]);
+    }, [currentIndex, handleClose, mediaItems.length, handleSendMessage]);
 
 
     const removeMedia = (id) => {

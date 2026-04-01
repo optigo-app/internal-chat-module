@@ -19,6 +19,9 @@ import './ProfileAvatar.scss';
 import { LoginContext } from '../../context/LoginData';
 import { LogoutApi } from '../../API/Logout/Logout';
 import { getWhatsAppAvatarConfig } from '../../utils/globalFunc';
+import ConfirmationDialog from '../ReusableComponent/ConfirmationDialog';
+import { useConfirmModal } from '../../hooks/useConfirmModal';
+import { getConfirmProps } from '../../hooks/confirmConfig';
 
 const ProfileAvatar = () => {
     const [anchorEl, setAnchorEl] = useState(null);
@@ -26,6 +29,8 @@ const ProfileAvatar = () => {
     const navigate = useNavigate();
     const { auth, setAuth, token, setToken, startSync } = useContext(LoginContext);
     const getId = JSON.parse(sessionStorage.getItem("hasSocketId"));
+
+    const { confirmationModal, open: openConfirm, close: closeConfirm } = useConfirmModal({ auth });
 
     const username = auth?.username;
     const avatarConfig = getWhatsAppAvatarConfig(username || 'User', 36);
@@ -41,26 +46,24 @@ const ProfileAvatar = () => {
         if (!startSync) return;
     };
 
-    const handleLogout = async () => {
+    const handleLogoutClick = () => {
+        handleClose();
+        openConfirm('logout');
+    };
+
+    const handleLogoutConfirm = async () => {
         try {
             await LogoutApi(auth?.id || getId?.id);
-
-            // Disconnect socket first
             disconnectSocket();
-
-            // Clear auth context
             setAuth({ userId: '', username: '', ukey: '', token: '' });
             setToken({ sv: '', yc: '' });
-
-            // Clear session storage
             sessionStorage.clear();
-
             navigate('/login');
-            handleClose();
+            closeConfirm();
         } catch (error) {
             console.error('Error during logout:', error);
             navigate('/login');
-            handleClose();
+            closeConfirm();
         }
     };
 
@@ -70,7 +73,7 @@ const ProfileAvatar = () => {
                 <Typography
                     variant="body1"
                     className="username-text"
-                    title={`Welcome ${username}`} // tooltip shows full name
+                    title={`Welcome ${username}`}
                 >
                     Welcome {username}
                 </Typography>
@@ -157,7 +160,7 @@ const ProfileAvatar = () => {
 
                 <Divider sx={{ my: 1, borderColor: 'rgba(0,0,0,0.06)' }} />
 
-                <MenuItem onClick={handleLogout} sx={{
+                <MenuItem onClick={handleLogoutClick} sx={{
                     '&:hover': {
                         bgcolor: 'rgba(239, 68, 68, 0.08) !important',
                         color: '#ef4444 !important',
@@ -172,6 +175,13 @@ const ProfileAvatar = () => {
                     <ListItemText primary="Log out" />
                 </MenuItem>
             </Menu>
+
+            <ConfirmationDialog
+                isOpen={confirmationModal.isOpen}
+                onClose={closeConfirm}
+                onConfirm={handleLogoutConfirm}
+                {...getConfirmProps('logout')}
+            />
         </div>
     );
 };

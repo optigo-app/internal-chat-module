@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Box, CircularProgress, Typography } from '@mui/material';
-import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
+import TypingIndicator from '../chat/messages/TypingIndicator';
 import MediaPreview from '../MediaPreview/MediaPreview';
 import MessageItem from './MessageItem';
 import ScrollToBottomButton from './ScrollToBottomButton';
@@ -42,7 +42,8 @@ const MessageArea = ({
     captureMessageScrollState,
     typingStatus,
     setDrawerViewState,
-    setDrawerOpen
+    setDrawerOpen,
+    handleSendMessage
 }) => {
     const [hoveredMessageId, setHoveredMessageId] = useState(null);
     const [reactionMenuAnchorEl, setReactionMenuAnchorEl] = useState(null);
@@ -249,6 +250,7 @@ const MessageArea = ({
                                         msg={msg}
                                         index={index}
                                         auth={auth}
+                                        handlePaste={handlePaste}
                                         selectedCustomer={selectedCustomer}
                                         blinkMessageId={blinkMessageId}
                                         hoveredMessageId={hoveredMessageId}
@@ -282,28 +284,12 @@ const MessageArea = ({
                     </React.Fragment>
                 ))}
                 <div ref={messagesEndRef} />
-                
+
                 {typingStatus && (
-                    <div className="typing-indicator-wrapper">
-                        <ConversationAvatar 
-                            member={{
-                                UserName: typingStatus.UserName,
-                                ufcc: typingStatus.ufcc,
-                                IsGroup: 0
-                            }} 
-                            size={28} 
-                        />
-                        <div className="typing-indicator-bubble">
-                            {selectedCustomer?.IsGroup === 1 && (
-                                <span className="typing-user-name">{typingStatus.UserName}</span>
-                            )}
-                            <div className="typing-dots-container">
-                                <div className="typing-dot"></div>
-                                <div className="typing-dot"></div>
-                                <div className="typing-dot"></div>
-                            </div>
-                        </div>
-                    </div>
+                    <TypingIndicator
+                        typingStatus={typingStatus}
+                        isGroup={selectedCustomer?.IsGroup === 1}
+                    />
                 )}
             </div>
 
@@ -313,6 +299,7 @@ const MessageArea = ({
                     scrollToBottom={scrollToBottom}
                     setMediaFiles={setMediaFiles}
                     handleClosePreview={handleClosePreview}
+                    handleSendMessage={handleSendMessage}
                 />
             )}
         </div>

@@ -158,6 +158,16 @@ const ImageAdjustmentModal = ({
         setScale(prev => Math.max(prev - 0.1, 0.5));
     };
 
+    const handleWheel = (e) => {
+        e.preventDefault();
+        const zoomIntensity = 0.1;
+        if (e.deltaY < 0) {
+            setScale(prev => Math.min(prev + zoomIntensity, 3));
+        } else {
+            setScale(prev => Math.max(prev - zoomIntensity, 0.5));
+        }
+    };
+
     const handleRotate = () => {
         setRotation(prev => (prev + 90) % 360);
     };
@@ -170,71 +180,97 @@ const ImageAdjustmentModal = ({
 
     const handleConfirm = async () => {
         if (!imageFile || !imageRef.current) return;
-
+        
         try {
-            // Create canvas to apply transformations
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const img = new Image();
 
             img.onload = () => {
-                // Set canvas size as square (no circular crop)
-                const size = 320; // Square dimensions for better quality
+
+                const size = 320;
                 canvas.width = size;
                 canvas.height = size;
 
-                // Fill with white background (no transparency)
-                ctx.fillStyle = '#ffffff';
+                ctx.save();
+
+                // create circular clipping mask
+                ctx.beginPath();
+                ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.clip();
+
+                // optional background
+                ctx.fillStyle = "#ffffff";
                 ctx.fillRect(0, 0, size, size);
 
-                // Apply transformations
                 ctx.save();
+
+                // move to center
                 ctx.translate(size / 2, size / 2);
+
+                // rotate
                 ctx.rotate((rotation * Math.PI) / 180);
+
+                // zoom
                 ctx.scale(scale, scale);
 
-                // Calculate image dimensions to fit the square
+                const cropSize = 300;
+
+                const scaleFactor = size / cropSize;
+
                 const imgAspect = img.width / img.height;
+
                 let drawWidth, drawHeight;
 
+                // COVER LOGIC (like object-fit: cover)
                 if (imgAspect > 1) {
-                    // Landscape
                     drawHeight = size;
                     drawWidth = size * imgAspect;
                 } else {
-                    // Portrait or square
                     drawWidth = size;
                     drawHeight = size / imgAspect;
                 }
 
-                // Apply position offset (scale position to canvas size)
-                const offsetX = (position.x / 300) * size; // Scale position to canvas size
-                const offsetY = (position.y / 300) * size;
+                // scale drag position to canvas
+                const offsetX = position.x * scaleFactor;
+                const offsetY = position.y * scaleFactor;
 
                 ctx.translate(offsetX, offsetY);
 
-                // Draw image centered in square
-                ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+                ctx.drawImage(
+                    img,
+                    -drawWidth / 2,
+                    -drawHeight / 2,
+                    drawWidth,
+                    drawHeight
+                );
+
                 ctx.restore();
 
-                // Convert to blob with high quality (square format)
                 canvas.toBlob((blob) => {
-                    const adjustedFile = new File([blob], imageFile.name, {
-                        type: 'image/jpeg',
-                        lastModified: Date.now()
-                    });
+
+                    const adjustedFile = new File(
+                        [blob],
+                        imageFile.name,
+                        {
+                            type: "image/jpeg",
+                            lastModified: Date.now()
+                        }
+                    );
+
                     onConfirm(adjustedFile);
-                }, 'image/jpeg', 0.95); // High quality
+
+                }, "image/jpeg", 0.95);
             };
 
             img.src = imageUrl;
+
         } catch (error) {
-            console.error('Error processing image:', error);
-            // Fallback to original file
+            console.error("Error processing image:", error);
             onConfirm(imageFile);
         }
     };
-
     return (
         <Dialog
             open={open}
@@ -360,6 +396,7 @@ const ImageAdjustmentModal = ({
                 {/* Image Container */}
                 <Box
                     ref={containerRef}
+                    onWheel={handleWheel}
                     className="image-adjustment-container"
                     sx={{
                         position: 'relative',

@@ -1,14 +1,22 @@
 import { useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { removeMemberApi } from '../API/Groups/RemoveMemberApi';
-import { fetchGroupDetails } from '../API/Groups/FetchGroupDetails';
 import { clearChatApi } from '../API/ClearChat/ClearChatApi';
 import { deleteConversationApi } from '../API/ConversationView/DeleteConversationApi';
 import { isMessageEditable } from '../utils/globalFunc';
 
 const INITIAL_STATE = { isOpen: false, actionType: null };
 
-export function useConfirmModal({ selectedCustomer, auth, onCustomerSelect, refresh, handleDeleteMessage }) {
+export function useConfirmModal({ 
+    selectedCustomer, 
+    auth, 
+    onCustomerSelect, 
+    refresh, 
+    handleDeleteMessage,
+    fetchAndCacheGroupMembers,
+    isCurrentUserAdmin,
+    getGroupPermission
+}) {
     const [confirmationModal, setConfirmationModal] = useState(INITIAL_STATE);
     const [selectedMessageForDelete, setSelectedMessageForDelete] = useState(null);
 
@@ -22,10 +30,10 @@ export function useConfirmModal({ selectedCustomer, auth, onCustomerSelect, refr
 
     const checkAdminStatusAndShowConfirmation = useCallback(async () => {
         try {
-            const groupData = await fetchGroupDetails(selectedCustomer.ConversationId, auth);
+            const groupData = await fetchAndCacheGroupMembers(selectedCustomer.ConversationId);
             if (groupData?.members) {
                 const currentUserId = auth?.id || auth?.userId;
-                const currentUser = groupData.members.find(m => m.UserId === currentUserId);
+                const currentUser = groupData.members.find(m => Number(m.UserId) === Number(currentUserId));
                 const adminCount = groupData.members.filter(m => m.IsGroupAdmin === 1).length;
                 if (currentUser?.IsGroupAdmin === 1 && adminCount === 1) {
                     open('adminCannotLeave');
@@ -38,7 +46,7 @@ export function useConfirmModal({ selectedCustomer, auth, onCustomerSelect, refr
         } catch {
             open('exitGroup');
         }
-    }, [selectedCustomer, auth, open]);
+    }, [selectedCustomer, auth, open, fetchAndCacheGroupMembers]);
 
     const handleConfirmExitGroup = useCallback(async () => {
         try {
@@ -118,6 +126,7 @@ export function useConfirmModal({ selectedCustomer, auth, onCustomerSelect, refr
         deleteChat: handleConfirmDeleteChat,
         clearChat: handleConfirmClearChat,
         deleteMessage: null, // handled via actions[] in ConfirmationDialog
+        logout: null, // handled via actions[] in ConfirmationDialog
     };
 
     const getDeleteMessageActions = useCallback(() => {
@@ -126,18 +135,32 @@ export function useConfirmModal({ selectedCustomer, auth, onCustomerSelect, refr
         const isOutgoing = msg?.Direction === 1;
         const timeLimit = parseInt(process.env.REACT_APP_MESSAGE_EDIT_TIME_LIMIT || '15', 10);
         const isWithinTimeLimit = isMessageEditable(msg, timeLimit);
+
+        const canDeleteForAll =
+            selectedCustomer?.IsGroup !== 1 ||
+            isCurrentUserAdmin ||
+            getGroupPermission(selectedCustomer?.ConversationId, 'AllowDeleteForAll') === 1 ||
+            selectedCustomer?.AllowDeleteForAll === 1 ||
+            selectedCustomer?.AllowDeleteForAll === true;
+
         return [
-            ...(isWithinTimeLimit && isOutgoing
+            ...(isWithinTimeLimit && isOutgoing && canDeleteForAll
                 ? [{
                     label: 'Delete for everyone',
-                    onClick: () => handleDeleteMessage(msg?.MessageId ?? msg?.Id, 2),
+                    onClick: () => {
+                        handleDeleteMessage(msg?.MessageId ?? msg?.Id, 2);
+                        close();
+                    },
                     danger: true,
                     variant: 'btn-action',
                 }]
                 : []),
             {
                 label: 'Delete for me',
-                onClick: () => handleDeleteMessage(msg?.MessageId ?? msg?.Id, 1),
+                onClick: () => {
+                    handleDeleteMessage(msg?.MessageId ?? msg?.Id, 1);
+                    close();
+                },
                 danger: true,
                 variant: 'btn-action',
             },
@@ -147,7 +170,7 @@ export function useConfirmModal({ selectedCustomer, auth, onCustomerSelect, refr
                 variant: 'btn-action',
             },
         ];
-    }, [selectedMessageForDelete, handleDeleteMessage, close]);
+    }, [selectedMessageForDelete, handleDeleteMessage, close, selectedCustomer, isCurrentUserAdmin, getGroupPermission]);
 
     return {
         confirmationModal,

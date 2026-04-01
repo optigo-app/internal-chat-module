@@ -127,15 +127,12 @@ const DetailsViews = ({
                             )}
 
                             <div className="section-divider" style={{ height: '1px', backgroundColor: '#f0f2f5', margin: '0 -24px' }} />
-
                             {customer?.IsGroup !== 1 && (
                                 <>
                                     <ContactInfo customer={customer} contactInfo={contactInfoData} loading={contactInfoLoading} />
-                                    <CommonGroupsSection customer={customer} auth={auth} open={open} />
                                     <div className="section-divider" style={{ height: '1px', backgroundColor: '#f0f2f5', margin: '0 -24px' }} />
                                 </>
                             )}
-
                             <MediaPreview
                                 mediaItems={mediaItems}
                                 onClick={() => {
@@ -143,13 +140,18 @@ const DetailsViews = ({
                                     setCurrentViewState('media');
                                 }}
                             />
-
                             {customer?.IsGroup === 1 && isRemovedFromCurrentGroup && (
                                 <Box className="removed-from-group-message" sx={{ textAlign: 'center', pb: 2 }}>
                                     <Typography style={{ color: '#856404', fontSize: '14px', fontWeight: 500 }}>
                                         You're no longer a member of this group
                                     </Typography>
                                 </Box>
+                            )}
+                            {customer?.IsGroup !== 1 && (
+                                <>
+                                    <div className="section-divider" style={{ height: '1px', backgroundColor: '#f0f2f5', margin: '0 -24px' }} />
+                                    <CommonGroupsSection customer={customer} auth={auth} open={open} />
+                                </>
                             )}
 
                             {customer?.IsGroup === 1 && (

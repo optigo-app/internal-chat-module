@@ -44,6 +44,13 @@ export const CONFIRM_CONFIG = {
         variant: 'danger',
         showCancel: false,     // cancel comes from actions[]
     },
+    logout: {
+        title: 'Log Out?',
+        description: 'Are you sure you want to log out?',
+        confirmText: 'Log Out',
+        variant: 'danger',
+        showCancel: true,
+    },
 };
 
 export function getConfirmProps(actionType) {

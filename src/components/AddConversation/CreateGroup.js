@@ -45,6 +45,7 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const containerRef = useRef(null);
     const groupNameInputRef = useRef(null);
+    const [selectedIndex, setSelectedIndex] = useState(-1);
     const pageSize = 100;
     const searchTimeoutRef = useRef(null);
     const { auth } = useContext(LoginContext);
@@ -108,6 +109,52 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
             debouncedSearch(value);
         }
     };
+
+    const scrollToSelectedIndex = useCallback((index) => {
+        if (containerRef.current && index >= 0) {
+            const container = containerRef.current;
+            const items = container.querySelectorAll('.member-list-item');
+            const targetItem = items[index];
+            if (targetItem) {
+                const containerRect = container.getBoundingClientRect();
+                const itemRect = targetItem.getBoundingClientRect();
+
+                if (itemRect.bottom > containerRect.bottom) {
+                    container.scrollTop += (itemRect.bottom - containerRect.bottom);
+                } else if (itemRect.top < containerRect.top) {
+                    container.scrollTop -= (containerRect.top - itemRect.top);
+                }
+            }
+        }
+    }, []);
+
+    const handleKeyDown = (e) => {
+        if (step !== 1 || !filteredMembers?.length) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedIndex(prev => {
+                const next = prev < filteredMembers.length - 1 ? prev + 1 : prev;
+                scrollToSelectedIndex(next);
+                return next;
+            });
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedIndex(prev => {
+                const next = prev > 0 ? prev - 1 : 0;
+                scrollToSelectedIndex(next);
+                return next;
+            });
+        } else if (e.key === 'Enter') {
+            if (selectedIndex >= 0 && selectedIndex < filteredMembers.length) {
+                toggleMemberSelection(filteredMembers[selectedIndex]);
+            }
+        }
+    };
+
+    useEffect(() => {
+        setSelectedIndex(-1);
+    }, [searchTerm, chatMembers, step]);
 
     const toggleMemberSelection = (member) => {
         setSelectedMembers(prev => {
@@ -350,6 +397,7 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
                                     size="small"
                                     value={searchTerm}
                                     onChange={handleSearchChange}
+                                    onKeyDown={handleKeyDown}
                                     InputProps={{
                                         disableUnderline: true,
                                         endAdornment: (
@@ -381,11 +429,12 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
 
                         <div className="customer_lists_main">
                             <ul ref={containerRef}>
-                                {filteredMembers?.map((member) => {
+                                {filteredMembers?.map((member, index) => {
                                     const isSelected = selectedMembers.some(m => m.UserId === member.UserId);
+                                    const isKeyboardSelected = index === selectedIndex;
                                     return (
-                                        <li key={member.UserId} onClick={() => toggleMemberSelection(member)}>
-                                            <div className={`member-item ${isSelected ? 'selected' : ''}`}>
+                                        <li key={member.UserId} onClick={() => toggleMemberSelection(member)} className="member-list-item">
+                                            <div className={`member-item ${isSelected ? 'selected' : ''} ${isKeyboardSelected ? 'keyboard-selected' : ''}`}>
                                                 <div className="member-avatar">
                                                     <Avatar {...member.avatarConfig} />
                                                 </div>

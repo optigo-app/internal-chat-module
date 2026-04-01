@@ -29,8 +29,10 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
     const [searchTerm, setSearchTerm] = useState('');
     const [availableCustomers, setAvailableCustomers] = useState([]);
     const [selectedMembers, setSelectedMembers] = useState([]);
-    const pastMembersCacheRef = React.useRef(null);
+    const [pastMembersCacheRef] = useState({ current: null });
     const [isLoading, setIsLoading] = useState(false);
+    const [selectedIndex, setSelectedIndex] = useState(-1);
+    const listContainerRef = React.useRef(null);
 
     const fetchCustomers = async (search = '') => {
         setIsLoading(true);
@@ -129,6 +131,60 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
         debouncedFetch(val);
     };
 
+    const filteredAvailableCustomers = availableCustomers
+        .filter(cust => mode === 'search' || mode === 'viewPastParticipants' ? true : mode === 'editAdmins' ? true : !existingMemberIds.includes(cust.UserId));
+
+    useEffect(() => {
+        setSelectedIndex(-1);
+    }, [searchTerm, availableCustomers]);
+
+    const scrollToSelectedIndex = React.useCallback((index) => {
+        if (listContainerRef.current && index >= 0) {
+            const container = listContainerRef.current;
+            const items = container.querySelectorAll('.member-list-item');
+            const targetItem = items[index];
+            if (targetItem) {
+                const containerRect = container.getBoundingClientRect();
+                const itemRect = targetItem.getBoundingClientRect();
+
+                if (itemRect.bottom > containerRect.bottom) {
+                    container.scrollTop += (itemRect.bottom - containerRect.bottom);
+                } else if (itemRect.top < containerRect.top) {
+                    container.scrollTop -= (containerRect.top - itemRect.top);
+                }
+            }
+        }
+    }, []);
+
+    const handleKeyDown = (e) => {
+        if (!filteredAvailableCustomers?.length) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedIndex(prev => {
+                const next = prev < filteredAvailableCustomers.length - 1 ? prev + 1 : prev;
+                scrollToSelectedIndex(next);
+                return next;
+            });
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedIndex(prev => {
+                const next = prev > 0 ? prev - 1 : 0;
+                scrollToSelectedIndex(next);
+                return next;
+            });
+        } else if (e.key === 'Enter') {
+            if (selectedIndex >= 0 && selectedIndex < filteredAvailableCustomers.length) {
+                const cust = filteredAvailableCustomers[selectedIndex];
+                if (mode === 'search') {
+                    onMemberClick?.(e, cust);
+                } else if (mode !== 'viewPastParticipants') {
+                    handleToggleMember(cust.UserId);
+                }
+            }
+        }
+    };
+
     const handleSubmit = () => {
         if (mode === 'editAdmins') {
             onSubmit(selectedMembers);
@@ -167,6 +223,7 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
                         size="small"
                         value={searchTerm}
                         onChange={handleSearchChange}
+                        onKeyDown={handleKeyDown}
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
@@ -190,21 +247,23 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
                         <CircularProgress size={24} sx={{ color: 'primary.main' }} />
                     </Box>
                 ) : (
-                    <List sx={{ width: '100%' }}>
-                        {availableCustomers
-                            .filter(cust => mode === 'search' || mode === 'viewPastParticipants' ? true : mode === 'editAdmins' ? true : !existingMemberIds.includes(cust.UserId))
-                            .map((cust) => {
+                    <List sx={{ width: '100%', overflowY: 'auto', flex: 1 }} ref={listContainerRef}>
+                        {filteredAvailableCustomers
+                            .map((cust, index) => {
                                 const isSelected = selectedMembers.includes(cust.UserId);
                                 const isDisabled = disabledIds.includes(cust.UserId);
+                                const isKeyboardHighlighted = index === selectedIndex;
                                 return (
                                     <ListItem
                                         key={cust.UserId}
+                                        className="member-list-item"
                                         onClick={(e) => mode === 'search' ? onMemberClick?.(e, cust) : mode === 'viewPastParticipants' ? null : handleToggleMember(cust.UserId)}
                                         sx={{
                                             borderRadius: '8px',
                                             mb: 0.5,
                                             cursor: mode === 'viewPastParticipants' ? 'default' : isDisabled ? 'default' : 'pointer',
                                             opacity: isDisabled ? 0.7 : 1,
+                                            backgroundColor: isKeyboardHighlighted ? 'rgba(115, 103, 240, 0.08)' : 'transparent',
                                             '&:hover': {
                                                 backgroundColor: mode === 'viewPastParticipants' ? 'transparent' : isDisabled ? 'transparent' : 'rgba(115, 103, 240, 0.04)',
                                                 borderRadius: 2
