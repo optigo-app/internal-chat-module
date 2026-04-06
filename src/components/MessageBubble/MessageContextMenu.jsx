@@ -31,6 +31,7 @@ const MessageContextMenu = ({
   onMessageInfo,
   onMemberRedirect,
   canDelete = true,
+  selectedCustomer,
 }) => {
   const timeLimit = parseInt(process.env.REACT_APP_MESSAGE_EDIT_TIME_LIMIT || "15", 10);
 
@@ -55,7 +56,7 @@ const MessageContextMenu = ({
       action: () => onMessageInfo?.(message),
     },
 
-    {
+    selectedCustomer?.RemoveInGroup != 1 && {
       label: "Reply",
       icon: <Reply size={18} />,
       action: () => onReply?.(message),
@@ -95,7 +96,7 @@ const MessageContextMenu = ({
       danger: true,
       action: () => onDelete?.(message),
     },
-  ].filter(Boolean), [message, isWithinTimeLimit, isOutgoing, isText]);
+  ].filter(item => item && !item.hidden), [message, isWithinTimeLimit, isOutgoing, isText]);
 
   const handleClick = (action) => {
     action?.();

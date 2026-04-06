@@ -60,9 +60,24 @@ const Customers = ({ selectedStatus, selectedTag }) => {
             }
         };
         window.addEventListener('SELECT_NEW_CONVERSATION', handleSelectNewConversation);
+
+        // Close conversation panel when the active conversation is deleted
+        const handleDeleteConversation = (event) => {
+            const deletedId = event.detail?.conversationId;
+            if (!deletedId) { setSelectedCustomer(null); return; }
+            setSelectedCustomer(prev => {
+                if (prev && Number(prev.ConversationId) === Number(deletedId)) return null;
+                return prev;
+            });
+        };
+        window.addEventListener('DELETE_CONVERSATION', handleDeleteConversation);
+        window.addEventListener('DELETE_CONVERSATION_ITEM', handleDeleteConversation);
+
         return () => {
             window.removeEventListener('SELECT_CONVERSATION', handleSelectConversation);
             window.removeEventListener('SELECT_NEW_CONVERSATION', handleSelectNewConversation);
+            window.removeEventListener('DELETE_CONVERSATION', handleDeleteConversation);
+            window.removeEventListener('DELETE_CONVERSATION_ITEM', handleDeleteConversation);
         };
     }, []);
 

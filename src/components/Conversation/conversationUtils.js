@@ -277,8 +277,8 @@ export const saveConversationToCache = (conversationId, messages) => {
 
     const cacheKey = `chat_cache_${conversationId}`;
     try {
-        // Limit cache to last 100 messages to maintain speed and stay within sessionStorage limits
-        const truncated = messages.slice(-100);
+        // Limit cache to last 1000 messages to maintain speed and stay within sessionStorage limits
+        const truncated = messages.slice(-1000);
         sessionStorage.setItem(cacheKey, JSON.stringify(truncated));
     } catch (e) {
         console.error("Error saving chat cache:", e);
@@ -335,8 +335,8 @@ export const updateChatCache = (conversationId, rawData, auth, isStatusChange = 
             return;
         }
 
-        // Limit cache to last 100 messages
-        const truncatedMessages = updatedMessages.slice(-100);
+        // Limit cache to last 1000 messages
+        const truncatedMessages = updatedMessages.slice(-1000);
         sessionStorage.setItem(cacheKey, JSON.stringify(truncatedMessages));
     } catch (e) {
         console.error("Error updating chat cache:", e);

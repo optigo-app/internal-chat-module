@@ -81,7 +81,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         messages, setMessages,
         mediaFiles, setMediaFiles,
         showMedia, setLoadedMedia, setShowMedia,
-        loading, hasMore,
+        loading, hasMore, loadingOlder,
         uploadProgress, loadedMedia,
         replyToMessage, forwardMessage,
         blinkMessageId, setBlinkMessageId,
@@ -228,7 +228,8 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         setIsCurrentUserAdmin,
         registerListener,
         unregisterListener,
-        addUniqueMessage
+        addUniqueMessage,
+        onCustomerSelect,
     });
 
     const isNarrowScreen = useMediaQuery('(max-width: 992px)');
@@ -678,6 +679,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                 showMedia={showMedia}
                                 setShowMedia={setShowMedia}
                                 loading={loading}
+                                loadingOlder={loadingOlder}
                                 mediaFiles={mediaFiles}
                                 setMediaFiles={setMediaFiles}
                                 handleClosePreview={handleClosePreview}
@@ -708,7 +710,6 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                 uploadProgress={uploadProgress}
                                 handleRemoveReaction={handleRemoveReaction}
                                 replyToMessage={replyToMessage}
-                                isSwitchingConversation={isSwitchingConversation}
                                 processFiles={processFiles}
                                 captureMessageScrollState={captureMessageScrollState}
                                 typingStatus={typingStatus}
@@ -817,15 +818,17 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                 message={messageContextMenu?.message}
                 mouseX={messageContextMenu?.mouseX}
                 mouseY={messageContextMenu?.mouseY}
+                selectedCustomer={selectedCustomer}
+                isRemovedFromGroup={isRemovedFromCurrentGroup}
             />
 
             <ForwardMessage
                 message={forwardMessage}
-                open={!!forwardAnchorEl && !!forwardMessage}
+                open={!!forwardMessage}
                 anchorEl={forwardAnchorEl}
-                isCentered={isForwardFromViewer}
+                isCentered={isForwardFromViewer || !forwardAnchorEl}
                 onClose={() => {
-                    setIsForwardFromViewer(false);
+                    if (typeof setIsForwardFromViewer === 'function') setIsForwardFromViewer(false);
                     handleCloseForward();
                 }}
                 onSend={handleSendForward}

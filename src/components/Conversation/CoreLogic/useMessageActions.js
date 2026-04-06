@@ -103,7 +103,27 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
             if (memberIds?.length > 0) receiverIds = memberIds;
           } catch { /* fallback to single ReceiverId */ }
         }
-        emitTextMessage({ auth, selectedCustomer, messageId: sentId, message: caption, isEdited: 0, receiverIds, extra: { Id: auth.SocketId, Status: 1, MessageStatus: 1, MessageType: 'text', Time: time, Date: date, DateTime: dateTime, ConversationId: convId || tempConversationId, dateTime } });
+
+        // Build reply context fields so receiver can render the reply preview
+        const replyExtra = (isReply && replySnapshot) ? {
+          ContextType: 2,
+          ContextId: replySnapshot.Id,
+          ReplyContextMsg: replySnapshot.text || 'Media',
+          SenderInfo: replySnapshot.sender || '',
+          Sender: replySnapshot.sender || '',
+          ReplyToAttachmentId: replySnapshot.ReplyToAttachmentId || null,
+        } : {};
+
+        emitTextMessage({
+          auth, selectedCustomer, messageId: sentId, message: caption, isEdited: 0, receiverIds,
+          extra: {
+            Id: auth.SocketId, Status: 1, MessageStatus: 1, MessageType: 'text',
+            Time: time, Date: date, DateTime: dateTime,
+            ConversationId: convId || tempConversationId,
+            dateTime,
+            ...replyExtra,
+          },
+        });
         dispatchMsg({ type: MSG.UPSERT, id: tempId, msg: { Id: sentId, MessageId: sentId, Status: 1, SenderId: auth?.id, Direction: 1 } });
       }
 

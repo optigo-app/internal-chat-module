@@ -24,6 +24,7 @@ import { useFavorite } from '../../contexts/FavoriteContext';
 import { useRemoveInGroup } from '../../contexts/RemoveInGroupContext';
 import { useGroupAdminMode } from '../../contexts/GroupAdminModeContext';
 import AddMemberDialog from '../ReusableComponent/AddMemberDialog';
+import MediaModal from '../MediaViewer/MdiaVew';
 
 const CustomerDetails = ({
     customer,
@@ -84,6 +85,8 @@ const CustomerDetails = ({
     const [isParticipantSearchOpen, setIsParticipantSearchOpen] = useState(false);
     const [isEditAdminDialogOpen, setIsEditAdminDialogOpen] = useState(false);
     const [isPastParticipantsOpen, setIsPastParticipantsOpen] = useState(false);
+
+    const [mediaOpen, setMediaOpen] = useState(false);
 
     // Confirmation Modal state for Role Change / Member Removal
     const [confirmationModal, setConfirmationModal] = useState({
@@ -701,9 +704,16 @@ const CustomerDetails = ({
                 if (response?.Status === "200") {
                     toast.success('You have left the group');
                     setConfirmationModal({ isOpen: false, member: null, actionType: null });
-                    onClose?.();
-                    window.dispatchEvent(new CustomEvent('DELETE_CONVERSATION_ITEM', {
-                        detail: { conversationId: customer.ConversationId }
+                    // Don't close the panel or message area — user stays but is now removed.
+                    // Update RemoveInGroup context so UI switches to read-only mode
+                    // and the "Delete group" button appears in DangerZone.
+                    updateRemoveInGroupStatus(customer.ConversationId, true);
+                    window.dispatchEvent(new CustomEvent('UPDATE_CONVERSATION_ITEM', {
+                        detail: {
+                            ConversationId: customer.ConversationId,
+                            RemoveInGroup: 1,
+                            isStatusChange: true
+                        }
                     }));
                 } else {
                     toast.error(response?.Message || 'Failed to exit group');
@@ -773,7 +783,7 @@ const CustomerDetails = ({
 
     const handleMediaClick = (media) => {
         if (media.type?.startsWith('image/') || media.type?.startsWith('video/')) {
-            window.open(media.src || media.FileUrl, '_blank');
+            setMediaOpen(true);
         } else {
             handleDownload(media.src || media.FileUrl, media.name || media.FileName || `document_${media.Id}`);
         }
@@ -1079,6 +1089,11 @@ const CustomerDetails = ({
                     }
                     variant={['clearChat', 'deleteGroup', 'deleteChat', 'exitGroup'].includes(confirmationModal.actionType) ? 'danger' : 'primary'}
                     showCancel={confirmationModal.actionType !== 'adminCannotLeave'}
+                />
+                <MediaModal
+                    open={mediaOpen}
+                    handleClose={() => setMediaOpen(false)}
+                    mediaItems={mediaItems}
                 />
             </div>
         </>

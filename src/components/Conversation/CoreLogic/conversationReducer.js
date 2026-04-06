@@ -1,20 +1,20 @@
 // ─── Action types ────────────────────────────────────────────────────────────
 export const MSG = {
-  LOAD:           'LOAD',
-  APPEND:         'APPEND',
-  UPSERT:         'UPSERT',
-  UPDATE_STATUS:  'UPDATE_STATUS',
-  UPDATE_REACTION:'UPDATE_REACTION',
-  EDIT:           'EDIT',
-  DELETE_ME:      'DELETE_ME',
-  DELETE_ALL:     'DELETE_ALL',
-  CLEAR:          'CLEAR',
-  SET_LOADING:    'SET_LOADING',
+  LOAD: 'LOAD',
+  APPEND: 'APPEND',
+  UPSERT: 'UPSERT',
+  UPDATE_STATUS: 'UPDATE_STATUS',
+  UPDATE_REACTION: 'UPDATE_REACTION',
+  EDIT: 'EDIT',
+  DELETE_ME: 'DELETE_ME',
+  DELETE_ALL: 'DELETE_ALL',
+  CLEAR: 'CLEAR',
+  SET_LOADING: 'SET_LOADING',
   SET_LOADING_OLDER: 'SET_LOADING_OLDER',
-  SET_HAS_MORE:   'SET_HAS_MORE',
-  SET_PAGE:       'SET_PAGE',
-  SET_TEMP_CONV:  'SET_TEMP_CONV',
-  SET_MESS_ID:    'SET_MESS_ID',
+  SET_HAS_MORE: 'SET_HAS_MORE',
+  SET_PAGE: 'SET_PAGE',
+  SET_TEMP_CONV: 'SET_TEMP_CONV',
+  SET_MESS_ID: 'SET_MESS_ID',
   SET_STORE_MESS: 'SET_STORE_MESS',
 };
 
@@ -53,7 +53,7 @@ export function messagesReducer(state, action) {
           ...incoming,
           // Only preserve existing isUploading/percent if the incoming update doesn't explicitly set them
           isUploading: 'isUploading' in incoming ? incoming.isUploading : existing.isUploading,
-          percent:     'percent'     in incoming ? incoming.percent     : existing.percent,
+          percent: 'percent' in incoming ? incoming.percent : existing.percent,
         };
         return { ...state, data: next };
       }
@@ -128,13 +128,13 @@ export function messagesReducer(state, action) {
     case MSG.CLEAR:
       return { ...msgInitialState };
 
-    case MSG.SET_LOADING:       return { ...state, loading: action.value };
+    case MSG.SET_LOADING: return { ...state, loading: action.value };
     case MSG.SET_LOADING_OLDER: return { ...state, loadingOlder: action.value };
-    case MSG.SET_HAS_MORE:      return { ...state, hasMore: action.value };
-    case MSG.SET_PAGE:          return { ...state, currentPage: action.value };
-    case MSG.SET_TEMP_CONV:     return { ...state, tempConversationId: action.value };
-    case MSG.SET_MESS_ID:       return { ...state, messId: action.value };
-    case MSG.SET_STORE_MESS:    return { ...state, storeMessData: action.value };
+    case MSG.SET_HAS_MORE: return { ...state, hasMore: action.value };
+    case MSG.SET_PAGE: return { ...state, currentPage: action.value };
+    case MSG.SET_TEMP_CONV: return { ...state, tempConversationId: action.value };
+    case MSG.SET_MESS_ID: return { ...state, messId: action.value };
+    case MSG.SET_STORE_MESS: return { ...state, storeMessData: action.value };
 
     default: return state;
   }

@@ -63,7 +63,7 @@ const MessageContent = ({
 
     return (
         <div className="message-content" style={{ flexDirection: 'column' }}>
-            <MessageBubble msg={msg} isOutgoing={isOutgoing}>
+            <MessageBubble msg={msg} isOutgoing={isOutgoing} selectedCustomer={selectedCustomer}>
                 <MessageActions
                     msg={msg}
                     isOutgoing={isOutgoing}

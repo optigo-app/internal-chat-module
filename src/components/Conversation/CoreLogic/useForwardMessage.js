@@ -9,10 +9,9 @@ import { getLocalTime } from './messageHelpers';
 export function useForwardMessage({ auth, selectedCustomer, uiState, dispatchUI, dispatchMsg }) {
 
   const handleForward = useCallback((message, event, attachmentId = null) => {
-    if (!event) return;
-    event.stopPropagation();
+    if (event) event.stopPropagation();
     dispatchUI({ type: UI.SET_FORWARD, value: { ...(message || {}), ReplyToAttachmentId: attachmentId || null } });
-    dispatchUI({ type: UI.SET_FORWARD_ANCHOR, value: event.currentTarget });
+    dispatchUI({ type: UI.SET_FORWARD_ANCHOR, value: event ? event.currentTarget : null });
   }, []);
 
   const handleCloseForward = useCallback(() => {
@@ -27,12 +26,11 @@ export function useForwardMessage({ auth, selectedCustomer, uiState, dispatchUI,
     }
 
     const conversationIdsArr = [];
-    const userIdsArr         = [];
-    const orderedRecipients  = [];
+    const userIdsArr = [];
 
     for (const contact of selectedContactsArr) {
-      if (contact?.ConversationId) { conversationIdsArr.push(contact.ConversationId); orderedRecipients.push(contact); }
-      else if (contact?.UserId || contact?.id) { userIdsArr.push(contact.UserId || contact.id); orderedRecipients.push(contact); }
+      if (contact?.ConversationId) { conversationIdsArr.push(contact.ConversationId); }
+      else if (contact?.UserId || contact?.id) { userIdsArr.push(contact.UserId || contact.id); }
     }
 
     const fwdMsg = uiState.forwardMessage;
@@ -69,23 +67,36 @@ export function useForwardMessage({ auth, selectedCustomer, uiState, dispatchUI,
           try {
             const forwarded = JSON.parse(rd.ForwardedMessages);
             if (Array.isArray(forwarded)) {
-              forwarded.forEach((fwdData, index) => {
-                const contact    = orderedRecipients[index];
-                const receiverId = contact?.UserId || contact?.ReceiverId || contact?.id;
-                if (!receiverId || !fwdData) return;
+              forwarded.forEach((fwdData) => {
+                if (!fwdData) return;
 
                 const { time, date, dateTime } = getLocalTime();
-                const convId       = fwdData.ConversationId;
-                const realMsgId    = fwdData.MessageId;
-                const isMedia      = ['image', 'video', 'document'].includes(fwdMsg?.MessageType);
-                let mediaItems     = fwdMsg?.mediaItems || [];
-                let previewUrl     = fwdMsg?.previewUrl || null;
-                let fileName       = fwdMsg?.fileName || null;
-                let fileType       = fwdMsg?.fileType || null;
+                const convId = fwdData.ConversationId;
+                const realMsgId = fwdData.MessageId;
+                const isMedia = ['image', 'video', 'document'].includes(fwdMsg?.MessageType);
+                let mediaItems = fwdMsg?.mediaItems || [];
+                let previewUrl = fwdMsg?.previewUrl || null;
+                let fileName = fwdMsg?.fileName || null;
+                let fileType = fwdMsg?.fileType || null;
 
                 if (fwdMsg?.ReplyToAttachmentId && Array.isArray(mediaItems)) {
                   const single = mediaItems.find(i => i.attachmentId === fwdMsg.ReplyToAttachmentId || i.Id === fwdMsg.ReplyToAttachmentId);
                   if (single) { mediaItems = [single]; previewUrl = single.url || previewUrl; fileName = single.filename || fileName; fileType = single.mimeType || fileType; }
+                }
+
+                // Find the matching contact for this forwarded entry by ConversationId
+                const matchedContact = selectedContactsArr.find(
+                  c => Number(c.ConversationId) === Number(convId)
+                );
+
+                // Parse ReceiverId — groups have UserId as a JSON array string e.g. "[4,5,7]"
+                // users have a plain numeric string. Parse so socket gets the right type.
+                let rawReceiverId = matchedContact?.UserId ?? matchedContact?.id ?? null;
+                let receiverId = rawReceiverId;
+                if (typeof rawReceiverId === 'string' && rawReceiverId.trim().startsWith('[')) {
+                  try { receiverId = JSON.parse(rawReceiverId); } catch {
+                    Number(receiverId)
+                  }
                 }
 
                 if (selectedCustomer?.ConversationId && Number(convId) === Number(selectedCustomer.ConversationId)) {
@@ -100,11 +111,16 @@ export function useForwardMessage({ auth, selectedCustomer, uiState, dispatchUI,
                   });
                 }
 
+                // Emit one socket event per forwarded conversation
                 emitInternalMessageSend({
-                  Id: realMsgId, ReceiverId: receiverId, ufcc: auth?.ufcc,
-                  SenderId: auth?.id, ConversationId: convId,
+                  Id: realMsgId,
+                  ReceiverId: receiverId,
+                  Type: fwdData.Type,
+                  ufcc: auth?.ufcc,
+                  SenderId: auth?.id,
+                  ConversationId: convId,
                   Message: fwdMsg?.Message || (isMedia ? '' : 'Forwarded Message'),
-                  MessageId: realMsgId, Status: 1, MessageStatus: 1, Direction: 2, DateTime: dateTime,
+                  MessageId: realMsgId, Status: 1, MessageStatus: 1, Direction: 0, DateTime: dateTime,
                   MessageType: fwdMsg?.MessageType || 'text', IsForwarded: true,
                   mediaItems, previewUrl, fileName, fileType, Time: time, Date: date,
                 });

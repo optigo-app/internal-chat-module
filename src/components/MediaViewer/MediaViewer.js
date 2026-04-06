@@ -7,7 +7,7 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import './MediaViewer.scss';
 import { handleDownloadFile, getCustomerDisplayName, getWhatsAppAvatarConfig, getCustomerAvatarSeed, hasCustomerName, getFileExt, getDocumentMeta } from '../../utils/globalFunc';
-import { FormatDateIST, formatChatTimestamp } from '../../utils/DateFnc';
+import { FormatDateIST } from '../../utils/DateFnc';
 import PersonIcon from '@mui/icons-material/Person';
 
 const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, onReply, onForward, message }) => {
@@ -145,9 +145,8 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
   };
 
   const currentMedia = mediaItems[currentIndex];
-
-  const dateStr = message.Date;
-  const timeStr = message?.Time || message?.dateTime ? message?.Time || message?.dateTime : message?.DateTime ? FormatDateIST(message.DateTime, "dd-mm-yyyy").time.toLowerCase() : '';
+  const dateStr = message?.Date;
+  const timeStr = message?.Time || message?.dateTime ? message?.Time || message?.dateTime : message?.DateTime ? FormatDateIST(message?.DateTime, "dd-mm-yyyy")?.time.toLowerCase() : '';
   const dateObj = new Date(dateStr);
   const formattedDate = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).format(dateObj);
   const timeStrUpper = timeStr.replace(/am|pm/g, (match) => match.toUpperCase());

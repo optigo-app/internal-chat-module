@@ -413,9 +413,23 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
 
     useEffect(() => {
         const handleUpdateItem = (event) => {
-            if (event.detail) {
-                handleSocketUpdate(event.detail, Boolean(event.detail.isStatusChange));
+            if (!event.detail) return;
+            const detail = event.detail;
+
+            // Handle RemoveInGroup flag update directly — no need to go through handleSocketUpdate
+            if (detail.RemoveInGroup !== undefined && detail.ConversationId) {
+                setChatMembers(prev => {
+                    if (!prev?.data) return prev;
+                    const idx = prev.data.findIndex(m => Number(m.ConversationId) === Number(detail.ConversationId));
+                    if (idx === -1) return prev;
+                    const updated = [...prev.data];
+                    updated[idx] = { ...updated[idx], RemoveInGroup: detail.RemoveInGroup };
+                    return { ...prev, data: updated };
+                });
+                return;
             }
+
+            handleSocketUpdate(detail, Boolean(detail.isStatusChange));
         };
         const handleRemoveEvent = (event) => {
             if (event.detail?.conversationId) {
@@ -826,8 +840,6 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             }) || [];
     }, [chatMembers, favoriteState, searchTerm, tabValue, selectedStatus, selectedTag]);
 
-    const mainFilteredMembers = React.useMemo(() => getFilteredMembers(false), [getFilteredMembers]);
-
     useEffect(() => {
         setSelectedIndex(-1);
     }, [searchTerm, tabValue, selectedStatus, selectedTag]);
@@ -851,12 +863,12 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     }, []);
 
     const handleKeyDown = (e) => {
-        if (!mainFilteredMembers?.length) return;
+        if (!filteredMembers?.length) return;
 
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             setSelectedIndex(prev => {
-                const next = prev < mainFilteredMembers.length - 1 ? prev + 1 : prev;
+                const next = prev < filteredMembers.length - 1 ? prev + 1 : prev;
                 scrollToSelectedIndex(next);
                 return next;
             });
@@ -868,17 +880,18 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 return next;
             });
         } else if (e.key === 'Enter') {
-            if (selectedIndex >= 0 && selectedIndex < mainFilteredMembers.length) {
-                handleCustomerClick(mainFilteredMembers[selectedIndex]);
+            if (selectedIndex >= 0 && selectedIndex < filteredMembers.length) {
+                handleCustomerClick(filteredMembers[selectedIndex]);
             }
         }
     };
 
     const isArchiveOpen = location.pathname === '/archieve';
     const isProfileOpen = location.pathname === '/profile';
-    const filteredMembers = getFilteredMembers(isArchiveOpen);
 
     const archivedCount = chatMembers?.data?.filter(m => m.IsArchived === 1)?.length || 0;
+
+    const filteredMembers = React.useMemo(() => getFilteredMembers(isArchiveOpen), [getFilteredMembers, isArchiveOpen]);
 
     const getMessageStatusIcon = (member) => {
         const direction = Number(member?.LastMessageDirection ?? member?.lastMessageDirection);
@@ -955,19 +968,13 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     if (index === -1) return prev;
 
                     const updatedData = [...prev.data];
-                    // If archiving, we might want to remove it from the current view unless it's the archive view
-                    if (action === "Archive" && !isArchiveOpen) {
-                        updatedData.splice(index, 1);
-                    } else if (action === "UnArchive" && isArchiveOpen) {
-                        updatedData.splice(index, 1);
-                    } else {
-                        updatedData[index] = {
-                            ...updatedData[index],
-                            IsPin: isPin,
-                            IsStar: isStar,
-                            IsArchived: isArchived
-                        };
-                    }
+                    // Always update the flags — getFilteredMembers handles visibility per view
+                    updatedData[index] = {
+                        ...updatedData[index],
+                        IsPin: isPin,
+                        IsStar: isStar,
+                        IsArchived: isArchived
+                    };
 
                     // Re-sort based on new pin/status
                     updatedData.sort(conversationComparator);
@@ -1247,7 +1254,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     ) : (
                         filteredMembers?.length > 0 ? (
                             <>
-                                {mainFilteredMembers
+                                {filteredMembers
                                     .filter(member => !member.isSearchResult)
                                     .map((member, index) => {
                                         const isSelectedAndReading =
@@ -1411,10 +1418,10 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                                 {/* Search Results Group */}
                                 {searchTerm && filteredMembers.some(m => m.isSearchResult) && (
                                     <div className="search-results-group">
-                                        {mainFilteredMembers
+                                        {filteredMembers
                                             .filter(member => member.isSearchResult)
                                             .map((member) => {
-                                                const memberIdx = mainFilteredMembers.indexOf(member);
+                                                const memberIdx = filteredMembers.indexOf(member);
                                                 const isKeyboardSelectedResult = memberIdx === selectedIndex;
                                                 return (
                                                     <li

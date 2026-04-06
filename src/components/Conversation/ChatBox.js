@@ -134,7 +134,7 @@ const ChatBox = ({
     return (
         <div className="message-input-area">
             {replyToMessage && (
-                <ReplyPreview message={replyToMessage} onCancel={handleCancelReply} />
+                <ReplyPreview key={replyToMessage?.Id || 'reply'} message={replyToMessage} onCancel={handleCancelReply} />
             )}
 
             <ChatStatusNotice

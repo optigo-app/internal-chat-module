@@ -67,11 +67,11 @@ export const multiAssignRoleApi = async (auth, { conversationId, adminChanges = 
                     timestamp: new Date().toISOString()
                 };
 
-                if (isPromotion) {
-                    emitMemberPromoted(eventData);
-                } else {
-                    emitMemberDemoted(eventData);
-                }
+                // if (isPromotion) {
+                //     emitMemberPromoted(eventData);
+                // } else {
+                //     emitMemberDemoted(eventData);
+                // }
             });
         }
 

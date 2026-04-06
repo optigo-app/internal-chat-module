@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import MessageContextMenu from './MessageContextMenu';
 
-const MessageBubble = ({ message, onReply, onForward }) => {
+const MessageBubble = ({ message, onReply, onForward, selectedCustomer }) => {
   const [contextMenu, setContextMenu] = useState(null);
 
   const handleContextMenu = (event) => {
@@ -68,6 +68,7 @@ const MessageBubble = ({ message, onReply, onForward }) => {
         message={message}
         mouseX={contextMenu?.mouseX || null}
         mouseY={contextMenu?.mouseY || null}
+        selectedCustomer={selectedCustomer}
       />
     </>
   );

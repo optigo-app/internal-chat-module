@@ -11,7 +11,8 @@ export const useGroupSocketListeners = ({
     setIsCurrentUserAdmin,
     registerListener,
     unregisterListener,
-    addUniqueMessage
+    addUniqueMessage,
+    onCustomerSelect,
 }) => {
     useEffect(() => {
         if (!selectedCustomer?.IsGroup || !selectedCustomer?.ConversationId) return;
@@ -22,7 +23,7 @@ export const useGroupSocketListeners = ({
         const callbacks = {
             onGroupEvent: (data) => {
                 if (data.conversationId !== conversationId) return;
-                
+
                 if (data.conversationData && addUniqueMessage) {
                     addUniqueMessage(data.conversationData);
                 }
@@ -31,19 +32,24 @@ export const useGroupSocketListeners = ({
                     'group_created': 'GROUP_CREATED',
                     'group_updated': 'GROUP_UPDATED',
                 };
-                
+
                 const notificationTemplate = eventNotificationMap[data.eventType];
                 if (notificationTemplate) {
                     notify(data, notificationTemplate, auth);
                 }
 
+                if (data.eventType === 'group_deleted') {
+                    toast.error('This group has been deleted');
+                    if (onCustomerSelect) onCustomerSelect(null);
+                    return;
+                }
+
                 const eventMessages = {
                     'group_created': 'Group created',
                     'group_updated': 'Group updated',
-                    'group_deleted': 'Group deleted',
                     'group_info_request': 'Group info requested'
                 };
-                
+
                 const message = eventMessages[data.eventType] || 'Group event';
                 toast(message);
 
@@ -55,7 +61,7 @@ export const useGroupSocketListeners = ({
 
             onMemberEvent: (data) => {
                 if (data.conversationId !== conversationId) return;
-                
+
                 if (data.conversationData && addUniqueMessage) {
                     addUniqueMessage(data.conversationData);
                 }
@@ -69,7 +75,7 @@ export const useGroupSocketListeners = ({
                     'member_promoted': 'MEMBER_PROMOTED',
                     'member_demoted': 'MEMBER_DEMOTED'
                 };
-                
+
                 const notificationTemplate = eventNotificationMap[data.eventType];
                 if (notificationTemplate) {
                     notify(data, notificationTemplate, auth);
@@ -81,7 +87,7 @@ export const useGroupSocketListeners = ({
                     'member_promoted': `${data.memberName || 'Member'} promoted to admin`,
                     'member_demoted': `${data.memberName || 'Member'} demoted from admin`
                 };
-                
+
                 const message = eventMessages[data.eventType] || 'Member event';
 
                 if (isCurrentUserRemoved) {
@@ -113,7 +119,7 @@ export const useGroupSocketListeners = ({
 
             onPermissionEvent: (data) => {
                 if (Number(data.conversationId) !== Number(conversationId)) return;
-                
+
                 notify(data, 'PERMISSION_CHANGED', auth);
                 toast('Group permissions updated');
 
@@ -146,6 +152,7 @@ export const useGroupSocketListeners = ({
         setIsCurrentUserAdmin,
         registerListener,
         unregisterListener,
-        addUniqueMessage
+        addUniqueMessage,
+        onCustomerSelect,
     ]);
 };

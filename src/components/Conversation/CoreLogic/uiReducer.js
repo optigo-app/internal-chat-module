@@ -33,20 +33,29 @@ export const uiInitialState = {
 
 export function uiReducer(state, action) {
   switch (action.type) {
-    case UI.SET_INPUT:          return { ...state, inputValue: action.value };
-    case UI.SET_MEDIA_FILES:    return { ...state, mediaFiles: action.value };
-    case UI.SET_SHOW_MEDIA:     return { ...state, showMedia: action.value };
-    case UI.SET_REPLY:          return { ...state, replyToMessage: action.value };
-    case UI.SET_FORWARD:        return { ...state, forwardMessage: action.value };
-    case UI.SET_FORWARD_ANCHOR: return { ...state, forwardAnchorEl: action.value };
-    case UI.SET_BLINK:          return { ...state, blinkMessageId: action.value };
-    case UI.SET_SEARCHING:      return { ...state, isSearching: action.value };
-    case UI.SET_SEARCH_RESULTS: return { ...state, searchResults: action.value };
+    case UI.SET_INPUT:          return state.inputValue === action.value ? state : { ...state, inputValue: action.value };
+    case UI.SET_MEDIA_FILES:    return state.mediaFiles === action.value ? state : { ...state, mediaFiles: action.value };
+    case UI.SET_SHOW_MEDIA:     return state.showMedia === action.value ? state : { ...state, showMedia: action.value };
+    case UI.SET_REPLY:          return state.replyToMessage === action.value ? state : { ...state, replyToMessage: action.value };
+    case UI.SET_FORWARD:        return state.forwardMessage === action.value ? state : { ...state, forwardMessage: action.value };
+    case UI.SET_FORWARD_ANCHOR: return state.forwardAnchorEl === action.value ? state : { ...state, forwardAnchorEl: action.value };
+    case UI.SET_BLINK:          return state.blinkMessageId === action.value ? state : { ...state, blinkMessageId: action.value };
+    case UI.SET_SEARCHING:      return state.isSearching === action.value ? state : { ...state, isSearching: action.value };
+    case UI.SET_SEARCH_RESULTS: return state.searchResults === action.value ? state : { ...state, searchResults: action.value };
     case UI.SET_UPLOAD_PROGRESS:
       return { ...state, uploadProgress: { ...state.uploadProgress, ...action.value } };
     case UI.SET_LOADED_MEDIA:
+      if (state.loadedMedia[action.key]) return state;
       return { ...state, loadedMedia: { ...state.loadedMedia, [action.key]: true } };
     case UI.SET_VIEWER:
+      if (
+        (action.open === undefined || state.mediaViewerOpen === action.open) &&
+        (action.items === undefined || state.mediaViewerItems === action.items) &&
+        (action.index === undefined || state.mediaViewerIndex === action.index) &&
+        (action.message === undefined || state.mediaViewerMessage === action.message)
+      ) {
+        return state;
+      }
       return {
         ...state,
         mediaViewerOpen: action.open ?? state.mediaViewerOpen,
@@ -56,4 +65,4 @@ export function uiReducer(state, action) {
       };
     default: return state;
   }
-}
+}

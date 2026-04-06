@@ -403,3 +403,16 @@
     }
   }
 }
+
+.swiper-button-next::after,
+.swiper-button-prev::after {
+  display: none;
+}
+
+.nav-prev {
+  left: 20px;
+}
+
+.nav-next {
+  right: 20px;
+}

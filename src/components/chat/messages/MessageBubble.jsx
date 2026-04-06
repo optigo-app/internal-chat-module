@@ -2,7 +2,7 @@ import { Box } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import "./MessageContent.scss";
 
-const MessageBubble = ({ msg, isOutgoing, children }) => {
+const MessageBubble = ({ msg, isOutgoing, children, selectedCustomer }) => {
     const theme = useTheme();
 
     return (

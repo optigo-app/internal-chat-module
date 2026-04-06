@@ -9,8 +9,6 @@ const VideoMessage = ({
     handleMediaClick,
     getMediaKey,
     getMediaSrcForMessage,
-    imageNotFound,
-    videoLoadError,
     setVideoLoadError,
     UploadProgressOverlay
 }) => {
@@ -21,7 +19,7 @@ const VideoMessage = ({
 
     const hasGrid = mediaItems.length > 1;
     const gridRows = mediaItems.length <= 2 ? "1fr" : "1fr 1fr";
-    const gridHeight = mediaItems.length <= 2 ? 160 : 220;
+    const gridHeight = mediaItems.length <= 2 ? 160 : 250;
 
     return (
         <div style={{ position: "relative" }}>
@@ -29,7 +27,7 @@ const VideoMessage = ({
                 className="message-video"
                 style={{
                     position: "relative",
-                    width: 220,
+                    width: 250,
                     height: hasGrid ? gridHeight : "auto",
                     borderRadius: 12,
                     overflow: "hidden"

@@ -43,8 +43,8 @@ const MessageActions = ({
                 },
             }}
         >
-            {/* Forward Action: Always Visible */}
-            {['image', 'video', 'document'].includes(msg?.MessageType) && !msg.IsDeletedForEveryone && (
+            {/* Forward Action: only for media messages (handleForward is undefined for text) */}
+            {!msg.IsDeletedForEveryone && !!handleForward && (
                 <Box
                     sx={{
                         display: 'flex',

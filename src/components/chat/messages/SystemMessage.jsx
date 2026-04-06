@@ -20,11 +20,11 @@ const SystemMessage = ({ message }) => {
             <Box
                 sx={{
                     backgroundColor: alpha(theme.palette.action.disabledBackground, 0.03),
-                    color: alpha(theme.palette.text.secondary, 0.8),
+                    color: alpha(theme.palette.text.secondary, 0.85),
                     padding: '4px 12px',
                     borderRadius: '16px',
-                    fontSize: '0.55rem',
-                    fontWeight: 500,
+                    fontSize: '0.6rem',
+                    fontWeight: 400,
                     maxWidth: '85%',
                     textAlign: 'center',
                     lineHeight: '1.4',

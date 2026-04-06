@@ -28,7 +28,7 @@ const MediaPreview = ({
 
             {totalCount > 0 && mediaItems.images?.length > 0 && (
                 <div className="media-preview-grid" style={{ padding: '0 16px 16px 16px', display: 'flex', gap: '8px' }}>
-                    {mediaItems.images.slice(0, 3).map((img, i) => (
+                    {mediaItems?.images?.slice(0, 5).map((img, i) => (
                         <div key={i} className="preview-item" style={{ width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden' }}>
                             <img src={img.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>

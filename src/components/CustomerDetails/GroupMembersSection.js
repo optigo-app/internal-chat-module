@@ -15,6 +15,7 @@ const GroupMembersSection = ({
     groupPermissions,
     onPastParticipantsClick
 }) => {
+    console.log("")
     const [hoveredMemberId, setHoveredMemberId] = useState(null);
     const canAddMembers = isCurrentUserAdmin || groupPermissions?.addOtherMembers;
 

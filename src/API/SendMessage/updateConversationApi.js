@@ -3,8 +3,6 @@ import { CommonAPI, buildCommonBody } from "../InitialApi/CommonApi";
 export const updateConversationApi = async (
     auth,
     {
-        page = 1,
-        pageSize = 50,
         conversationId,
         isPin = 0,
         isStar = 0,
@@ -18,9 +16,7 @@ export const updateConversationApi = async (
         }
 
         const payload = {
-            Page: page,
-            PageSize: pageSize,
-            ConversationId: conversationId,
+            CommonUseJson: JSON.stringify([conversationId]),
             UserId: auth.id ?? 0,
             IsPin: isPin,
             IsStar: isStar,

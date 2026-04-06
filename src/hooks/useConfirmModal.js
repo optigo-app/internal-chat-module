@@ -77,10 +77,13 @@ export function useConfirmModal({
             });
             if (response?.Status === '200' || response?.success === true) {
                 toast.success('Conversation deleted');
+                const convId = selectedCustomer.ConversationId;
+                sessionStorage.removeItem(`chat_cache_${convId}`);
+                sessionStorage.removeItem(`chat_last_page_${convId}`);
                 close();
                 onCustomerSelect(null);
                 window.dispatchEvent(new CustomEvent('DELETE_CONVERSATION', {
-                    detail: { conversationId: selectedCustomer.ConversationId },
+                    detail: { conversationId: convId },
                 }));
             } else {
                 toast.error(response?.Message || 'Failed to delete conversation');

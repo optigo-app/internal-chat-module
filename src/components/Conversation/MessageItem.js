@@ -37,6 +37,7 @@ const MessageItem = ({
     const hoverHideTimeoutRef = useRef(null);
     const messageDomId = msg.Id ?? msg.fileName;
     const isOutgoing = msg.Direction === 1;
+    const isMediaMessage = ['image', 'video', 'document', 'audio'].includes(msg?.MessageType);
     const isBlinking = blinkMessageId === messageDomId;
     const currentHoverId = msg?.messageId || msg?.id || index;
     const isHovered = hoveredMessageId === currentHoverId;
@@ -131,7 +132,7 @@ const MessageItem = ({
                 getMessageStatusIcon={getMessageStatusIcon}
                 handleRemoveReaction={handleRemoveReaction}
                 getMessageById={(id) => messageById.get(id)}
-                handleForward={handleForward}
+                handleForward={isMediaMessage ? handleForward : undefined}
                 setDrawerViewState={setDrawerViewState}
                 setDrawerOpen={setDrawerOpen}
             />

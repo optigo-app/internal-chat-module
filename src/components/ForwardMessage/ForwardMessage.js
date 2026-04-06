@@ -20,7 +20,7 @@ import {
     CheckBox as CheckBoxIcon,
     CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
 } from '@mui/icons-material';
-import { List } from 'react-window';
+import { FixedSizeList } from 'react-window';
 import { LoginContext } from '../../context/LoginData';
 import { getForwardListApi } from '../../API/SendMessage/forwardlistApi';
 import { getWhatsAppAvatarConfig } from '../../utils/globalFunc';
@@ -180,14 +180,14 @@ const ForwardMessage = ({ message, onSend, onClose, anchorEl, open, isCentered =
 
     const ROW_HEIGHT = 64;
 
-    const Row = useCallback(({ index, style, items, selectedIds, onSelect }) => {
-        const contact = items?.[index];
+    const Row = useCallback(({ index, style }) => {
+        const contact = filteredContacts?.[index];
         if (!contact) return null;
         const isSelected = selectedIds.has(contact.id);
 
         return (
             <MenuItem
-                onClick={() => onSelect(contact)}
+                onClick={() => handleContactSelect(contact)}
                 className={`fm-contactItem ${isSelected ? 'isSelected' : ''}`}
                 style={style}
             >
@@ -219,7 +219,7 @@ const ForwardMessage = ({ message, onSend, onClose, anchorEl, open, isCentered =
                 />
             </MenuItem>
         );
-    }, []);
+    }, [filteredContacts, selectedIds, handleContactSelect, theme]);
 
     useEffect(() => {
         if (open) {
@@ -303,18 +303,15 @@ const ForwardMessage = ({ message, onSend, onClose, anchorEl, open, isCentered =
                             </div>
                         ) : (
                             <>
-                                <List
-                                    listRef={listRef}
-                                    rowComponent={Row}
-                                    rowCount={filteredContacts.length}
-                                    rowHeight={ROW_HEIGHT}
-                                    rowProps={{
-                                        items: filteredContacts,
-                                        selectedIds,
-                                        onSelect: handleContactSelect,
-                                    }}
-                                    style={{ height: listHeight, width: '100%' }}
-                                />
+                                <FixedSizeList
+                                    ref={listRef}
+                                    height={listHeight}
+                                    itemCount={filteredContacts.length}
+                                    itemSize={ROW_HEIGHT}
+                                    width="100%"
+                                >
+                                    {Row}
+                                </FixedSizeList>
                             </>
                         )}
                     </Box>

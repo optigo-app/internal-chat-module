@@ -5,7 +5,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 const ChatStatusNotice = ({ isRemovedFromGroup, isOnlyAdminSend, isCurrentUserAdmin }) => {
     const theme = useTheme();
 
-    if (!isRemovedFromGroup && !(isOnlyAdminSend && !isCurrentUserAdmin)) return null;
+    if (!isRemovedFromGroup && (!isOnlyAdminSend || isCurrentUserAdmin)) return null;
 
     let message = "";
     if (isRemovedFromGroup) {
