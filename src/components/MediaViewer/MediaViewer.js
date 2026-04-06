@@ -9,8 +9,13 @@ import './MediaViewer.scss';
 import { handleDownloadFile, getCustomerDisplayName, getWhatsAppAvatarConfig, getCustomerAvatarSeed, hasCustomerName, getFileExt, getDocumentMeta } from '../../utils/globalFunc';
 import { FormatDateIST } from '../../utils/DateFnc';
 import PersonIcon from '@mui/icons-material/Person';
+import QuickReactionMenu from '../Conversation/QuickReactionMenu';
+import ReactionDetailsMenu from '../Conversation/ReactionMenu';
+import { charToUnified, parseReactions } from '../../utils/EmojiUtils';
+import { Emoji } from 'emoji-picker-react';
+import { Box } from '@mui/material';
 
-const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, onReply, onForward, message }) => {
+const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, onReply, onForward, message, messages, auth, handleMessageEmojiClick, handleRemoveReaction }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [loading, setLoading] = useState(() => {
     const initialState = {};
@@ -25,6 +30,18 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const draggingRef = useRef(false);
   const startPosRef = useRef({ x: 0, y: 0 });
+  const reactionButtonRef = useRef(null);
+  const [reactionAnchorEl, setReactionAnchorEl] = useState(null);
+  const [detailAnchorEl, setDetailAnchorEl] = useState(null);
+
+  // Sync with the actual messages array to get live reaction updates
+  const liveMessage = React.useMemo(() => {
+    const list = Array.isArray(messages?.data) ? messages.data : (Array.isArray(messages) ? messages : []);
+    const found = list.find(m => String(m.Id || m.MessageId) === String(message?.Id || message?.MessageId));
+    return found || message;
+  }, [messages, message]);
+
+  const parsedReactions = React.useMemo(() => parseReactions(liveMessage?.ReactionEmojis), [liveMessage?.ReactionEmojis]);
 
   const resetZoom = useCallback(() => {
     setZoomLevel(1);
@@ -208,8 +225,28 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
               <IconButton className="toolbar-btn" onClick={() => onReply(currentMedia?.attachmentId)}><Reply size={18} /></IconButton>
             </Tooltip>
             <Tooltip title="React" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
-              <IconButton className="toolbar-btn"><Smile size={18} /></IconButton>
+              <IconButton
+                ref={reactionButtonRef}
+                className="toolbar-btn"
+                onClick={() => setReactionAnchorEl(reactionButtonRef.current)}
+              >
+                <Smile size={18} />
+              </IconButton>
             </Tooltip>
+            <QuickReactionMenu
+              open={Boolean(reactionAnchorEl)}
+              anchorEl={reactionAnchorEl}
+              hideTrigger={true}
+              disablePortal={true}
+              onOpen={(e) => setReactionAnchorEl(e.currentTarget)}
+              onClose={() => setReactionAnchorEl(null)}
+              onSelectEmoji={(emoji) => {
+                if (typeof handleMessageEmojiClick === 'function') {
+                  handleMessageEmojiClick(emoji, liveMessage);
+                }
+                setReactionAnchorEl(null);
+              }}
+            />
             <Tooltip title="Forward" placement='bottom' slotProps={{ popper: { sx: { zIndex: 11000 } } }}>
               <IconButton className="toolbar-btn" onClick={(e) => onForward?.(e, currentMedia?.attachmentId)}><Forward size={18} /></IconButton>
             </Tooltip>
@@ -377,12 +414,68 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
                         );
                       })()
                     )}
+
+                    {/* Reaction Overlay (Consolidated Bottom-Left) */}
+                    {liveMessage?.ReactionEmojis && liveMessage.ReactionEmojis !== "" && liveMessage.ReactionEmojis !== "[]" && (
+                      <Box
+                        className="media-viewer-reaction-group"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDetailAnchorEl(e.currentTarget);
+                        }}
+                      >
+                        <div className="reaction-pills">
+                          {(() => {
+                            try {
+                              const reactions = JSON.parse(liveMessage.ReactionEmojis);
+                              if (Array.isArray(reactions)) {
+                                const uniqueEmojis = [...new Set(reactions.map(r => r?.Reaction || r?.Emoji))].slice(0, 3);
+                                return (
+                                  <>
+                                    <div className="reaction-icons">
+                                      {uniqueEmojis.map((emojiChar, idx) => {
+                                        const unified = charToUnified(emojiChar);
+                                        return unified ? (
+                                          <Emoji key={idx} unified={unified} size={20} emojiStyle="apple" />
+                                        ) : (
+                                          <span key={idx}>{emojiChar}</span>
+                                        );
+                                      })}
+                                    </div>
+                                  </>
+                                );
+                              }
+                            } catch (e) {
+                              console.error("MediaViewer slide reactions parse error:", e);
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      </Box>
+                    )}
                   </div>
                 </SwiperSlide>
               );
             })}
           </Swiper>
         </div>
+
+        {/* Reaction Details Menu */}
+        {liveMessage?.ReactionEmojis && (
+          <ReactionDetailsMenu
+            anchorEl={detailAnchorEl}
+            onClose={() => setDetailAnchorEl(null)}
+            reactions={parsedReactions}
+            auth={auth}
+            disablePortal={true}
+            onRemoveReaction={(reaction) => {
+              if (typeof handleRemoveReaction === 'function') {
+                handleRemoveReaction(reaction, liveMessage);
+              }
+              setDetailAnchorEl(null);
+            }}
+          />
+        )}
 
         {mediaItems.length > 1 && (
           <button className="media-viewer-nav next" onClick={handleNext}>

@@ -22,7 +22,7 @@ import { Search, X as Clear, Check } from 'lucide-react';
 import { fetchCustomerLists } from '../../API/CustomerLists/CustomerLists';
 import { PastParticipantListApi } from '../../API/Groups/PastParticipantListApi';
 import { LoginContext } from '../../context/LoginData';
-import { getCustomerDisplayName, getWhatsAppAvatarConfig } from '../../utils/globalFunc';
+import { getCustomerDisplayName, getWhatsAppAvatarConfig, highlightText } from '../../utils/globalFunc';
 
 const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode = 'add', groupMembers = [], onMemberClick, preSelectedIds = [], disabledIds = [], conversationId }) => {
     const { auth } = useContext(LoginContext);
@@ -104,10 +104,25 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
         }
     };
 
-    const debouncedFetch = React.useCallback(
-        debounce((val) => fetchCustomers(val), 500),
-        [auth]
+    const fetchCustomersRef = React.useRef(fetchCustomers);
+    fetchCustomersRef.current = fetchCustomers;
+
+    const debouncedFetch = React.useMemo(
+        () => debounce((val) => fetchCustomersRef.current(val), 500),
+        []
     );
+
+    useEffect(() => {
+        return () => {
+            debouncedFetch.cancel();
+        };
+    }, [debouncedFetch]);
+
+    useEffect(() => {
+        if (open && (mode === 'search' || mode === 'editAdmins')) {
+            fetchCustomers(searchTerm);
+        }
+    }, [groupMembers, mode, open]);
 
     useEffect(() => {
         if (open) {
@@ -128,7 +143,11 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
     const handleSearchChange = (e) => {
         const val = e.target.value;
         setSearchTerm(val);
-        debouncedFetch(val);
+        if (mode === 'search' || mode === 'editAdmins' || mode === 'viewPastParticipants') {
+            fetchCustomers(val);
+        } else {
+            debouncedFetch(val);
+        }
     };
 
     const filteredAvailableCustomers = availableCustomers
@@ -246,6 +265,12 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
                     <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                         <CircularProgress size={24} sx={{ color: 'primary.main' }} />
                     </Box>
+                ) : filteredAvailableCustomers.length === 0 ? (
+                    <Box sx={{ py: 8, textAlign: 'center' }}>
+                        <Typography variant="body2" sx={{ color: '#667781', fontWeight: 500 }}>
+                            {searchTerm ? `No results found for "${searchTerm}"` : 'No participants found'}
+                        </Typography>
+                    </Box>
                 ) : (
                     <List sx={{ width: '100%', overflowY: 'auto', flex: 1 }} ref={listContainerRef}>
                         {filteredAvailableCustomers
@@ -288,8 +313,8 @@ const AddMemberDialog = ({ open, onClose, onSubmit, existingMemberIds = [], mode
                                             <Avatar {...getWhatsAppAvatarConfig(cust.DisplayName || cust.CustomerName || cust.Name || cust.UserName || 'User', 40)} src={cust.ProfileImage || cust.ProfileImageUrl} />
                                         </ListItemAvatar>
                                         <ListItemText
-                                            primary={getCustomerDisplayName(cust)}
-                                            secondary={(cust.UserEmail ?? cust.DisplayEmail) ?? ''}
+                                            primary={highlightText(getCustomerDisplayName(cust), searchTerm)}
+                                            secondary={highlightText((cust.UserEmail ?? cust.DisplayEmail) ?? '', searchTerm)}
                                         />
                                     </ListItem>
                                 );

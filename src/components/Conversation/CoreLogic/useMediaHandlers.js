@@ -17,7 +17,7 @@ export function useMediaHandlers({ auth, selectedCustomer, uiState, dispatchUI, 
     if (!files?.length) return;
     const { acceptedFiles, skippedSize, skippedTotal, skippedCount } = validateMediaFiles(files);
 
-    if (skippedCount  > 0) showToast(`Only 30 files allowed. ${skippedCount} removed.`, 'error', { id: 'too-many-files' });
+    if (skippedCount > 0) showToast(`Only 30 files allowed. ${skippedCount} removed.`, 'error', { id: 'too-many-files' });
     if (skippedSize.length > 0) showToast(`Files too large: ${skippedSize.slice(0, 2).join(', ')}`, 'error', { id: 'file-too-large' });
     if (skippedTotal.length > 0) showToast('Total selection exceeds 100MB.', 'error', { id: 'total-too-large' });
     if (!acceptedFiles.length) return;
@@ -29,7 +29,7 @@ export function useMediaHandlers({ auth, selectedCustomer, uiState, dispatchUI, 
     }));
 
     dispatchUI({ type: UI.SET_MEDIA_FILES, value: newMediaFiles });
-    dispatchUI({ type: UI.SET_SHOW_MEDIA,  value: true });
+    dispatchUI({ type: UI.SET_SHOW_MEDIA, value: true });
   }, []);
 
   const handleFileChange = useCallback(async (e) => {
@@ -47,7 +47,7 @@ export function useMediaHandlers({ auth, selectedCustomer, uiState, dispatchUI, 
 
   const handleClosePreview = useCallback(() => {
     dispatchUI({ type: UI.SET_MEDIA_FILES, value: [] });
-    dispatchUI({ type: UI.SET_SHOW_MEDIA,  value: false });
+    dispatchUI({ type: UI.SET_SHOW_MEDIA, value: false });
   }, []);
 
   const uploadAndSendMedia = useCallback(async ({ files, caption, type, tempId, time, date, dateTime }) => {
@@ -55,9 +55,10 @@ export function useMediaHandlers({ auth, selectedCustomer, uiState, dispatchUI, 
     if (!safeFiles.length) return;
 
     try {
-      const isGroup   = selectedCustomer?.IsGroup === 1;
-      const memberIds = isGroup ? await fetchAndCacheGroupMembers(selectedCustomer.ConversationId) : [];
-      const convId    = selectedCustomer?.ConversationId || tempConversationId;
+      const isGroup = selectedCustomer?.IsGroup === 1;
+      const groupData = isGroup ? await fetchAndCacheGroupMembers(selectedCustomer.ConversationId) : null;
+      const memberIds = (groupData?.members || []).map(m => Number(m.UserId || m.userId || m.id)).filter(Boolean);
+      const convId = selectedCustomer?.ConversationId || tempConversationId;
 
       const uploadedUrls = await uploadFiles({
         files: safeFiles, conversationId: convId, type,
@@ -68,14 +69,14 @@ export function useMediaHandlers({ auth, selectedCustomer, uiState, dispatchUI, 
       });
 
       const attachments = safeFiles.map((f, i) => ({ FileUrl: uploadedUrls[i], FileName: f.name, MimeType: f.type }));
-      const mediaItems  = safeFiles.map((f, i) => ({ url: uploadedUrls[i], filename: f.name, mimeType: f.type }));
+      const mediaItems = safeFiles.map((f, i) => ({ url: uploadedUrls[i], filename: f.name, mimeType: f.type }));
 
       const receiverId = selectedCustomer?.CustomerId || selectedCustomer?.UserId;
       const sendFn = type === 'image' ? sendImageMessage : type === 'video' ? sendVideoMessage : sendDocumentMessage;
-      const res    = await sendFn(auth, { senderId: auth?.id, receiverId, conversationId: convId, caption, attachments });
+      const res = await sendFn(auth, { senderId: auth?.id, receiverId, conversationId: convId, caption, attachments });
 
-      const sentId      = res?.Data?.rd?.[0]?.MessageId;
-      const sentConvId  = res?.Data?.rd?.[0]?.ConversationId;
+      const sentId = res?.Data?.rd?.[0]?.MessageId;
+      const sentConvId = res?.Data?.rd?.[0]?.ConversationId;
       const serverAttachments = (() => {
         try { const raw = res?.Data?.rd?.[0]?.Attachments; return raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : []; }
         catch { return []; }

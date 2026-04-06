@@ -139,6 +139,7 @@ const DetailsViews = ({
                                     setDirection('forward');
                                     setCurrentViewState('media');
                                 }}
+                                onMediaClick={handleMediaClick}
                             />
                             {customer?.IsGroup === 1 && isRemovedFromCurrentGroup && (
                                 <Box className="removed-from-group-message" sx={{ textAlign: 'center', pb: 2 }}>

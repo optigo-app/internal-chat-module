@@ -88,7 +88,8 @@ export const useReactions = ({ auth, selectedCustomer, setMessages, messagesRef,
 
                 if (isGroup) {
                     try {
-                        const memberIds = await fetchAndCacheGroupMembers(selectedCustomer.ConversationId);
+                        const groupData = await fetchAndCacheGroupMembers(selectedCustomer.ConversationId);
+                        const memberIds = (groupData?.members || []).map(m => Number(m.UserId || m.userId || m.id)).filter(Boolean);
                         receiverIdValue = memberIds.length > 0 ? memberIds : [selectedCustomer?.ReceiverId];
                     } catch (error) {
                         console.error('Error fetching group members for reaction:', error);
@@ -210,7 +211,8 @@ export const useReactions = ({ auth, selectedCustomer, setMessages, messagesRef,
 
                 if (isGroup) {
                     try {
-                        const memberIds = await fetchAndCacheGroupMembers(selectedCustomer.ConversationId);
+                        const groupData = await fetchAndCacheGroupMembers(selectedCustomer.ConversationId);
+                        const memberIds = (groupData?.members || []).map(m => Number(m.UserId || m.userId || m.id)).filter(Boolean);
                         receiverIdValue = memberIds.length > 0 ? memberIds : [selectedCustomer?.ReceiverId];
                     } catch {
                         receiverIdValue = [selectedCustomer?.ReceiverId];

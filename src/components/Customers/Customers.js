@@ -1,4 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useContext } from 'react';
+import { LoginContext } from '../../context/LoginData';
+import { contactInfoApi } from '../../API/SendMessage/ContactInfoApi';
 import CustomerLists from '../CustomerLists/CustomerLists';
 import './Customers.scss';
 import { useLocation } from 'react-router-dom';
@@ -12,6 +14,40 @@ const Customers = ({ selectedStatus, selectedTag }) => {
     const [isConversationRead, setIsConversationRead] = useState(false);
     const [viewConversationRead, setViewConversationRead] = useState(false);
     const location = useLocation();
+    const { auth } = useContext(LoginContext);
+
+    useEffect(() => {
+        const resolveConversationId = async () => {
+            // Only resolve if we have a selected customer/member but no ConversationId
+            if (selectedCustomer && !selectedCustomer.ConversationId && selectedCustomer.IsGroup !== 1) {
+                const receiverId = selectedCustomer.ReceiverId || selectedCustomer.UserId || selectedCustomer.id || selectedCustomer.SenderId;
+                if (receiverId && auth?.token) {
+                    try {
+                        const response = await contactInfoApi(auth, { contactUserId: receiverId });
+                        if (response?.Status === "200") {
+                            const data = response?.Data?.rd?.[0] || response?.Data;
+                            if (data?.ConversationId) {
+                                setSelectedCustomer(prev => {
+                                    const prevId = prev?.ReceiverId || prev?.UserId || prev?.id || prev?.SenderId;
+                                    if (prevId && String(prevId) === String(receiverId)) {
+                                        return {
+                                            ...prev,
+                                            ConversationId: data.ConversationId,
+                                            name: data.CustomerName || data.UserName || data.name || prev.name
+                                        };
+                                    }
+                                    return prev;
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error resolving conversation ID:', error);
+                    }
+                }
+            }
+        };
+        resolveConversationId();
+    }, [selectedCustomer?.UserId, selectedCustomer?.ReceiverId, selectedCustomer?.id, selectedCustomer?.SenderId, auth?.token]);
 
     const handleCustomerSelect = useCallback((customer) => {
         const list = converListRef.current || [];

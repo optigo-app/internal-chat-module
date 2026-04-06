@@ -99,8 +99,9 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
         let receiverIds = selectedCustomer?.ReceiverId || selectedCustomer?.UserId;
         if (isGroup) {
           try {
-            const memberIds = await fetchAndCacheGroupMembers(selectedCustomer.ConversationId);
-            if (memberIds?.length > 0) receiverIds = memberIds;
+            const groupData = await fetchAndCacheGroupMembers(selectedCustomer.ConversationId);
+            const memberIds = (groupData?.members || []).map(m => Number(m.UserId || m.userId || m.id)).filter(Boolean);
+            if (memberIds.length > 0) receiverIds = memberIds;
           } catch { /* fallback to single ReceiverId */ }
         }
 
@@ -166,7 +167,8 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
         if (Number(mode) === 2) {
           dispatchMsg({ type: MSG.DELETE_ALL, messageId, deletedInfo });
           const isGroup   = selectedCustomer?.IsGroup === 1;
-          const memberIds = isGroup ? await fetchAndCacheGroupMembers(selectedCustomer.ConversationId) : [];
+          const groupData = isGroup ? await fetchAndCacheGroupMembers(selectedCustomer.ConversationId) : null;
+          const memberIds = (groupData?.members || []).map(m => Number(m.UserId || m.userId || m.id)).filter(Boolean);
           emitInternalMessageDelete({
             ufcc: auth?.ufcc, UserId: auth?.id, SenderId: auth?.id,
             ReceiverId: isGroup ? (memberIds.length ? memberIds : [selectedCustomer?.ReceiverId]) : selectedCustomer?.ReceiverId,

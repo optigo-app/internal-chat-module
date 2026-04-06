@@ -29,6 +29,7 @@ import { Navigation, Keyboard, A11y } from "swiper/modules";
 
 import "swiper/css";
 import "swiper/css/navigation";
+import { handleDownloadFile } from "../../utils/globalFunc";
 
 /* ─── Tokens ───────────────────── */
 
@@ -40,7 +41,7 @@ const T = {
   text: "#1f2937",
   muted: "rgba(31,41,55,0.55)",
   radius: "12px",
-  toolbar: 72,
+  toolbar: 84,
   thumbH: 84
 };
 
@@ -98,13 +99,13 @@ const NavBtn = ({ dir, className }) => {
 /* ─── Thumbnail Strip ───────────────── */
 
 const ThumbnailStrip = ({ items, activeIdx, onSelect }) => {
-  const thumbSwiper = useRef(null);
+  const [swiper, setSwiper] = useState(null);
 
   useEffect(() => {
-    if (thumbSwiper.current) {
-      thumbSwiper.current.slideTo(activeIdx);
+    if (swiper && !swiper.destroyed) {
+      swiper.slideTo(activeIdx);
     }
-  }, [activeIdx]);
+  }, [activeIdx, swiper]);
 
   return (
     <Box
@@ -120,7 +121,10 @@ const ThumbnailStrip = ({ items, activeIdx, onSelect }) => {
       <Swiper
         slidesPerView={"auto"}
         spaceBetween={8}
-        onSwiper={(s) => (thumbSwiper.current = s)}
+        onSwiper={setSwiper}
+        initialSlide={activeIdx}
+        slideToClickedSlide={true}
+        watchSlidesProgress={true}
       >
         {items.map((item, idx) => {
           const type = getType(item);
@@ -196,7 +200,6 @@ const Toolbar_ = ({
     >
       <Stack direction="row" spacing={1} sx={{ flex: 1 }}>
         <TypeIcon type={type} size={18} />
-
         <Box>
           <Typography sx={{ fontWeight: 600, fontSize: 13 }}>
             {name}
@@ -229,7 +232,7 @@ const Toolbar_ = ({
 
       <Stack direction="row" spacing={1} sx={{ ml: 2 }}>
         {item?.FileUrl && (
-          <IconButton component="a" href={item.FileUrl} download>
+          <IconButton onClick={() => handleDownloadFile(item.FileUrl)}>
             <Download size={16} />
           </IconButton>
         )}
@@ -295,9 +298,9 @@ const SlideContent = ({ item, zoom }) => {
 
 /* ─── MAIN COMPONENT ───────────────── */
 
-const MediaModal = ({ open, handleClose, mediaItems }) => {
+const MediaModal = ({ open, handleClose, mediaItems, initialIndex = 0 }) => {
   const [zoom, setZoom] = useState(1);
-  const [activeIdx, setActiveIdx] = useState(0);
+  const [activeIdx, setActiveIdx] = useState(initialIndex);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const swiperRef = useRef(null);
@@ -309,6 +312,15 @@ const MediaModal = ({ open, handleClose, mediaItems }) => {
       ...(mediaItems?.documents || [])
     ];
   }, [mediaItems]);
+
+  useEffect(() => {
+    if (open) {
+      setActiveIdx(initialIndex);
+      if (swiperRef.current) {
+        swiperRef.current.slideTo(initialIndex, 0);
+      }
+    }
+  }, [open, initialIndex]);
 
   const handleZoom = (delta) => {
     setZoom((z) => Math.min(Math.max(z + delta, 1), 4));
@@ -377,6 +389,7 @@ const MediaModal = ({ open, handleClose, mediaItems }) => {
                 prevEl: ".nav-prev"
               }}
               keyboard
+              initialSlide={initialIndex}
               onSwiper={(s) => (swiperRef.current = s)}
               onSlideChange={(s) => {
                 setZoom(1);

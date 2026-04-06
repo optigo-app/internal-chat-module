@@ -15,7 +15,8 @@ export default function ReactionDetailsMenu({
     onClose,
     reactions = [],
     auth,
-    onRemoveReaction
+    onRemoveReaction,
+    disablePortal = false
 }) {
     const open = Boolean(anchorEl);
     const [filter, setFilter] = React.useState("all");
@@ -46,11 +47,15 @@ export default function ReactionDetailsMenu({
             anchorEl={anchorEl}
             open={open}
             onClose={onClose}
+            disablePortal={disablePortal}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'center' }}
             PaperProps={{
                 sx: {
                     width: 320,
                     borderRadius: 2,
-                    maxHeight: 400
+                    maxHeight: 400,
+                    zIndex: 11000,
                 }
             }}
         >

@@ -8,25 +8,25 @@ import { fetchGroupDetails } from '../../API/Groups/FetchGroupDetails';
 import { formatDateHeader } from '../../utils/DateFnc';
 import imageNotFound from '../../assets/image-not-found.jpg';
 
-import { useMessageLoader }   from './CoreLogic/useMessageLoader';
-import { useSocketHandlers }  from './CoreLogic/useSocketHandlers';
-import { useReadReceipt }     from './CoreLogic/useReadReceipt';
-import { useMediaHandlers }   from './CoreLogic/useMediaHandlers';
-import { useMessageActions }  from './CoreLogic/useMessageActions';
-import { useForwardMessage }  from './CoreLogic/useForwardMessage';
+import { useMessageLoader } from './CoreLogic/useMessageLoader';
+import { useSocketHandlers } from './CoreLogic/useSocketHandlers';
+import { useReadReceipt } from './CoreLogic/useReadReceipt';
+import { useMediaHandlers } from './CoreLogic/useMediaHandlers';
+import { useMessageActions } from './CoreLogic/useMessageActions';
+import { useForwardMessage } from './CoreLogic/useForwardMessage';
 
 export const useConversation = (selectedCustomer, onConversationRead, onViewConversationRead, isDrawerOpen = false, onCustomerSelect = null) => {
-  const { auth }  = useContext(LoginContext);
+  const { auth } = useContext(LoginContext);
   const [msgState, dispatchMsg] = useReducer(messagesReducer, msgInitialState);
-  const [uiState,  dispatchUI]  = useReducer(uiReducer, uiInitialState);
+  const [uiState, dispatchUI] = useReducer(uiReducer, uiInitialState);
 
   // ── Stable refs ────────────────────────────────────────────────────────────
   const selectedCustomerRef = useRef(selectedCustomer);
-  const messagesRef         = useRef(msgState.data);
-  const groupMembersRef     = useRef([]);
-  const isAppFirstLoad      = useRef(true);
-  const cacheWriteTimer     = useRef(null);
-  const processedMsgIds     = useRef(new Set());
+  const messagesRef = useRef(msgState.data);
+  const groupMembersRef = useRef([]);
+  const isAppFirstLoad = useRef(true);
+  const cacheWriteTimer = useRef(null);
+  const processedMsgIds = useRef(new Set());
 
   useEffect(() => { selectedCustomerRef.current = selectedCustomer; dispatchUI({ type: UI.SET_MEDIA_FILES, value: [] }); dispatchUI({ type: UI.SET_SHOW_MEDIA, value: false }); }, [selectedCustomer]);
   useEffect(() => { messagesRef.current = msgState.data; }, [msgState.data]);
@@ -38,14 +38,18 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
   // ── Group members ──────────────────────────────────────────────────────────
   const fetchAndCacheGroupMembers = useCallback(async (conversationId, force = false) => {
-    if (!conversationId || !auth) return [];
-    if (!force && groupMembersRef.current?.length > 0) return groupMembersRef.current;
+    if (!conversationId || !auth) return { members: [], groupDetails: null };
+    if (!force && groupMembersRef.current?.length > 0) {
+      return { members: groupMembersRef.current, groupDetails: null };
+    }
     try {
       const groupData = await fetchGroupDetails(conversationId, auth);
-      const members   = (groupData?.members || []).map(m => Number(m.UserId || m.userId || m.id)).filter(Boolean);
+      const members = groupData?.members || [];
       groupMembersRef.current = members;
-      return members;
-    } catch { return []; }
+      return { members, groupDetails: groupData?.groupDetails };
+    } catch {
+      return { members: [], groupDetails: null };
+    }
   }, [auth?.token, auth?.userId]);
 
   // ── Normalise helper (memoised by auth identity) ───────────────────────────
@@ -121,7 +125,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
   }, [isDrawerOpen, selectedCustomer?.ConversationId, handleReadMessage]);
 
   useEffect(() => {
-    if (selectedCustomer && onConversationRead)     onConversationRead(true);
+    if (selectedCustomer && onConversationRead) onConversationRead(true);
     if (selectedCustomer && onViewConversationRead) onViewConversationRead(true);
     return () => { if (onConversationRead) onConversationRead(false); if (onViewConversationRead) onViewConversationRead(false); };
   }, [selectedCustomer]);
@@ -204,47 +208,47 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
   }, []);
 
   const getMediaKey = useCallback((msg, index) => msg?.Id ?? msg?.id ?? msg?.mediaId ?? msg?.MediaUrl ?? `m-${index}`, []);
-  const markLoaded  = useCallback((key) => dispatchUI({ type: UI.SET_LOADED_MEDIA, key }), []);
+  const markLoaded = useCallback((key) => dispatchUI({ type: UI.SET_LOADED_MEDIA, key }), []);
 
   // ── Public API ─────────────────────────────────────────────────────────────
   return {
     // State (flattened for drop-in compatibility)
-    inputValue:          uiState.inputValue,
-    setInputValue:       (v) => dispatchUI({ type: UI.SET_INPUT, value: v }),
-    messages:            { data: msgState.data, total: msgState.total },
-    setMessages:         (updater) => {
+    inputValue: uiState.inputValue,
+    setInputValue: (v) => dispatchUI({ type: UI.SET_INPUT, value: v }),
+    messages: { data: msgState.data, total: msgState.total },
+    setMessages: (updater) => {
       const next = typeof updater === 'function' ? updater({ data: msgState.data, total: msgState.total }) : updater;
       dispatchMsg({ type: MSG.LOAD, data: Array.isArray(next) ? next : (next?.data ?? []), total: next?.total ?? 0 });
     },
-    mediaFiles:          uiState.mediaFiles,
-    setMediaFiles:       (v) => dispatchUI({ type: UI.SET_MEDIA_FILES, value: typeof v === 'function' ? v(uiState.mediaFiles) : v }),
-    showMedia:           uiState.showMedia,
-    setShowMedia:        (v) => dispatchUI({ type: UI.SET_SHOW_MEDIA, value: v }),
-    loading:             msgState.loading,
-    loadingOlder:        msgState.loadingOlder,
-    hasMore:             msgState.hasMore,
-    currentPage:         msgState.currentPage,
-    uploadProgress:      uiState.uploadProgress,
-    loadedMedia:         uiState.loadedMedia,
-    setLoadedMedia:      (v) => dispatchUI({ type: UI.SET_LOADED_MEDIA, key: v }),
-    replyToMessage:      uiState.replyToMessage,
-    setReplyToMessage:   (v) => dispatchUI({ type: UI.SET_REPLY, value: v }),
-    forwardMessage:      uiState.forwardMessage,
-    forwardAnchorEl:     uiState.forwardAnchorEl,
-    setForwardAnchorEl:  (v) => dispatchUI({ type: UI.SET_FORWARD_ANCHOR, value: v }),
-    blinkMessageId:      uiState.blinkMessageId,
-    setBlinkMessageId:   (v) => dispatchUI({ type: UI.SET_BLINK, value: v }),
-    mediaViewerOpen:     uiState.mediaViewerOpen,
-    setMediaViewerOpen:  (v) => dispatchUI({ type: UI.SET_VIEWER, open: v }),
-    mediaViewerItems:    uiState.mediaViewerItems,
-    mediaViewerIndex:    uiState.mediaViewerIndex,
+    mediaFiles: uiState.mediaFiles,
+    setMediaFiles: (v) => dispatchUI({ type: UI.SET_MEDIA_FILES, value: typeof v === 'function' ? v(uiState.mediaFiles) : v }),
+    showMedia: uiState.showMedia,
+    setShowMedia: (v) => dispatchUI({ type: UI.SET_SHOW_MEDIA, value: v }),
+    loading: msgState.loading,
+    loadingOlder: msgState.loadingOlder,
+    hasMore: msgState.hasMore,
+    currentPage: msgState.currentPage,
+    uploadProgress: uiState.uploadProgress,
+    loadedMedia: uiState.loadedMedia,
+    setLoadedMedia: (v) => dispatchUI({ type: UI.SET_LOADED_MEDIA, key: v }),
+    replyToMessage: uiState.replyToMessage,
+    setReplyToMessage: (v) => dispatchUI({ type: UI.SET_REPLY, value: v }),
+    forwardMessage: uiState.forwardMessage,
+    forwardAnchorEl: uiState.forwardAnchorEl,
+    setForwardAnchorEl: (v) => dispatchUI({ type: UI.SET_FORWARD_ANCHOR, value: v }),
+    blinkMessageId: uiState.blinkMessageId,
+    setBlinkMessageId: (v) => dispatchUI({ type: UI.SET_BLINK, value: v }),
+    mediaViewerOpen: uiState.mediaViewerOpen,
+    setMediaViewerOpen: (v) => dispatchUI({ type: UI.SET_VIEWER, open: v }),
+    mediaViewerItems: uiState.mediaViewerItems,
+    mediaViewerIndex: uiState.mediaViewerIndex,
     setMediaViewerIndex: (v) => dispatchUI({ type: UI.SET_VIEWER, index: v }),
-    mediaViewerMessage:  uiState.mediaViewerMessage,
-    searchResults:       uiState.searchResults,
-    isSearching:         uiState.isSearching,
+    mediaViewerMessage: uiState.mediaViewerMessage,
+    searchResults: uiState.searchResults,
+    isSearching: uiState.isSearching,
     groupMessagesByDate,
-    messId:              msgState.messId,
-    groupMembers:        groupMembersRef.current,
+    messId: msgState.messId,
+    groupMembers: groupMembersRef.current,
 
     // Functions
     loadConversation,

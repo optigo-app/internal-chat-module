@@ -2,6 +2,7 @@ import React from 'react';
 import { SHA1 } from "crypto-js";
 import Hex from "crypto-js/enc-hex";
 import imageCompression from 'browser-image-compression';
+import JSZip from 'jszip';
 
 const hashString = (value) => {
     const str = String(value ?? '');
@@ -197,27 +198,83 @@ export function passwordToSha1(password) {
     return SHA1(password.toString()).toString(Hex);
 }
 
-export const handleDownloadFile = async (fileUrl, filename = null, options = {}) => {
+export const handleDownloadFile = async (fileUrlOrMessage, filename = null, options = {}) => {
+    // 0️⃣ Support for Message Object or Bulk Download
+    if (typeof fileUrlOrMessage === 'object' && fileUrlOrMessage !== null && !options?.isRecursive) {
+        const msg = fileUrlOrMessage;
+        const mediaItems = Array.isArray(msg?.mediaItems) ? msg.mediaItems : [];
+
+        // CASE A: Single file within a message or legacy object
+        if (mediaItems.length === 1 || (!mediaItems.length && (msg.FileUrl || msg.src || msg.FileUrlOrMessage))) {
+            const url = mediaItems[0]?.url || msg.FileUrl || msg.src || msg.FileUrlOrMessage;
+            const name = mediaItems[0]?.filename || msg.FileName || msg.name || filename;
+            return handleDownloadFile(url, name, { ...options, isRecursive: true });
+        }
+
+        // CASE B: Multiple files -> Create ZIP
+        if (mediaItems.length > 1) {
+            try {
+                const zip = new JSZip();
+                const timestamp = new Date().getTime();
+                const zipFileName = `attachments_${timestamp}.zip`;
+
+                const fetchPromises = mediaItems.map(async (item, idx) => {
+                    try {
+                        const url = item.url;
+                        if (!url) return;
+
+                        const name = item.filename || `file_${idx + 1}${getFileExt(url) ? '.' + getFileExt(url) : ''}`;
+                        const response = await fetch(url);
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        const blob = await response.blob();
+                        zip.file(name, blob);
+                    } catch (err) {
+                        console.error(`Failed to add item ${idx} to ZIP:`, err);
+                    }
+                });
+
+                await Promise.all(fetchPromises);
+                const content = await zip.generateAsync({ type: "blob" });
+                const zipUrl = window.URL.createObjectURL(content);
+
+                const link = document.createElement('a');
+                link.href = zipUrl;
+                link.download = zipFileName;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(zipUrl);
+
+                return { success: true, filename: zipFileName };
+            } catch (error) {
+                console.error('Bulk download ZIP creation failed:', error);
+                return { success: false, error: error.message };
+            }
+        }
+    }
+
+    // 1️⃣ Original Single File Logic
+    const fileUrl = typeof fileUrlOrMessage === 'string' ? fileUrlOrMessage : (fileUrlOrMessage?.FileUrl || fileUrlOrMessage?.src);
+    if (!fileUrl) return { success: false, error: "No URL provided" };
+
     try {
-        // 1️⃣ Generate filename if not provided
+        // Generate filename if not provided
         if (!filename) {
             const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-            // Try to infer extension from URL
-            const extMatch = fileUrl.match(/\.[a-zA-Z0-9]+$/);
+            const extMatch = String(fileUrl).match(/\.[a-zA-Z0-9]+$/);
             const ext = extMatch ? extMatch[0] : '';
             filename = `file-${timestamp}${ext}`;
         }
 
-        // 2️⃣ Ensure filename has extension (if possible)
+        // Ensure filename has extension
         if (!filename.includes('.')) {
-            const extMatch = fileUrl.match(/\.[a-zA-Z0-9]+$/);
+            const extMatch = String(fileUrl).match(/\.[a-zA-Z0-9]+$/);
             filename += extMatch ? extMatch[0] : '';
         }
 
-        // 3️⃣ Resolve full URL if needed (optional helper)
-        const fullFileUrl = fileUrl.startsWith('http') ? fileUrl : fileUrl;
+        const fullFileUrl = String(fileUrl).startsWith('http') ? fileUrl : fileUrl;
 
-        // 4️⃣ Fetch file as blob
         const response = await fetch(fullFileUrl, {
             method: 'GET',
             headers: {
@@ -233,7 +290,6 @@ export const handleDownloadFile = async (fileUrl, filename = null, options = {})
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
 
-        // 5️⃣ Create temporary link to trigger download
         const link = document.createElement('a');
         link.href = url;
         link.download = filename;
@@ -241,7 +297,6 @@ export const handleDownloadFile = async (fileUrl, filename = null, options = {})
         document.body.appendChild(link);
         link.click();
 
-        // 6️⃣ Cleanup
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
 

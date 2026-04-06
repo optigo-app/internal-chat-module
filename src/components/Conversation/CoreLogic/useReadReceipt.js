@@ -31,7 +31,8 @@ export function useReadReceipt({ auth, selectedCustomerRef, messagesRef, isDrawe
         if (isSocketConnected()) {
           let receiverIdValue = receiverId;
           if (isGroup) {
-            const memberIds = await fetchAndCacheGroupMembers(custConverId);
+            const groupData = await fetchAndCacheGroupMembers(custConverId);
+            const memberIds = (groupData?.members || []).map(m => Number(m.UserId || m.userId || m.id)).filter(Boolean);
             if (memberIds?.length > 0) receiverIdValue = memberIds;
           }
 

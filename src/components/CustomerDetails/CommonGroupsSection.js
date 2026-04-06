@@ -11,13 +11,12 @@ const CommonGroupsSection = ({ customer, auth, open }) => {
     const [showAll, setShowAll] = useState(false);
 
     useEffect(() => {
-        debugger
         const fetchCommonGroups = async () => {
             if (!open || !customer?.ConversationId) return;
             setLoading(true);
             try {
                 const response = await CommonGroupListApi(auth, {
-                    userId: (customer.ReceiverId || customer.UserId) ?? '',
+                    userId: (customer.ReceiverId || customer.id) ?? '',
                     conversationId: customer.ConversationId ?? ''
                 });
 

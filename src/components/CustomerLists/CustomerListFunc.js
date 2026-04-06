@@ -10,7 +10,8 @@ export const getMessagePreview = (msg) => {
       : type === 'video' ? 'Video'
         : type === 'document' ? 'Document'
           : type === 'file' ? 'File'
-            : 'New message';
+            : msg?.SystemMsg === 1 ? (msg?.Message || '')
+              : 'New message';
 
   const showIcon = type === 'image' || type === 'video' || type === 'document' || type === 'file';
   const Icon = type === 'image' ? Image
@@ -65,6 +66,7 @@ export const processApiResponse = (apiData) => {
         DateTime: conversation.LastMessageDate || conversation.LastUpdatedDate,
         Status: conversation.LastMessageStatus,
         Direction: conversation.LastMessageDirection,
+        SystemMsg: conversation.LastMessageSystemMsg ?? conversation.SystemMsg,
       }
       : null;
 

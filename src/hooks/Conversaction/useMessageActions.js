@@ -26,7 +26,7 @@ export const useMessageActions = ({ selectedCustomer, auth, refresh, updateFavor
     const handleToggleFavorite = useCallback(async () => {
         const newIsStar = isFavorite ? 0 : 1;
         updateFavoriteStatus(selectedCustomer?.ConversationId, newIsStar);
-        
+
         try {
             const response = await updateConversationApi(auth, {
                 page: 1,
@@ -36,7 +36,7 @@ export const useMessageActions = ({ selectedCustomer, auth, refresh, updateFavor
                 isStar: newIsStar,
                 isArchived: selectedCustomer?.IsArchived || 0,
             });
-            
+
             if (response?.Status === "200" || response?.success === true) {
                 toast.success(newIsStar ? "Added to favorites" : "Removed from favorites");
                 if (selectedCustomer) {
@@ -54,6 +54,10 @@ export const useMessageActions = ({ selectedCustomer, auth, refresh, updateFavor
     }, [selectedCustomer, auth, isFavorite, updateFavoriteStatus, refresh]);
 
     const handleMemberRedirect = useCallback((member) => {
+        toast("Member Message Comming Soon...", {
+            icon: "⏳",
+        });
+        return;
         if (member) {
             if (member.ConversationId) {
                 window.dispatchEvent(new CustomEvent('SELECT_CONVERSATION', {

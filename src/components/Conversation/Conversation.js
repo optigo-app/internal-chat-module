@@ -41,7 +41,7 @@ import {
 const Conversation = ({ selectedCustomer, onConversationRead, onViewConversationRead, onCustomerSelect }) => {
     const isOnline = useOnlineStatus();
     const { auth } = useContext(LoginContext);
-    
+
     const [contextMenu, setContextMenu] = useState(null);
     const containerRef = useRef(null);
     const mediaPreviewScrollStateRef = useRef(null);
@@ -486,7 +486,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
             toast('Mute notifications — coming soon!');
         } else if (action === 'favourite') {
             await handleToggleFavorite();
-        } else if (action === 'selectMessage') {
+        } else if (action === 'selectMessages') {
             toast('Select message — coming soon!');
         } else if (action === 'clearChat') {
             openConfirmModal('clearChat');
@@ -577,6 +577,10 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                     initialIndex={mediaViewerIndex}
                     selectedCustomer={selectedCustomer}
                     message={mediaViewerMessage}
+                    messages={messages}
+                    auth={auth}
+                    handleMessageEmojiClick={handleMessageEmojiClick}
+                    handleRemoveReaction={handleRemoveReaction}
                     onClose={() => setMediaViewerOpen(false)}
                     onReply={(attachmentId) => {
                         handleReply(mediaViewerMessage, attachmentId);

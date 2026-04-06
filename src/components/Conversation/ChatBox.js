@@ -87,7 +87,8 @@ const ChatBox = ({
         let receiverIdValue;
         if (isGroup) {
             try {
-                const memberIds = await fetchAndCacheGroupMembers(selectedCustomer.ConversationId);
+                const groupData = await fetchAndCacheGroupMembers(selectedCustomer.ConversationId);
+                const memberIds = (groupData?.members || []).map(m => Number(m.UserId || m.userId || m.id)).filter(Boolean);
                 receiverIdValue = memberIds.length > 0 ? memberIds : [];
             } catch (error) {
                 console.error('Error fetching group members for typing status:', error);

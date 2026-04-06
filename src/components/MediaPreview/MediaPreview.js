@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { X, Trash2 } from 'lucide-react';
+import { X, Trash2, Plus } from 'lucide-react';
 import './MediaPreview.scss';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, FreeMode, Thumbs } from 'swiper/modules';
+import { validateMediaFiles } from '../../utils/globalFunc';
+import { showToast } from '../../utils/toastHelper';
 
 // Swiper styles
 import 'swiper/css';
@@ -225,14 +227,34 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
             }
             return filtered;
         });
-        if (typeof setMediaFiles === 'function') {
-            setMediaFiles((prev) => {
-                const filtered = (prev || []).filter((file) => `${file.name}-${file.size}-${file.lastModified}` !== id);
-                return filtered;
-            });
-        }
     };
 
+    const handleAddMore = useCallback(() => {
+        if (fileInputRef.current) {
+            fileInputRef.current.click();
+        }
+    }, []);
+
+    const handleFileSelect = useCallback((e) => {
+        const selectedFiles = Array.from(e.target.files || []);
+        if (selectedFiles.length === 0) return;
+
+        // Current files list - extract raw File objects
+        const existingFiles = (mediaFiles || []).map(m => m?.file || m).filter(f => f instanceof File);
+        const combinedFiles = [...existingFiles, ...selectedFiles];
+
+        const { acceptedFiles, skippedSize, skippedTotal, skippedCount } = validateMediaFiles(combinedFiles);
+
+        if (skippedCount > 0) showToast(`Only 30 files allowed. ${skippedCount} items removed.`, 'error', { id: 'too-many-files' });
+        if (skippedSize.length > 0) showToast(`Files too large: ${skippedSize.slice(0, 2).join(', ')}`, 'error', { id: 'file-too-large' });
+        if (skippedTotal.length > 0) showToast('Total selection exceeds 100MB.', 'error', { id: 'total-too-large' });
+
+        if (typeof setMediaFiles === 'function') {
+            setMediaFiles(acceptedFiles);
+        }
+        // Clear input to allow re-selection
+        e.target.value = '';
+    }, [mediaFiles, setMediaFiles]);
 
     return (
         <div className="media-preview-container">
@@ -417,7 +439,22 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                             </SwiperSlide>
                                         );
                                     })}
+
+                                    {/* Add More Slide */}
+                                    <SwiperSlide style={{ width: 'auto' }}>
+                                        <div className="add-more-thumbnail" onClick={handleAddMore} title="Add more files">
+                                            <Plus size={24} color="#667781" />
+                                        </div>
+                                    </SwiperSlide>
                                 </Swiper>
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileSelect}
+                                    multiple
+                                    style={{ display: 'none' }}
+                                    accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                                />
                             </div>
                         )}
                     </div>

@@ -231,6 +231,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 ...incoming,
                 Message: incoming?.Message ?? existingChat?.LastMessage ?? '',
                 MessageType: normalizedType,
+                SystemMsg: incoming?.SystemMsg ?? incoming?.LastMessageSystemMsg ?? existingChat?.SystemMsg
             };
             const messagePreview = getMessagePreview(previewMsg);
             const messagePreviewText = messagePreview?.text ?? '';
@@ -338,6 +339,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     LastMessageStatus: incoming?.MessageStatus ?? incoming?.Status ?? incoming?.status ?? currentChat.LastMessageStatus,
                     LastMessageDirection: normalizedDirection,
                     LastMessageId: incomingId || currentChat.LastMessageId,
+                    SystemMsg: incoming?.SystemMsg ?? incoming?.LastMessageSystemMsg ?? currentChat.SystemMsg,
                 };
 
                 updatedData[index] = updatedChat;
@@ -949,6 +951,16 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         } else if (action === "UnArchive") {
             isArchived = 0;
         }
+
+        const actionMessages = {
+            Pin: "Conversation pinned 📌",
+            UnPin: "Conversation unpinned",
+            Star: "Conversation added to favorites ⭐",
+            UnStar: "Conversation removed from favorites",
+            Archive: "Conversation archived 🗂️",
+            UnArchive: "Conversation unarchived"
+        };
+
         try {
             const response = await updateConversationApi(auth, {
                 page: 1,
@@ -959,7 +971,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 isArchived,
             });
             if (response?.Status === "200" || response?.success === true) {
-                toast.success("Conversation updated");
+                toast.success(actionMessages[action] || "Conversation updated");
 
                 // Silent push: Update local state directly
                 setChatMembers(prev => {

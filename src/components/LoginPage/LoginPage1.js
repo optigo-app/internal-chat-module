@@ -168,7 +168,6 @@ const LoginPage1 = () => {
             socket.on("connect_error", (err) => {
                 console.error("❌ Socket connect error:", err.message);
                 setFormError("Socket connection failed");
-                toast.error("Socket connection failed");
                 setIsLoading(false);
             });
 

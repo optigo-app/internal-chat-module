@@ -14,9 +14,10 @@ import {
   Info,
   User,
   Edit2,
+  Download,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { isMessageEditable } from "../../utils/globalFunc";
+import { handleDownloadFile, isMessageEditable } from "../../utils/globalFunc";
 
 const MessageContextMenu = ({
   open,
@@ -67,11 +68,17 @@ const MessageContextMenu = ({
       icon: <User size={18} />,
       action: () => onMemberRedirect?.(message),
     },
-
+    isText &&
     {
       label: "Copy",
       icon: <Copy size={17} />,
       action: handleCopy,
+    },
+    !isText &&
+    {
+      label: message?.AttachmentCount > 1 ? "Download All" : "Download",
+      icon: <Download size={17} />,
+      action: () => handleDownloadFile(message),
     },
 
     {

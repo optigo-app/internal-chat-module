@@ -24,7 +24,7 @@ import { useFavorite } from '../../contexts/FavoriteContext';
 import { useRemoveInGroup } from '../../contexts/RemoveInGroupContext';
 import { useGroupAdminMode } from '../../contexts/GroupAdminModeContext';
 import AddMemberDialog from '../ReusableComponent/AddMemberDialog';
-import MediaModal from '../MediaViewer/MdiaVew';
+import MediaModal from '../MediaViewer/MediaVew';
 
 const CustomerDetails = ({
     customer,
@@ -87,6 +87,7 @@ const CustomerDetails = ({
     const [isPastParticipantsOpen, setIsPastParticipantsOpen] = useState(false);
 
     const [mediaOpen, setMediaOpen] = useState(false);
+    const [initialMediaIndex, setInitialMediaIndex] = useState(0);
 
     // Confirmation Modal state for Role Change / Member Removal
     const [confirmationModal, setConfirmationModal] = useState({
@@ -354,10 +355,9 @@ const CustomerDetails = ({
 
     const loadContactInfo = async () => {
         try {
-            const contactUserId = customer?.id;
+            const contactUserId = customer?.ReceiverId || customer?.id;
             const response = await contactInfoApi(auth, {
                 contactUserId,
-                conversationId: customer?.ConversationId
             });
             if (response?.Status === "200" || response?.success) {
                 const contactData = response?.Data?.rd?.[0] || response?.Data || null;
@@ -782,7 +782,20 @@ const CustomerDetails = ({
     };
 
     const handleMediaClick = (media) => {
-        if (media.type?.startsWith('image/') || media.type?.startsWith('video/')) {
+        const isImage = media.type?.startsWith('image/') || media.MimeType?.startsWith('image/');
+        const isVideo = media.type?.startsWith('video/') || media.MimeType?.startsWith('video/');
+
+        if (isImage || isVideo) {
+            const allMedia = [
+                ...(mediaItems.images || []),
+                ...(mediaItems.videos || []),
+                ...(mediaItems.documents || [])
+            ];
+            const index = allMedia.findIndex(item =>
+                (item.Id && item.Id === media.Id) ||
+                (item.FileUrl && item.FileUrl === media.FileUrl)
+            );
+            setInitialMediaIndex(index >= 0 ? index : 0);
             setMediaOpen(true);
         } else {
             handleDownload(media.src || media.FileUrl, media.name || media.FileName || `document_${media.Id}`);
@@ -1094,6 +1107,7 @@ const CustomerDetails = ({
                     open={mediaOpen}
                     handleClose={() => setMediaOpen(false)}
                     mediaItems={mediaItems}
+                    initialIndex={initialMediaIndex}
                 />
             </div>
         </>

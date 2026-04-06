@@ -121,7 +121,6 @@ export const useGroupSocketListeners = ({
                 if (Number(data.conversationId) !== Number(conversationId)) return;
 
                 notify(data, 'PERMISSION_CHANGED', auth);
-                toast('Group permissions updated');
 
                 if (data.changedPermission && data.changedPermission.name === 'SendNewMessage') {
                     updateGroupAdminMode(conversationId, data.changedPermission.value === 0);

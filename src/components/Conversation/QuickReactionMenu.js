@@ -10,11 +10,13 @@ const QuickReactionMenu = ({
     onOpen,
     onClose,
     onSelectEmoji,
+    hideTrigger = false,
+    disablePortal = false,
 }) => {
     const theme = useTheme();
     const [menuOrigins, setMenuOrigins] = useState({
-        anchorOrigin: { vertical: 'top', horizontal: 'center' },
-        transformOrigin: { vertical: 'bottom', horizontal: 'center' },
+        anchorOrigin: { vertical: 'bottom', horizontal: 'center' },
+        transformOrigin: { vertical: 'top', horizontal: 'center' },
     });
 
 
@@ -28,31 +30,34 @@ const QuickReactionMenu = ({
     return (
         <>
             {/* Trigger Button */}
-            <IconButton
-                size="small"
-                onClick={onOpen}
-                aria-controls={open ? 'account-menu' : undefined}
-                aria-haspopup="true"
-                aria-expanded={open ? 'true' : undefined}
-                sx={{
-                    width: 28,
-                    height: 28,
-                    color: theme.palette.text.secondary,
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                        backgroundColor: alpha(theme.palette.primary.main, 0.12),
-                        color: theme.palette.primary.main,
-                    },
-                }}
-            >
-                <SmilePlus size={16} />
-            </IconButton>
+            {!hideTrigger && (
+                <IconButton
+                    size="small"
+                    onClick={onOpen}
+                    aria-controls={open ? 'account-menu' : undefined}
+                    aria-haspopup="true"
+                    aria-expanded={open ? 'true' : undefined}
+                    sx={{
+                        width: 28,
+                        height: 28,
+                        color: theme.palette.text.secondary,
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                            backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                            color: theme.palette.primary.main,
+                        },
+                    }}
+                >
+                    <SmilePlus size={16} />
+                </IconButton>
+            )}
 
             {/* Reaction Menu */}
             <Menu
                 anchorEl={anchorEl}
                 open={open}
                 onClose={onClose}
+                disablePortal={disablePortal}
                 anchorOrigin={menuOrigins.anchorOrigin}
                 transformOrigin={menuOrigins.transformOrigin}
                 PaperProps={{
@@ -64,6 +69,7 @@ const QuickReactionMenu = ({
                         m: 0,
                         overflow: 'hidden',
                         border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+                        zIndex: 11000,
                     },
                 }}
                 MenuListProps={{ sx: { p: 0 } }}
