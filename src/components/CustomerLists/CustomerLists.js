@@ -25,7 +25,8 @@ import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import './CustomerLists.scss';
 import { fetchConversationLists } from '../../API/ConverLists/ConversationLists';
 import { formatChatTimestamp } from '../../utils/DateFnc';
-import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig, hasCustomerName, highlightText } from '../../utils/globalFunc';
+import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig, hasCustomerName, highlightText, renderTextWithLinks } from '../../utils/globalFunc';
+import { renderEmojiText } from '../../utils/EmojiRenderer';
 import WhatsAppMenu from '../ReusableComponent/WhatsAppMenu';
 import { getMessagePreview, processApiResponse, getCustomerListMenuItems } from './CustomerListFunc';
 import { updateConversationApi } from '../../API/SendMessage/updateConversationApi';
@@ -1354,7 +1355,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
 
                                                                         {/* TEXT MESSAGE */}
                                                                         {member.LastMessageType === 1 && (
-                                                                            member.LastMessage || 'Text'
+                                                                            renderEmojiText(member.LastMessage || 'Text', { size: 16 })
                                                                         )}
 
                                                                         {/* IMAGE */}

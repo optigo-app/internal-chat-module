@@ -165,11 +165,16 @@ const MessageArea = ({
     }, [groupMessagesByDate, typingStatus]);
 
     // Rebuild index map on every rows change
+    const prevRowsLengthRef = useRef(0);
     useEffect(() => {
+        const prevLen = prevRowsLengthRef.current;
+        prevRowsLengthRef.current = rows.length;
         const map = {};
         rows.forEach((row, i) => { map[i] = getRowStableKey(row); });
         indexToStableKey.current = map;
-        listRef.current?.resetAfterIndex(0, false);
+        // Only reset from the first changed index instead of resetting everything
+        const resetFrom = rows.length !== prevLen ? Math.max(0, Math.min(prevLen, rows.length) - 1) : 0;
+        listRef.current?.resetAfterIndex(resetFrom, false);
     }, [rows]);
 
     // ── Height helpers ────────────────────────────────────────────────────
@@ -184,9 +189,13 @@ const MessageArea = ({
         if (row.type === 'typing') return TYPING_ROW_HEIGHT;
         if (row.type === 'spacer-top' || row.type === 'spacer-bottom') return 8;
         if (row.type === 'message') {
-            const hasMedia = ['image', 'video', 'document'].includes(row.msg?.MessageType);
-            if (hasMedia) return 320;
-            return selectedCustomer?.IsGroup === 1 && row.msg?.Direction === 0 ? 85 : 68;
+            const mt = row.msg?.MessageType;
+            if (mt === 'image' || mt === 'video') return 300;
+            if (mt === 'document' || mt === 'audio') return 120;
+            const msgLen = (row.msg?.Message || '').length;
+            const isGroup = selectedCustomer?.IsGroup === 1 && row.msg?.Direction === 0;
+            const base = isGroup ? 95 : 72;
+            return msgLen > 100 ? base + Math.floor(msgLen / 60) * 20 : base;
         }
         return 80;
     }, [rows, selectedCustomer?.IsGroup]);
@@ -261,11 +270,15 @@ const MessageArea = ({
             listRef.current?.scrollToItem(rows.length - 1, 'end');
             requestAnimationFrame(() => {
                 const outer = outerRef.current;
-                if (outer) outer.scrollTop = outer.scrollHeight; // exact bottom
-                distanceFromBottomRef.current = 0; // we're at the bottom
-                setListVisible(true); // fade in
+                if (outer) outer.scrollTop = outer.scrollHeight;
+                distanceFromBottomRef.current = 0;
+                // Extra frame to catch any late-measuring rows (images etc.)
+                requestAnimationFrame(() => {
+                    if (outer) outer.scrollTop = outer.scrollHeight;
+                    setListVisible(true);
+                });
             });
-        }, 150);
+        }, 250);
     }, [rows.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── Auto-scroll on new incoming/outgoing message ──────────────────────
@@ -479,7 +492,7 @@ const MessageArea = ({
                     backgroundSize: 'auto, contain',
                     backgroundPosition: 'center, center',
                     backgroundRepeat: 'repeat, repeat',
-                    backgroundAttachment: 'scroll, fixed',
+                    backgroundAttachment: 'scroll, scroll',
                 }}
             >
                 {listHeight > 0 && (
@@ -491,7 +504,7 @@ const MessageArea = ({
                         itemSize={getSize}
                         itemData={itemData}
                         width="100%"
-                        overscanCount={12}
+                        overscanCount={8}
                         onScroll={onListScroll}
                         style={{ willChange: 'transform', outline: 'none' }}
                     >

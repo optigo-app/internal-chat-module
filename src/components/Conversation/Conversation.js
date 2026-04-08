@@ -9,6 +9,7 @@ import MessageContextMenu from '../MessageBubble/MessageContextMenu';
 import ForwardMessage from '../ForwardMessage/ForwardMessage';
 import MediaViewer from '../MediaViewer/MediaViewer';
 import { getCustomerDisplayName } from '../../utils/globalFunc';
+import { renderEmojiText } from '../../utils/EmojiRenderer';
 import ChatBox from './ChatBox';
 import MessageArea from './MessageArea';
 import ViewContext from './ViewContext';
@@ -534,6 +535,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
 
     const handleSendMessageCallback = useCallback((messageOverride) => {
         handleSendMessage(containerRef, scrollToBottom, messageOverride);
+        setShowPicker(false);
     }, [handleSendMessage, scrollToBottom]);
 
     if (!isOnline) {
@@ -607,7 +609,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                 </div>
                                 <div className="customer-info">
                                     <Typography variant="subtitle1" className="customer-name" onClick={handleOpenInfo} style={{ cursor: 'pointer' }}>
-                                        {getCustomerDisplayName(selectedCustomer)}
+                                        {renderEmojiText(getCustomerDisplayName(selectedCustomer))}
                                     </Typography>
                                     {typingStatus ? (
                                         <Typography variant="body2" className="typing-indicator">
@@ -617,7 +619,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                         selectedCustomer?.IsGroup === 1 ? (
                                             selectedCustomer?.GroupDesc ? (
                                                 <Typography variant="body2" className="customer-email">
-                                                    {selectedCustomer.GroupDesc}
+                                                    {renderEmojiText(selectedCustomer.GroupDesc)}
                                                 </Typography>
                                             ) : null
                                         ) : (

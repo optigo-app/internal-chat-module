@@ -65,7 +65,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
   // ── Sub-hooks ──────────────────────────────────────────────────────────────
   const { loadConversation, loadOlderMessages, abortControllerRef } = useMessageLoader({
-    selectedCustomer, auth, pageSize: 100, msgState, dispatchMsg, normalizeServerMessages,
+    selectedCustomer, auth, pageSize: 1000, msgState, dispatchMsg, normalizeServerMessages, msgDataRef: messagesRef,
   });
 
   const { handleReadMessage } = useReadReceipt({

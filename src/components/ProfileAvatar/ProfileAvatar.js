@@ -81,6 +81,7 @@ const ProfileAvatar = () => {
             <IconButton onClick={handleClick} className="profile-avatar" size="large">
                 <Avatar
                     alt={username || "User"}
+                    src={auth?.ProfileImageUrl || undefined}
                     sx={avatarConfig.sx}
                 >
                     {avatarConfig.children}

@@ -6,7 +6,8 @@ import {
   Stack,
   Typography,
   Fade,
-  Chip
+  Chip,
+  Button
 } from "@mui/material";
 
 import {
@@ -85,9 +86,12 @@ const NavBtn = ({ dir, className }) => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
+        boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
+        border: "1px solid rgba(0,0,0,0.05)",
+        transition: "all .2s",
         "&:hover": {
-          bgcolor: "#f5f5f5"
+          bgcolor: "#fff",
+          transform: "translateY(-50%) scale(1.05)"
         }
       }}
     >
@@ -97,10 +101,8 @@ const NavBtn = ({ dir, className }) => {
 };
 
 /* ─── Thumbnail Strip ───────────────── */
-
 const ThumbnailStrip = ({ items, activeIdx, onSelect }) => {
   const [swiper, setSwiper] = useState(null);
-
   useEffect(() => {
     if (swiper && !swiper.destroyed) {
       swiper.slideTo(activeIdx);
@@ -111,8 +113,8 @@ const ThumbnailStrip = ({ items, activeIdx, onSelect }) => {
     <Box
       sx={{
         height: T.thumbH,
-        borderTop: `1px solid ${T.border}`,
-        bgcolor: "#f1f3f7",
+        bgcolor: "#f6f7fb",
+        boxShadow: "inset 0 1px 0 rgba(0,0,0,0.03)",
         px: 2,
         display: "flex",
         alignItems: "center"
@@ -125,31 +127,39 @@ const ThumbnailStrip = ({ items, activeIdx, onSelect }) => {
         initialSlide={activeIdx}
         slideToClickedSlide={true}
         watchSlidesProgress={true}
+        centeredSlides={true}
       >
         {items.map((item, idx) => {
           const type = getType(item);
           const active = idx === activeIdx;
 
           return (
-            <SwiperSlide key={idx} style={{ width: 60 }}>
+            <SwiperSlide key={idx} style={{ width: 64 }}>
               <Box
                 onClick={() => onSelect(idx)}
                 sx={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: "8px",
+                  width: 60,
+                  height: 60,
+                  margin: "2px 0px",
+                  borderRadius: "10px",
                   overflow: "hidden",
                   border: active
                     ? `2px solid ${T.accent}`
-                    : "2px solid transparent",
+                    : "1px solid rgba(0,0,0,0.08)",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  bgcolor: "#fff"
+                  bgcolor: "#fff",
+                  position: "relative",
+                  transition: "all .2s ease",
+                  "&:hover": {
+                    transform: "scale(1.05)"
+                  }
                 }}
               >
-                {type === "image" ? (
+                {/* IMAGE */}
+                {type === "image" && (
                   <img
                     src={item.src || item.FileUrl}
                     style={{
@@ -159,8 +169,60 @@ const ThumbnailStrip = ({ items, activeIdx, onSelect }) => {
                     }}
                     alt=""
                   />
-                ) : (
-                  <TypeIcon type={type} size={22} />
+                )}
+
+                {/* VIDEO */}
+                {type === "video" && (
+                  <>
+                    <video
+                      src={(item.src || item.FileUrl) + "#t=0.5"}
+                      muted
+                      preload="metadata"
+                      playsInline
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        pointerEvents: "none"
+                      }}
+                    />
+
+                    {/* Play overlay */}
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        bgcolor: "rgba(0,0,0,0.25)"
+                      }}
+                    >
+                      <Video size={16} color="#fff" />
+                    </Box>
+                  </>
+                )}
+
+                {/* DOCUMENT */}
+                {type === "document" && (
+                  <>
+                    <TypeIcon type={type} size={20} />
+
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        bottom: 2,
+                        right: 2,
+                        bgcolor: "rgba(0,0,0,0.6)",
+                        color: "#fff",
+                        fontSize: 9,
+                        px: 0.5,
+                        borderRadius: "3px"
+                      }}
+                    >
+                      DOC
+                    </Box>
+                  </>
                 )}
               </Box>
             </SwiperSlide>
@@ -172,7 +234,6 @@ const ThumbnailStrip = ({ items, activeIdx, onSelect }) => {
 };
 
 /* ─── Toolbar ───────────────── */
-
 const Toolbar_ = ({
   item,
   totalCount,
@@ -195,18 +256,42 @@ const Toolbar_ = ({
         bgcolor: T.surface,
         px: 3,
         display: "flex",
-        alignItems: "center"
+        alignItems: "center",
+        justifyContent: "space-between"
       }}
     >
-      <Stack direction="row" spacing={1} sx={{ flex: 1 }}>
-        <TypeIcon type={type} size={18} />
-        <Box>
-          <Typography sx={{ fontWeight: 600, fontSize: 13 }}>
+      <Stack direction="row" spacing={2} alignItems="center" sx={{ flex: 1 }}>
+        <Box
+          sx={{
+            width: 34,
+            height: 34,
+            borderRadius: "8px",
+            bgcolor: "#f1f3f7",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+        >
+          <TypeIcon type={type} size={16} />
+        </Box>
+
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            sx={{
+              fontWeight: 600,
+              fontSize: 13,
+              color: T.text,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              maxWidth: 420
+            }}
+          >
             {name}
           </Typography>
 
           <Typography sx={{ fontSize: 11, color: T.muted }}>
-            {activeIdx + 1} / {totalCount}
+            {activeIdx + 1} of {totalCount}
           </Typography>
         </Box>
       </Stack>
@@ -288,10 +373,84 @@ const SlideContent = ({ item, zoom }) => {
     );
 
   return (
-    <Box textAlign="center">
-      <FileText size={40} />
-      <Typography>{item.FileName}</Typography>
-      <Chip label={item.MimeType} />
+    <Box
+      sx={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        width: "100%",
+        height: "70vh"
+      }}
+    >
+      <Box
+        sx={{
+          width: 340,
+          p: 4,
+          borderRadius: "14px",
+          bgcolor: "#fff",
+          border: `1px solid ${T.border}`,
+          boxShadow: "0 12px 40px rgba(0,0,0,0.12)",
+          textAlign: "center"
+        }}
+      >
+        <Box
+          sx={{
+            width: 70,
+            height: 70,
+            borderRadius: "12px",
+            bgcolor: "#f1f3f7",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto",
+            mb: 2
+          }}
+        >
+          <FileText size={34} />
+        </Box>
+
+        <Typography
+          sx={{
+            fontWeight: 600,
+            fontSize: 14,
+            mb: 1,
+            wordBreak: "break-word"
+          }}
+        >
+          {item.FileName || "Document"}
+        </Typography>
+
+        <Typography
+          sx={{
+            fontSize: 12,
+            color: T.muted,
+            mb: 3
+          }}
+        >
+          {item.MimeType || "File"}
+        </Typography>
+
+        <Stack direction="row" spacing={2} justifyContent="center">
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<FileText size={16} />}
+            onClick={() => window.open(item.FileUrl, "_blank")}
+            className="secondaryBtnClassname"
+          >
+            Open
+          </Button>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<Download size={16} />}
+            onClick={() => handleDownloadFile(item.FileUrl, item.FileName)}
+            className="primaryBtnClassname"
+          >
+            Download
+          </Button>
+        </Stack>
+      </Box>
     </Box>
   );
 };
@@ -372,7 +531,6 @@ const MediaModal = ({ open, handleClose, mediaItems, initialIndex = 0 }) => {
           <Box
             sx={{
               flex: 1,
-              pt: 4,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",

@@ -3,7 +3,7 @@ import { conversationView } from '../../../API/ConversationView/ConversationView
 import { MSG } from './conversationReducer';
 import { mergeMessages, getMessageId } from './messageHelpers';
 
-export function useMessageLoader({ selectedCustomer, auth, pageSize, msgState, dispatchMsg, normalizeServerMessages }) {
+export function useMessageLoader({ selectedCustomer, auth, pageSize, msgState, dispatchMsg, normalizeServerMessages, msgDataRef }) {
   const latestRequestRef = useRef(0);
   const abortControllerRef = useRef(null);
   const loadingRef = useRef(false);
@@ -30,7 +30,7 @@ export function useMessageLoader({ selectedCustomer, auth, pageSize, msgState, d
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
             dispatchMsg({ type: MSG.LOAD, data: parsed, total: parsed.length });
-            dispatchMsg({ type: MSG.SET_HAS_MORE, value: true });
+            dispatchMsg({ type: MSG.SET_HAS_MORE, value: false });
             didShowCache = true;
             const unread = Number(selectedCustomer?.unreadCount ?? selectedCustomer?.UnreadCount ?? 0);
             if (unread === 0) return;
@@ -53,7 +53,7 @@ export function useMessageLoader({ selectedCustomer, auth, pageSize, msgState, d
 
       const merged = mergeMessages(serverMessages, msgState.data, selectedId);
       dispatchMsg({ type: MSG.LOAD, data: merged, total: response.total });
-      dispatchMsg({ type: MSG.SET_HAS_MORE, value: response.hasMore });
+      dispatchMsg({ type: MSG.SET_HAS_MORE, value: false });
       dispatchMsg({ type: MSG.SET_PAGE, value: page });
     } catch (err) {
       if (err.name !== 'AbortError') console.error('loadConversation error:', err);
@@ -89,8 +89,14 @@ export function useMessageLoader({ selectedCustomer, auth, pageSize, msgState, d
       const raw = Array.isArray(response.data?.rd) ? response.data.rd : (Array.isArray(response.data) ? response.data : []);
       const serverMessages = normalizeServerMessages(raw);
 
+      if (serverMessages.length === 0) {
+        dispatchMsg({ type: MSG.SET_HAS_MORE, value: false });
+        return;
+      }
+
+      const currentData = msgDataRef ? msgDataRef.current : msgState.data;
       const map = new Map();
-      for (const m of msgState.data) { const k = getMessageId(m); if (k) map.set(k, m); }
+      for (const m of currentData) { const k = getMessageId(m); if (k) map.set(k, m); }
       for (const m of serverMessages) { const k = getMessageId(m); if (k && !k.startsWith('temp_')) map.set(k, m); }
 
       const sorted = Array.from(map.values()).sort(
@@ -98,7 +104,7 @@ export function useMessageLoader({ selectedCustomer, auth, pageSize, msgState, d
       );
 
       dispatchMsg({ type: MSG.LOAD, data: sorted, total: response.total });
-      dispatchMsg({ type: MSG.SET_HAS_MORE, value: (serverMessages.length || 0) === pageSize });
+      dispatchMsg({ type: MSG.SET_HAS_MORE, value: serverMessages.length === pageSize });
       dispatchMsg({ type: MSG.SET_PAGE, value: nextPage });
 
       requestAnimationFrame(() => {

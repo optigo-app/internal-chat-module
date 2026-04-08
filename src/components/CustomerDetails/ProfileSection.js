@@ -2,6 +2,7 @@ import { Typography, Avatar, IconButton, Box, TextField, InputAdornment, Badge, 
 import { User, Pencil, X, Check } from 'lucide-react';
 import ProfileAvatarUpload from '../ReusableComponent/ProfileAvatarUpload';
 import { getWhatsAppAvatarConfig, hasCustomerName, isImageDead } from '../../utils/globalFunc';
+import { renderEmojiText } from '../../utils/EmojiRenderer';
 
 const StyledBadge = styled(Badge)(({ theme }) => ({
     '& .MuiBadge-badge': {
@@ -129,7 +130,7 @@ const ProfileSection = ({
                 ) : (
                     <>
                         <Typography className="customer-name">
-                            {customer?.IsGroup === 1 ? localGroupData.name : displayName}
+                            {renderEmojiText(customer?.IsGroup === 1 ? localGroupData.name : displayName)}
                         </Typography>
                         {customer?.IsGroup === 1 && canEditGroup && (
                             <IconButton size="small" className="edit-icon-btn" onClick={startEditingName}>

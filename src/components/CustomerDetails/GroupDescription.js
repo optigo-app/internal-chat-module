@@ -1,6 +1,7 @@
 import { Typography, Box, TextField, InputAdornment, IconButton } from '@mui/material';
 import { Pencil, X, Check } from 'lucide-react';
 import { formatDate, formatTime12h } from '../../utils/DateFnc';
+import { renderEmojiText } from '../../utils/EmojiRenderer';
 
 const GroupDescription = ({
     localGroupData,
@@ -68,7 +69,7 @@ const GroupDescription = ({
                     style={{ cursor: canEditGroup ? 'pointer' : 'default' }}
                     onClick={canEditGroup ? startEditingDesc : undefined}
                 >
-                    {localGroupData.description || ''}
+                    {renderEmojiText(localGroupData.description || '')}
                 </Typography>
             )}
 

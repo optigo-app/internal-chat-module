@@ -201,7 +201,8 @@ const CustomerDetails = ({
             [type]: { ...prev[type], isLoading: true }
         }));
         try {
-            const response = await fetchMediaLists(page, pageSize, customer.ConversationId, auth, customer.id);
+            console.log("customer", customer)
+            const response = await fetchMediaLists(page, pageSize, customer.ConversationId, auth, (customer.id ?? auth?.id));
             if (response?.data) {
                 const categorized = processMediaItems(response.data);
                 setMediaItems(prev => ({

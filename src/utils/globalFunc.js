@@ -4,6 +4,7 @@ import Hex from "crypto-js/enc-hex";
 import imageCompression from 'browser-image-compression';
 import JSZip from 'jszip';
 import { toast } from 'react-hot-toast';
+import { renderEmojiText } from './EmojiRenderer';
 
 // Global cache for images that return 404/error to prevent flickering from stale API data
 const deadImageCache = new Set();
@@ -60,8 +61,11 @@ export const renderTextWithLinks = (rawText, options = {}) => {
             const end = start + matchedUrl.length;
 
             if (start > lastIndex) {
+                const textPart = line.slice(lastIndex, start);
                 nodes.push(
-                    <React.Fragment key={`t-${lineIndex}-${matchIndex}`}>{line.slice(lastIndex, start)}</React.Fragment>
+                    <React.Fragment key={`t-${lineIndex}-${matchIndex}`}>
+                        {renderEmojiText(textPart)}
+                    </React.Fragment>
                 );
             }
 
@@ -93,7 +97,12 @@ export const renderTextWithLinks = (rawText, options = {}) => {
         }
 
         if (lastIndex < line.length) {
-            nodes.push(<React.Fragment key={`e-${lineIndex}`}>{line.slice(lastIndex)}</React.Fragment>);
+            const textPart = line.slice(lastIndex);
+            nodes.push(
+                <React.Fragment key={`e-${lineIndex}`}>
+                    {renderEmojiText(textPart)}
+                </React.Fragment>
+            );
         }
 
         return (
@@ -489,9 +498,9 @@ export const highlightText = (text, query) => {
     return parts.map((part, i) =>
         part.toLowerCase() === query.toLowerCase() ? (
             <span key={i} style={{ color: '#685dd8', fontWeight: 600 }}>
-                {part}
+                {renderEmojiText(part)}
             </span>
-        ) : part
+        ) : renderEmojiText(part)
     );
 };
 

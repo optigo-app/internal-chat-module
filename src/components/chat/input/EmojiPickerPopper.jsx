@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Popper, Paper } from '@mui/material';
+import { Box, Popper, Paper, ClickAwayListener } from '@mui/material';
 import EmojiPicker from 'emoji-picker-react';
 
 const EmojiPickerPopper = ({
@@ -10,6 +10,11 @@ const EmojiPickerPopper = ({
 }) => {
     const [placement, setPlacement] = useState('top-start');
     const [height, setHeight] = useState(400);
+
+    const handleClickAway = (event) => {
+        if (anchorEl && anchorEl.contains(event.target)) return;
+        if (onClose) onClose();
+    };
 
     useEffect(() => {
         if (!open || !anchorEl) return;
@@ -64,30 +69,32 @@ const EmojiPickerPopper = ({
             ]}
             sx={{ zIndex: (theme) => theme.zIndex.modal + 30 }}
         >
-            <Paper
-                elevation={0}
-                sx={{
-                    borderRadius: 3,
-                    overflow: 'hidden',
-                    boxShadow: '0px 15px 45px rgba(0,0,0,0.15)',
-                    maxWidth: 'min(380px, calc(100vw - 24px))',
-                    maxHeight: 'calc(100vh - 24px)',
-                    border: '1px solid rgba(0,0,0,0.06)',
-                }}
-                onClick={(e) => e.stopPropagation()}
-            >
-                <Box sx={{ width: 380, maxWidth: '100%' }}>
-                    <EmojiPicker
-                        onEmojiClick={onEmojiClick}
-                        width="100%"
-                        height={height}
-                        searchDisabled={false}
-                        skinTonesDisabled={true}
-                        previewConfig={{ showPreview: true }}
-                        emojiStyle="apple"
-                    />
-                </Box>
-            </Paper>
+            <ClickAwayListener onClickAway={handleClickAway}>
+                <Paper
+                    elevation={0}
+                    sx={{
+                        borderRadius: 3,
+                        overflow: 'hidden',
+                        boxShadow: '0px 15px 45px rgba(0,0,0,0.15)',
+                        maxWidth: 'min(380px, calc(100vw - 24px))',
+                        maxHeight: 'calc(100vh - 24px)',
+                        border: '1px solid rgba(0,0,0,0.06)',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <Box sx={{ width: 380, maxWidth: '100%' }}>
+                        <EmojiPicker
+                            onEmojiClick={onEmojiClick}
+                            width="100%"
+                            height={height}
+                            searchDisabled={false}
+                            skinTonesDisabled={true}
+                            previewConfig={{ showPreview: true }}
+                            emojiStyle="apple"
+                        />
+                    </Box>
+                </Paper>
+            </ClickAwayListener>
         </Popper>
     );
 };
