@@ -162,9 +162,12 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             }
             console.error('Error loading members:', error);
         } finally {
-            setLoading(false);
+            setTimeout(() => {
+                setLoading(false);
+            }, 100);
         }
     }, [loading, hasMore, auth?.token, auth?.userId, pageSize, processApiResponse, searchTerm, conversationComparator]);
+
 
     useEffect(() => {
         if (isSyncing === false) {
@@ -383,6 +386,12 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                     LastMessageStatus: incoming?.MessageStatus ?? incoming?.Status ?? incoming?.status,
                     LastMessageDirection: normalizedDirection,
                     LastMessageId: incoming?.MessageId ?? incoming?.Id,
+                    // FIX: Ensure IsGroup and and metadata is preserved for new list items
+                    IsGroup: incoming?.IsGroup !== undefined ? incoming.IsGroup : (incoming?.isGroup ? 1 : 0),
+                    GroupMembers: incoming?.GroupMembers || [],
+                    IsStar: incoming?.IsStar ?? 0,
+                    IsPin: incoming?.IsPin ?? 0,
+                    ProfileImageUrl: incoming?.ProfileImageUrl || incoming?.ProfileImage || '',
                     // FIX: For incoming messages, the "Receiver" of the chat item (the person we talk to) 
                     // is the SENDER of the message.
                     ReceiverId: isOutgoing
@@ -418,21 +427,36 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             if (!event.detail) return;
             const detail = event.detail;
 
-            // Handle RemoveInGroup flag update directly — no need to go through handleSocketUpdate
-            if (detail.RemoveInGroup !== undefined && detail.ConversationId) {
+            // Handle silent UI updates for specific conversation items (Profile, Name, Read-only status, etc.)
+            if (detail.ConversationId) {
                 setChatMembers(prev => {
                     if (!prev?.data) return prev;
                     const idx = prev.data.findIndex(m => Number(m.ConversationId) === Number(detail.ConversationId));
                     if (idx === -1) return prev;
+
                     const updated = [...prev.data];
-                    updated[idx] = { ...updated[idx], RemoveInGroup: detail.RemoveInGroup };
+                    const existing = updated[idx];
+
+                    // Smart merge: Only update specific fields if provided in detail
+                    const merged = { ...existing };
+                    if (detail.ProfileImageUrl !== undefined) merged.ProfileImageUrl = detail.ProfileImageUrl;
+                    if (detail.name !== undefined) merged.name = detail.name;
+                    if (detail.ConversationName !== undefined) merged.ConversationName = detail.ConversationName;
+                    if (detail.RemoveInGroup !== undefined) merged.RemoveInGroup = detail.RemoveInGroup;
+                    if (detail.IsStar !== undefined) merged.IsStar = detail.IsStar;
+                    if (detail.IsPin !== undefined) merged.IsPin = detail.IsPin;
+
+                    updated[idx] = merged;
                     return { ...prev, data: updated };
                 });
-                return;
+
+                // If it's just a profile/name change, we don't need to go through handleSocketUpdate (which is for messages)
+                if (!detail.Message && !detail.LastMessage) return;
             }
 
             handleSocketUpdate(detail, Boolean(detail.isStatusChange));
         };
+
         const handleRemoveEvent = (event) => {
             if (event.detail?.conversationId) {
                 handleRemoveItem(event.detail.conversationId);
@@ -613,8 +637,8 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                             if (!normalized.GroupDesc) {
                                 merged.GroupDesc = existing.GroupDesc;
                             }
-                            if (!normalized.ProfileImageUrl) {
-                                merged.ProfileImageUrl = existing.ProfileImageUrl;
+                            if (normalized.ProfileImageUrl !== undefined) {
+                                merged.ProfileImageUrl = normalized.ProfileImageUrl;
                             }
 
                             updatedData[index] = merged;

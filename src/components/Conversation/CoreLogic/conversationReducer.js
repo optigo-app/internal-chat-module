@@ -81,13 +81,44 @@ export function messagesReducer(state, action) {
     }
 
     case MSG.UPDATE_REACTION: {
-      const { messageId, reactions } = action;
+      const { messageId, reactions, senderId } = action;
       return {
         ...state,
         data: state.data.map(msg => {
           const id = msg.MessageId || msg.Id || msg.id;
           if (String(id) !== String(messageId)) return msg;
-          return { ...msg, ReactionEmojis: JSON.stringify(reactions) };
+
+          let current = [];
+          try {
+            current = typeof msg.ReactionEmojis === 'string' ? JSON.parse(msg.ReactionEmojis || '[]') : (msg.ReactionEmojis || []);
+          } catch (e) { current = []; }
+
+          // Ensure current is an array
+          if (!Array.isArray(current)) current = [];
+
+          // If we have incoming reactions, we merge them
+          if (Array.isArray(reactions) && reactions.length > 0) {
+            reactions.forEach(incoming => {
+              const sid = incoming.UserId || senderId;
+              if (!sid) return;
+
+              // Filter out existing reaction for this user
+              current = current.filter(r => String(r.UserId) !== String(sid));
+
+              // Add if it's not a "remove" reaction (empty string or specific "remove" indicator)
+              if (incoming.Reaction && incoming.Reaction !== "") {
+                current.push({
+                  ...incoming,
+                  UserId: sid // Ensure UserId is set
+                });
+              }
+            });
+          } else if (senderId) {
+            // If reactions is empty but senderId is provided, it's a removal for that user
+            current = current.filter(r => String(r.UserId) !== String(senderId));
+          }
+
+          return { ...msg, ReactionEmojis: JSON.stringify(current) };
         }),
       };
     }

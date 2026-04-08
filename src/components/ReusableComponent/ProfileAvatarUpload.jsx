@@ -4,7 +4,7 @@ import { Camera, Upload, Eye, Trash2 } from 'lucide-react';
 import { checkCameraAvailability, capturePhotoFromCamera, openImageFilePicker } from '../../utils/cameraUtils';
 import { uploadMediaAPi } from '../../API/FileUpload/uploadHelpers';
 import { removeFileApi } from '../../API/FileUpload/filesRemoveApi';
-import { getWhatsAppAvatarConfig } from '../../utils/globalFunc';
+import { getWhatsAppAvatarConfig, isImageDead, markImageAsDead } from '../../utils/globalFunc';
 import toast from 'react-hot-toast';
 import ConfirmationDialog from './ConfirmationDialog';
 import WhatsAppMenu from './WhatsAppMenu';
@@ -128,6 +128,7 @@ const ProfileAvatarUpload = ({
 
         try {
             // Remove from storage
+            if (currentImageUrl) markImageAsDead(currentImageUrl);
             await removeExistingImage();
 
             // Clear preview and notify parent
@@ -255,7 +256,7 @@ const ProfileAvatarUpload = ({
         setCameraDialog({ open: false, message: '' });
     };
 
-    const displayImage = previewImage || currentImageUrl;
+    const displayImage = (previewImage || (currentImageUrl && !isImageDead(currentImageUrl))) ? (previewImage || currentImageUrl) : null;
 
     return (
         <>
@@ -269,17 +270,15 @@ const ProfileAvatarUpload = ({
                 }}
             >
                 <Avatar
-                    {...(displayImage ? {} : getWhatsAppAvatarConfig(avatarSeed, size))}
+                    {...getWhatsAppAvatarConfig(avatarSeed, size)}
                     className="profile-avatar"
-                    src={displayImage}
+                    src={displayImage || undefined}
                     sx={{
                         width: size,
                         height: size,
-                        ...(displayImage ? {} : getWhatsAppAvatarConfig(avatarSeed, size).sx)
+                        ...getWhatsAppAvatarConfig(avatarSeed, size).sx
                     }}
-                >
-                    {!displayImage && getWhatsAppAvatarConfig(avatarSeed, size).children}
-                </Avatar>
+                />
 
                 {showOverlay && !disabled && (
                     <div className="avatar-overlay" style={{

@@ -169,6 +169,7 @@ const DetailsViews = ({
                                         setShowAllMembers={setShowAllMembers}
                                         groupPermissions={groupPermissions}
                                         onPastParticipantsClick={onPastParticipantsClick}
+                                        isPastParticipant={localGroupData.isPastParticipant}
                                     />
                                 </>
                             )}

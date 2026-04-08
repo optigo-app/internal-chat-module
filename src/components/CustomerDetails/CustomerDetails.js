@@ -1,3 +1,4 @@
+import { getCustomerAvatarSeed, getCustomerDisplayName, markImageAsDead } from '../../utils/globalFunc';
 import { useState, useEffect, useContext, useRef } from 'react';
 import './CustomerDetails.scss';
 import { LoginContext } from '../../context/LoginData';
@@ -19,7 +20,6 @@ import DetailsViews from './DetailsViews';
 import MemberActions from './MemberActions';
 import GroupDialogs from './GroupDialogs';
 import ConfirmationDialog from '../ReusableComponent/ConfirmationDialog';
-import { getCustomerAvatarSeed, getCustomerDisplayName } from '../../utils/globalFunc';
 import { useFavorite } from '../../contexts/FavoriteContext';
 import { useRemoveInGroup } from '../../contexts/RemoveInGroupContext';
 import { useGroupAdminMode } from '../../contexts/GroupAdminModeContext';
@@ -71,7 +71,8 @@ const CustomerDetails = ({
         name: customer?.ConversationName || '',
         createdBy: null,
         entryDate: null,
-        createdById: null
+        createdById: null,
+        isPastParticipant: 0
     });
 
     // Editing states
@@ -331,7 +332,8 @@ const CustomerDetails = ({
                     name: data.groupDetails.Name || data.groupDetails.ConversationName,
                     createdBy: data.groupDetails.CreatedByName || data.groupDetails.CreatedBy,
                     entryDate: data.groupDetails.EntryDate,
-                    createdById: data.groupDetails.CreatedBy
+                    createdById: data.groupDetails.CreatedBy,
+                    isPastParticipant: data.groupDetails.IsPastParticipant || 0
                 }));
             }
 
@@ -441,6 +443,16 @@ const CustomerDetails = ({
                 setLocalGroupData(prev => ({ ...prev, name: editedName }));
                 setIsEditingName(false);
                 toast.success('Group name updated');
+
+                // Dispatch silent update for the sidebar
+                window.dispatchEvent(new CustomEvent('UPDATE_CONVERSATION_ITEM', {
+                    detail: {
+                        ConversationId: customer.ConversationId,
+                        name: editedName,
+                        ConversationName: editedName,
+                        isStatusChange: true
+                    }
+                }));
             } else {
                 toast.error(response?.Message || 'Failed to update name');
             }
@@ -890,6 +902,15 @@ const CustomerDetails = ({
                     customer.ProfileImageUrl = imageUrl;
                 }
                 loadGroupInfo();
+
+                // Dispatch silent update for the sidebar
+                window.dispatchEvent(new CustomEvent('UPDATE_CONVERSATION_ITEM', {
+                    detail: {
+                        ConversationId: customer.ConversationId,
+                        ProfileImageUrl: imageUrl,
+                        isStatusChange: true
+                    }
+                }));
             } else {
                 toast.error(response?.Message || 'Failed to update group profile');
             }
@@ -914,10 +935,22 @@ const CustomerDetails = ({
                     return;
                 }
                 toast.success('Group profile photo removed successfully');
+                if (customer?.ProfileImageUrl) {
+                    markImageAsDead(customer.ProfileImageUrl);
+                }
                 if (customer) {
                     customer.ProfileImageUrl = "";
                 }
                 loadGroupInfo();
+
+                // Dispatch silent update for the sidebar
+                window.dispatchEvent(new CustomEvent('UPDATE_CONVERSATION_ITEM', {
+                    detail: {
+                        ConversationId: customer.ConversationId,
+                        ProfileImageUrl: "",
+                        isStatusChange: true
+                    }
+                }));
             } else {
                 toast.error(response?.Message || 'Failed to remove group profile');
             }

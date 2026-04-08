@@ -54,10 +54,10 @@ export const useMessageActions = ({ selectedCustomer, auth, refresh, updateFavor
     }, [selectedCustomer, auth, isFavorite, updateFavoriteStatus, refresh]);
 
     const handleMemberRedirect = useCallback((member) => {
-        toast("Member Message Comming Soon...", {
-            icon: "⏳",
-        });
-        return;
+        // toast("Member Message Comming Soon...", {
+        //     icon: "⏳",
+        // });
+        // return;
         if (member) {
             if (member.ConversationId) {
                 window.dispatchEvent(new CustomEvent('SELECT_CONVERSATION', {

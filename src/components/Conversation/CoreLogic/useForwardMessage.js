@@ -19,11 +19,13 @@ export function useForwardMessage({ auth, selectedCustomer, uiState, dispatchUI,
     dispatchUI({ type: UI.SET_FORWARD_ANCHOR, value: null });
   }, []);
 
+
   const handleSendForward = useCallback(async (selectedContactsArr = []) => {
     if (!selectedContactsArr.length || !uiState.forwardMessage) {
       toast.error('Please select at least one contact.');
       return;
     }
+    console.log("selectedContactsArr", selectedCustomer)
 
     const conversationIdsArr = [];
     const userIdsArr = [];
@@ -93,9 +95,15 @@ export function useForwardMessage({ auth, selectedCustomer, uiState, dispatchUI,
                 // users have a plain numeric string. Parse so socket gets the right type.
                 let rawReceiverId = matchedContact?.UserId ?? matchedContact?.id ?? null;
                 let receiverId = rawReceiverId;
-                if (typeof rawReceiverId === 'string' && rawReceiverId.trim().startsWith('[')) {
-                  try { receiverId = JSON.parse(rawReceiverId); } catch {
-                    Number(receiverId)
+                if (typeof rawReceiverId === 'string') {
+                  if (rawReceiverId.trim().startsWith('[')) {
+                    try {
+                      receiverId = JSON.parse(rawReceiverId);
+                    } catch {
+                      receiverId = [];
+                    }
+                  } else {
+                    receiverId = Number(rawReceiverId);
                   }
                 }
 
@@ -123,6 +131,13 @@ export function useForwardMessage({ auth, selectedCustomer, uiState, dispatchUI,
                   MessageId: realMsgId, Status: 1, MessageStatus: 1, Direction: 0, DateTime: dateTime,
                   MessageType: fwdMsg?.MessageType || 'text', IsForwarded: true,
                   mediaItems, previewUrl, fileName, fileType, Time: time, Date: date,
+                  SenderName: auth?.username || auth?.name,
+                  FirstName: auth?.firstName || auth?.FirstName,
+                  LastName: auth?.lastName || auth?.LastName,
+                  SenderEmail: auth?.email,
+                  SenderProfilePicture: auth?.profilePicture,
+                  RecieverName: matchedContact?.DisplayName || '',
+                  IsGroup: matchedContact?.Type === 'Group' ? 1 : 0,
                 });
               });
             }

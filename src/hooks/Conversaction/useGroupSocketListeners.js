@@ -44,14 +44,14 @@ export const useGroupSocketListeners = ({
                     return;
                 }
 
-                const eventMessages = {
-                    'group_created': 'Group created',
-                    'group_updated': 'Group updated',
-                    'group_info_request': 'Group info requested'
-                };
+                // const eventMessages = {
+                //     'group_created': 'Group created',
+                //     'group_updated': 'Group updated',
+                //     'group_info_request': 'Group info requested'
+                // };
 
-                const message = eventMessages[data.eventType] || 'Group event';
-                toast(message);
+                // const message = eventMessages[data.eventType] || 'Group event';
+                // toast(message);
 
                 const shouldSkipRefresh = ['group_updated', 'group_created'].includes(data.eventType);
                 if (refresh && !shouldSkipRefresh) {
@@ -89,7 +89,6 @@ export const useGroupSocketListeners = ({
                 };
 
                 const message = eventMessages[data.eventType] || 'Member event';
-
                 if (isCurrentUserRemoved) {
                     updateRemoveInGroupStatus(conversationId, true);
                     toast.error('You were removed from this group');
@@ -127,15 +126,12 @@ export const useGroupSocketListeners = ({
                 } else if (data.permissions) {
                     updateGroupAdminMode(conversationId, data.permissions.SendNewMessage === 0);
                 }
-
                 if (refresh) {
                     setTimeout(() => refresh(), 500);
                 }
             }
         };
-
         registerListener(conversationId, callbacks);
-
         return () => {
             unregisterListener(conversationId);
         };

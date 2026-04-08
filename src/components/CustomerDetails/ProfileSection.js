@@ -1,7 +1,7 @@
 import { Typography, Avatar, IconButton, Box, TextField, InputAdornment, Badge, styled } from '@mui/material';
 import { User, Pencil, X, Check } from 'lucide-react';
 import ProfileAvatarUpload from '../ReusableComponent/ProfileAvatarUpload';
-import { getWhatsAppAvatarConfig, hasCustomerName } from '../../utils/globalFunc';
+import { getWhatsAppAvatarConfig, hasCustomerName, isImageDead } from '../../utils/globalFunc';
 
 const StyledBadge = styled(Badge)(({ theme }) => ({
     '& .MuiBadge-badge': {
@@ -52,7 +52,6 @@ const ProfileSection = ({
     groupPermissions
 }) => {
     const canEditGroup = isCurrentUserAdmin || groupPermissions?.editGroupSettings;
-
     return (
         <div className={`profile-section ${customer?.IsGroup === 1 ? 'group-profile' : ''}`}>
             {customer?.IsGroup === 1 && canEditGroup ? (
@@ -82,21 +81,11 @@ const ProfileSection = ({
                         variant="dot"
                         invisible={customer?.IsGroup === 1}
                     >
-                        {!hasCustomerName(customer) ? (
-                            <Avatar
-                                {...getWhatsAppAvatarConfig(avatarSeed, 130)}
-                                className="profile-avatar"
-                                src={customer?.ProfileImageUrl}
-                            >
-                                <User size={80} />
-                            </Avatar>
-                        ) : (
-                            <Avatar
-                                {...(getWhatsAppAvatarConfig(avatarSeed, 130))}
-                                className="profile-avatar"
-                                src={customer?.ProfileImageUrl}
-                            />
-                        )}
+                        <Avatar
+                            {...(getWhatsAppAvatarConfig(avatarSeed, 130))}
+                            className="profile-avatar"
+                            src={(customer?.ProfileImageUrl && !isImageDead(customer?.ProfileImageUrl)) ? customer?.ProfileImageUrl : undefined}
+                        />
                     </StyledBadge>
                 </div>
             )}
@@ -151,7 +140,7 @@ const ProfileSection = ({
                 )}
             </div>
 
-            {customer?.IsGroup === 1 ? (
+            {customer?.IsGroup == 1 ? (
                 <Typography className="group-subtext">
                     Group · <span className="accent-text">{localGroupData.members.length} members</span>
                 </Typography>

@@ -37,7 +37,7 @@ export const getApiHeaders = (init = {}) => {
     }
 
     const headers = {
-        Version: version,
+        Version: isLocal ? "R50B3" : "R75PRO",
         sp: "80",
     };
 

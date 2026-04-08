@@ -11,7 +11,6 @@ import { emitTextMessage } from './socketHelpers';
 import { emitInternalMessageDelete } from '../../../socket';
 
 export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI, dispatchMsg, fetchAndCacheGroupMembers, onCustomerSelect, tempConversationId, uploadAndSendMedia }) {
-
   const handleSendMessage = useCallback(async (containerRef, scrollToBottom, messageOverride = null) => {
     const caption = (messageOverride !== null ? messageOverride : uiState.inputValue).trim();
     if (!caption && !uiState.mediaFiles?.length) return;
@@ -51,7 +50,7 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
       return;
     }
 
-    const replySnapshot    = uiState.replyToMessage;
+    const replySnapshot = uiState.replyToMessage;
     const replyToMessageId = uiState.storeMessData?.messageId;
     const tempId = `${Date.now()}-${Math.random()}`;
 
@@ -78,25 +77,25 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
       const isReply = !!(replySnapshot && replyToMessageId);
       const resp = isReply
         ? await replyToMessageApi(auth, {
-            conversationId: replySnapshot.ConversationId || selectedCustomer?.ConversationId,
-            replyToMessageId: replySnapshot.Id,
-            ReplyToAttachmentId: replySnapshot.ReplyToAttachmentId,
-            message: caption, messageType: 1,
-          })
+          conversationId: replySnapshot.ConversationId || selectedCustomer?.ConversationId,
+          replyToMessageId: replySnapshot.Id,
+          ReplyToAttachmentId: replySnapshot.ReplyToAttachmentId,
+          message: caption, messageType: 1,
+        })
         : await sendTextMessage(auth, {
-            senderId: auth?.id,
-            receiverId: selectedCustomer?.CustomerId || selectedCustomer?.UserId,
-            conversationId: selectedCustomer?.ConversationId ?? null,
-            message: caption,
-          });
+          senderId: auth?.id,
+          receiverId: selectedCustomer?.CustomerId || selectedCustomer?.UserId,
+          conversationId: selectedCustomer?.ConversationId ?? null,
+          message: caption,
+        });
 
-      const sentId     = resp?.Data?.rd?.[0]?.MessageId;
-      const convId     = resp?.Data?.rd?.[0]?.ConversationId || selectedCustomer?.ConversationId;
-      const isNewConv  = resp?.Data?.rd?.[0]?.IsNewConversation === true;
+      const sentId = resp?.Data?.rd?.[0]?.MessageId;
+      const convId = resp?.Data?.rd?.[0]?.ConversationId || selectedCustomer?.ConversationId;
+      const isNewConv = resp?.Data?.rd?.[0]?.IsNewConversation === true;
 
       if (sentId) {
-        const isGroup   = selectedCustomer?.IsGroup === 1;
-        let receiverIds = selectedCustomer?.ReceiverId || selectedCustomer?.UserId;
+        const isGroup = selectedCustomer?.IsGroup === 1;
+        let receiverIds = selectedCustomer?.ReceiverId || selectedCustomer?.UserId || selectedCustomer?.SenderId;
         if (isGroup) {
           try {
             const groupData = await fetchAndCacheGroupMembers(selectedCustomer.ConversationId);
@@ -161,12 +160,12 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
   const handleDeleteMessage = useCallback(async (messageId, mode) => {
     if (!messageId) return;
     try {
-      const response  = await deleteMessageApi(auth, messageId, mode, selectedCustomer?.ConversationId);
+      const response = await deleteMessageApi(auth, messageId, mode, selectedCustomer?.ConversationId);
       const deletedInfo = response?.Data?.rd?.[0] || response?.rd?.[0];
       if (deletedInfo?.stat != 0) {
         if (Number(mode) === 2) {
           dispatchMsg({ type: MSG.DELETE_ALL, messageId, deletedInfo });
-          const isGroup   = selectedCustomer?.IsGroup === 1;
+          const isGroup = selectedCustomer?.IsGroup === 1;
           const groupData = isGroup ? await fetchAndCacheGroupMembers(selectedCustomer.ConversationId) : null;
           const memberIds = (groupData?.members || []).map(m => Number(m.UserId || m.userId || m.id)).filter(Boolean);
           emitInternalMessageDelete({
@@ -191,11 +190,11 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
   const handleReply = useCallback(async (message, attachmentId = null) => {
     dispatchMsg({ type: MSG.SET_STORE_MESS, value: { messageId: message?.MessageId } });
     const mediaCount = Array.isArray(message?.mediaItems) ? message.mediaItems.length : 0;
-    const fileName   = message?.fileName || message?.mediaItems?.[0]?.filename || '';
-    const replyType  = message?.MessageType;
-    const fallback   = replyType === 'image' ? (mediaCount > 1 && !attachmentId ? `${mediaCount} Photos` : 'Photo')
+    const fileName = message?.fileName || message?.mediaItems?.[0]?.filename || '';
+    const replyType = message?.MessageType;
+    const fallback = replyType === 'image' ? (mediaCount > 1 && !attachmentId ? `${mediaCount} Photos` : 'Photo')
       : replyType === 'video' ? (mediaCount > 1 && !attachmentId ? `${mediaCount} Videos` : 'Video')
-      : replyType === 'document' ? (fileName || 'Document') : 'Media';
+        : replyType === 'document' ? (fileName || 'Document') : 'Media';
 
     const replyText = message?.Message?.trim() ? message.Message : fallback;
     let finalAttachmentId = attachmentId;

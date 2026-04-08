@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Avatar, Skeleton } from '@mui/material';
-import { getWhatsAppAvatarConfig, getCustomerAvatarSeed, hasCustomerName } from '../../utils/globalFunc';
+import { getWhatsAppAvatarConfig, getCustomerAvatarSeed, hasCustomerName, isImageDead, markImageAsDead } from '../../utils/globalFunc';
 import PersonIcon from '@mui/icons-material/Person';
 
 const ConversationAvatar = ({ member, size = 45 }) => {
@@ -13,7 +13,7 @@ const ConversationAvatar = ({ member, size = 45 }) => {
         const trimmed = url.trim().toLowerCase();
         return trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined';
     };
-    const imageUrl = isValidUrl(rawImageUrl) ? rawImageUrl : null;
+    const imageUrl = isValidUrl(rawImageUrl) && !isImageDead(rawImageUrl) ? rawImageUrl : null;
 
     useEffect(() => {
         if (imageUrl) {
@@ -31,7 +31,10 @@ const ConversationAvatar = ({ member, size = 45 }) => {
     }, [imageUrl]);
 
     const handleLoad = () => setImageState('loaded');
-    const handleError = () => setImageState('error');
+    const handleError = () => {
+        if (imageUrl) markImageAsDead(imageUrl);
+        setImageState('error');
+    };
 
     // Replicate original logic: if no name, show generic icon inside avatar
     if (!hasCustomerName(member)) {

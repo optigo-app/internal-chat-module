@@ -4,9 +4,9 @@ import { MSG } from './conversationReducer';
 import { mergeMessages, getMessageId } from './messageHelpers';
 
 export function useMessageLoader({ selectedCustomer, auth, pageSize, msgState, dispatchMsg, normalizeServerMessages }) {
-  const latestRequestRef    = useRef(0);
-  const abortControllerRef  = useRef(null);
-  const loadingRef          = useRef(false);
+  const latestRequestRef = useRef(0);
+  const abortControllerRef = useRef(null);
+  const loadingRef = useRef(false);
 
   // Keep loadingRef in sync externally (call this from the parent hook)
   const syncLoadingRef = (val) => { loadingRef.current = val; };
@@ -20,8 +20,8 @@ export function useMessageLoader({ selectedCustomer, auth, pageSize, msgState, d
     abortControllerRef.current = controller;
 
     const selectedId = selectedCustomer.ConversationId;
-    const cacheKey   = `chat_cache_${selectedId}`;
-    let didShowCache  = false;
+    const cacheKey = `chat_cache_${selectedId}`;
+    let didShowCache = false;
 
     if (page === 1 && reset && !ignoreCache) {
       try {
@@ -43,7 +43,9 @@ export function useMessageLoader({ selectedCustomer, auth, pageSize, msgState, d
 
     try {
       const response = await conversationView(selectedId, page, pageSize, auth, 'ConvView', controller.signal);
-      if (requestId !== latestRequestRef.current) return;
+      
+      // CRITICAL: Double safety check against race conditions and stale requests
+      if (requestId !== latestRequestRef.current || selectedId !== selectedCustomer?.ConversationId) return;
 
       const raw = Array.isArray(response.data?.rd) ? response.data.rd
         : (Array.isArray(response.data) ? response.data : []);
@@ -73,20 +75,23 @@ export function useMessageLoader({ selectedCustomer, auth, pageSize, msgState, d
 
     const container = containerRef?.current;
     const prevScrollHeight = container?.scrollHeight || 0;
-    const prevScrollTop    = container?.scrollTop    || 0;
+    const prevScrollTop = container?.scrollTop || 0;
 
+    const selectedId = selectedCustomer.ConversationId;
     try {
       const response = await conversationView(
-        selectedCustomer.ConversationId, nextPage, pageSize, auth, 'ConvView', controller.signal
+        selectedId, nextPage, pageSize, auth, 'ConvView', controller.signal
       );
-      if (requestId !== latestRequestRef.current) return;
+      
+      // CRITICAL: Prevent merging older messages from a previous chat if the user switched while loading
+      if (requestId !== latestRequestRef.current || selectedId !== selectedCustomer?.ConversationId) return;
 
       const raw = Array.isArray(response.data?.rd) ? response.data.rd : (Array.isArray(response.data) ? response.data : []);
       const serverMessages = normalizeServerMessages(raw);
 
       const map = new Map();
-      for (const m of msgState.data)   { const k = getMessageId(m); if (k) map.set(k, m); }
-      for (const m of serverMessages)  { const k = getMessageId(m); if (k && !k.startsWith('temp_')) map.set(k, m); }
+      for (const m of msgState.data) { const k = getMessageId(m); if (k) map.set(k, m); }
+      for (const m of serverMessages) { const k = getMessageId(m); if (k && !k.startsWith('temp_')) map.set(k, m); }
 
       const sorted = Array.from(map.values()).sort(
         (a, b) => new Date(a.DateTime).getTime() - new Date(b.DateTime).getTime()

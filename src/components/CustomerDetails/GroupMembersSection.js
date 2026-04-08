@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Typography, Avatar } from '@mui/material';
+import React, { useState } from 'react';
+import { Typography } from '@mui/material';
+import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
 import { Search, UserPlus, ChevronDown, Clock } from 'lucide-react';
 import { getWhatsAppAvatarConfig } from '../../utils/globalFunc';
 
@@ -13,9 +14,9 @@ const GroupMembersSection = ({
     showAllMembers,
     setShowAllMembers,
     groupPermissions,
-    onPastParticipantsClick
+    onPastParticipantsClick,
+    isPastParticipant = 0
 }) => {
-    console.log("")
     const [hoveredMemberId, setHoveredMemberId] = useState(null);
     const canAddMembers = isCurrentUserAdmin || groupPermissions?.addOtherMembers;
 
@@ -58,9 +59,13 @@ const GroupMembersSection = ({
                         style={{ cursor: isCurrentUserAdmin && member.UserId !== (auth?.id || auth?.userId) ? 'pointer' : 'default' }}
                     >
                         <div className="setting-left">
-                            <Avatar
-                                {...getWhatsAppAvatarConfig(member.Name || 'User', 42)}
-                                src={member.ProfileImageUrl}
+                            <ConversationAvatar 
+                                member={{
+                                    ...member,
+                                    name: member.Name || 'User',
+                                    ProfileImageUrl: member.ProfileImageUrl
+                                }} 
+                                size={42} 
                             />
                             <div className="text-stack" style={{ flex: 1 }}>
                                 <div className="member-name-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -105,14 +110,16 @@ const GroupMembersSection = ({
                     </div>
                 )}
 
-                <div className="setting-item no-border member-item add-member-row" onClick={onPastParticipantsClick} style={{ marginTop: '5px' }}>
-                    <div className="setting-left">
-                        <div className="action-circle-small" style={{ backgroundColor: '#f0f2f5', color: '#54656f' }}>
-                            <Clock size={20} />
+                {isPastParticipant > 0 && (
+                    <div className="setting-item no-border member-item add-member-row" onClick={onPastParticipantsClick} style={{ marginTop: '5px' }}>
+                        <div className="setting-left">
+                            <div className="action-circle-small" style={{ backgroundColor: '#f0f2f5', color: '#54656f' }}>
+                                <Clock size={20} />
+                            </div>
+                            <span className="member-name action-text" style={{ color: '#54656f' }}>Past participants</span>
                         </div>
-                        <span className="member-name action-text" style={{ color: '#54656f' }}>Past participants</span>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

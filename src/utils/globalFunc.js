@@ -3,6 +3,20 @@ import { SHA1 } from "crypto-js";
 import Hex from "crypto-js/enc-hex";
 import imageCompression from 'browser-image-compression';
 import JSZip from 'jszip';
+import { toast } from 'react-hot-toast';
+
+// Global cache for images that return 404/error to prevent flickering from stale API data
+const deadImageCache = new Set();
+
+export const markImageAsDead = (url) => {
+    if (!url || typeof url !== 'string') return;
+    deadImageCache.add(url);
+};
+
+export const isImageDead = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    return deadImageCache.has(url);
+};
 
 const hashString = (value) => {
     const str = String(value ?? '');

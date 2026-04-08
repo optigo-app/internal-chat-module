@@ -21,8 +21,12 @@ const CommonGroupsSection = ({ customer, auth, open }) => {
                 });
 
                 if (response?.Status === "200" || response?.success) {
-                    const fetchedGroups = response?.Data?.rd || response?.rd || [];
-                    setGroups(fetchedGroups);
+                    if (response?.Data?.rd?.length > 0) {
+                        const fetchedGroups = response?.Data?.rd || response?.rd || [];
+                        setGroups(fetchedGroups);
+                    } else {
+                        setGroups([]);
+                    }
                 } else {
                     setGroups([]);
                 }
@@ -104,79 +108,82 @@ const CommonGroupsSection = ({ customer, auth, open }) => {
             <Typography sx={{ color: '#667781', fontSize: '14px', fontWeight: 500, mb: 1 }}>
                 {groups.length} group{groups.length !== 1 ? 's' : ''} in common
             </Typography>
-
-            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                {visibleGroups.map((group) => (
-                    <Box
-                        key={group.ConversationId}
-                        onClick={() => handleGroupClick(group)}
-                        sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 2,
-                            p: 1.5,
-                            ml: -1.5,
-                            mr: -1.5,
-                            cursor: 'pointer',
-                            borderRadius: '8px',
-                            '&:hover': {
-                                backgroundColor: '#f0f2f5'
-                            }
-                        }}
-                    >
-                        <Avatar
-                            {...getWhatsAppAvatarConfig(group.Name || 'Group', 48)}
-                            src={group.ProfileUrl}
-                        />
-
-                        <Box sx={{ flex: 1, overflow: 'hidden' }}>
-                            <Typography
+            {groups?.length > 0 && (
+                <>
+                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                        {visibleGroups.map((group) => (
+                            <Box
+                                key={group.ConversationId}
+                                onClick={() => handleGroupClick(group)}
                                 sx={{
-                                    fontSize: '16px',
-                                    color: '#111b21',
-                                    fontWeight: 400,
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis'
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 2,
+                                    p: 1.5,
+                                    ml: -1.5,
+                                    mr: -1.5,
+                                    cursor: 'pointer',
+                                    borderRadius: '8px',
+                                    '&:hover': {
+                                        backgroundColor: '#f0f2f5'
+                                    }
                                 }}
                             >
-                                {group.Name || 'Unnamed Group'}
-                            </Typography>
+                                <Avatar
+                                    {...getWhatsAppAvatarConfig(group.Name || 'Group', 48)}
+                                    src={group.ProfileUrl}
+                                />
 
+                                <Box sx={{ flex: 1, overflow: 'hidden' }}>
+                                    <Typography
+                                        sx={{
+                                            fontSize: '16px',
+                                            color: '#111b21',
+                                            fontWeight: 400,
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis'
+                                        }}
+                                    >
+                                        {group.Name || ''}
+                                    </Typography>
+
+                                    <Typography
+                                        sx={{
+                                            fontSize: '14px',
+                                            color: '#667781',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            mt: 0.2
+                                        }}
+                                    >
+                                        {renderMembersPreview(group.Members)}
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        ))}
+                    </Box>
+
+                    {groups.length > INITIAL_LIMIT && (
+                        <Box sx={{ textAlign: 'center', mt: 1 }}>
                             <Typography
+                                onClick={() => setShowAll(prev => !prev)}
                                 sx={{
                                     fontSize: '14px',
-                                    color: '#667781',
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    mt: 0.2
+                                    cursor: 'pointer',
+                                    color: 'primary.main',
+                                    fontWeight: 500,
+                                    '&:hover': { textDecoration: 'underline' }
                                 }}
                             >
-                                {renderMembersPreview(group.Members)}
+                                {showAll
+                                    ? 'Show less'
+                                    : `Show ${groups.length - INITIAL_LIMIT} more`}
                             </Typography>
                         </Box>
-                    </Box>
-                ))}
-            </Box>
-
-            {groups.length > INITIAL_LIMIT && (
-                <Box sx={{ textAlign: 'center', mt: 1 }}>
-                    <Typography
-                        onClick={() => setShowAll(prev => !prev)}
-                        sx={{
-                            fontSize: '14px',
-                            cursor: 'pointer',
-                            color: 'primary.main',
-                            fontWeight: 500,
-                            '&:hover': { textDecoration: 'underline' }
-                        }}
-                    >
-                        {showAll
-                            ? 'Show less'
-                            : `Show ${groups.length - INITIAL_LIMIT} more`}
-                    </Typography>
-                </Box>
+                    )}
+                </>
             )}
         </div>
     );

@@ -50,17 +50,29 @@ export function useSocketHandlers({ auth, selectedCustomerRef, dispatchMsg, hand
     };
 
     const handleReactionMessage = (data) => {
-      if (data._isFromCurrentUser) return;
+      if (!data) return;
       const myId     = Number(auth?.id ?? auth?.userId);
       const senderId = Number(data?.SenderId ?? data?.userId ?? data?.UserId);
-      if (myId && senderId && myId === senderId) return;
-
       const messageId = data?.MessageId || data?.Id || data?.id;
-      let newReactions = [];
-      try { newReactions = data.ReactionEmojis ? (typeof data.ReactionEmojis === 'string' ? JSON.parse(data.ReactionEmojis) : data.ReactionEmojis) : []; }
-      catch (e) { console.error('reaction parse error', e); }
+      if (!messageId) return;
 
-      dispatchRef.current({ type: MSG.UPDATE_REACTION, messageId, reactions: newReactions });
+      let incomingReactions = [];
+      try {
+        incomingReactions = data.ReactionEmojis
+          ? (typeof data.ReactionEmojis === 'string' ? JSON.parse(data.ReactionEmojis) : data.ReactionEmojis)
+          : [];
+      } catch (e) {
+        console.error('reaction parse error', e);
+      }
+
+      // If incomingReactions is empty but we have a senderId, it might be a removal
+      // We pass the data to the reducer which will handle the merging/removal logic
+      dispatchRef.current({
+        type: MSG.UPDATE_REACTION,
+        messageId,
+        reactions: incomingReactions,
+        senderId: senderId
+      });
     };
 
     const handleInternalMessage = (data) => {
