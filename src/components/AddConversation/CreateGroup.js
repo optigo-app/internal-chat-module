@@ -9,12 +9,12 @@ import {
     IconButton,
     Chip
 } from '@mui/material';
-import { Clear, ArrowBack, ArrowForward, Check, SentimentSatisfiedAlt as EmojiIcon } from '@mui/icons-material';
+import { Clear, ArrowBack, ArrowForward, Check, SentimentSatisfiedAlt as EmojiIcon, Person as PersonIcon } from '@mui/icons-material';
 import { ChevronRight, X } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
-import { Popover, Divider, styled } from '@mui/material';
+import { Popover, Divider } from '@mui/material';
 import './CreateGroup.scss';
-import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig } from '../../utils/globalFunc';
+import { getCustomerAvatarSeed, getCustomerDisplayName, getWhatsAppAvatarConfig, hasCustomerName } from '../../utils/globalFunc';
 import { fetchCustomerLists } from '../../API/CustomerLists/CustomerLists';
 import { LoginContext } from '../../context/LoginData';
 import { createGroupApi } from '../../API/Groups/CreateGroupApi';
@@ -241,6 +241,7 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
 
         if (!groupName.trim()) {
             setGroupNameTouched(true);
+            groupNameInputRef.current?.querySelector('input, textarea')?.focus();
             toast.error('Group Subject is required');
             return;
         }
@@ -436,7 +437,19 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
                                         <li key={member.UserId} onClick={() => toggleMemberSelection(member)} className="member-list-item">
                                             <div className={`member-item ${isSelected ? 'selected' : ''} ${isKeyboardSelected ? 'keyboard-selected' : ''}`}>
                                                 <div className="member-avatar">
-                                                    <Avatar {...member.avatarConfig} />
+                                                    {member.ProfileImageUrl ? (
+                                                        <Avatar src={member.ProfileImageUrl} />
+                                                    ) : (
+                                                        !hasCustomerName(member) ? (
+                                                            <Avatar
+                                                                {...getWhatsAppAvatarConfig(getCustomerAvatarSeed(member))}
+                                                            >
+                                                                <PersonIcon fontSize="small" />
+                                                            </Avatar>
+                                                        ) : (
+                                                            <Avatar {...member.avatarConfig} />
+                                                        )
+                                                    )}
                                                 </div>
                                                 <div className="member-info">
                                                     <Typography variant="subtitle1" className="member-name">{member.name}</Typography>
@@ -599,7 +612,7 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
                             <Button
                                 variant="contained"
                                 className="continue_fab finalize"
-                                disabled={!groupName.trim() || loading}
+                                disabled={loading}
                                 onClick={handleFinalContinue}
                             >
                                 {loading ? <CircularProgress size={24} color="inherit" /> : <Check />}

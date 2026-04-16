@@ -13,8 +13,7 @@ const TypingIndicator = ({ typingStatus, isGroup }) => {
             sx={{
                 display: 'flex',
                 alignItems: 'flex-end',
-                gap: 1.5,
-                padding: '8px 16px',
+                gap: 1, // Matches MessageItem's 8px margin
                 animation: 'fadeIn 0.3s ease-out',
                 '@keyframes fadeIn': {
                     from: { opacity: 0, transform: 'translateY(10px)' },
@@ -27,9 +26,11 @@ const TypingIndicator = ({ typingStatus, isGroup }) => {
                     member={{
                         UserName: typingStatus.UserName,
                         ufcc: typingStatus.ufcc,
+                        ProfileImageUrl: typingStatus.ProfileImageUrl,
+                        ProfileImage: typingStatus.ProfileImage,
                         IsGroup: 0
                     }}
-                    size={28}
+                    size={38}
                 />
             )}
             <Box

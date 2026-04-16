@@ -222,7 +222,9 @@ export const buildGroupMessagePayload = (params) => {
         SenderEmail: auth?.email,
         FirstName: auth?.firstName,
         LastName: auth?.lastName,
-        SenderProfilePicture: auth?.profilePicture,
+        SenderProfilePicture: auth?.ProfileImageUrl || auth?.profilePicture || auth?.profileImage || '',
+        ProfileImageUrl: auth?.ProfileImageUrl || auth?.profileImage || auth?.AvatarUrl || '',
+        ProfileImage: auth?.ProfileImage || auth?.profileImage || auth?.AvatarUrl || '',
         ReplyTo: replyTo,
         IsEdited: finalIsEdited,
         MessageId: finalMessageId,
@@ -232,7 +234,7 @@ export const buildGroupMessagePayload = (params) => {
     };
 };
 
-/**
+/** 
  * Build group reaction payload for socket
  * @param {object} params - Reaction parameters
  * @returns {object} Socket payload

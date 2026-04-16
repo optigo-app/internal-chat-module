@@ -21,6 +21,7 @@ export const filesUploadApi = async ({ attachments, folderName, uniqueNo, onProg
     const response = await axios.post(UPLOAD_URL, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+        'Access-Control-Allow-Origin': '*',
       },
       onUploadProgress: (progressEvent) => {
         if (typeof onProgress !== 'function') return;

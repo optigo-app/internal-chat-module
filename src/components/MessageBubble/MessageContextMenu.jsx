@@ -63,7 +63,7 @@ const MessageContextMenu = ({
       action: () => onReply?.(message),
     },
 
-    message?.Direction === 0 && {
+    selectedCustomer?.IsGroup == 1 && message?.Direction === 0 && {
       label: `Message ${message?.SenderInfo || "User"}`,
       icon: <User size={18} />,
       action: () => onMemberRedirect?.(message),

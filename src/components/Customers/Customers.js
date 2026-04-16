@@ -33,7 +33,7 @@ const Customers = ({ selectedStatus, selectedTag }) => {
                                         return {
                                             ...prev,
                                             ConversationId: data.ConversationId,
-                                            name: data.CustomerName || data.UserName || data.name || prev.name
+                                            name: data.CustomerName || data.UserName || data.name || prev.name,
                                         };
                                     }
                                     return prev;

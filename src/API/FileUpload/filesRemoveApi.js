@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { REMOVE_FILE_URL } from '../InitialApi/Config';
+import { getHeaders, REMOVE_FILE_URL } from '../InitialApi/Config';
 
 export const removeFileApi = async ({ attachments }) => {
     const data = {
@@ -9,6 +9,8 @@ export const removeFileApi = async ({ attachments }) => {
         const response = await axios.post(REMOVE_FILE_URL, data, {
             headers: {
                 'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                ...getHeaders()
             },
             maxBodyLength: Infinity,
         });

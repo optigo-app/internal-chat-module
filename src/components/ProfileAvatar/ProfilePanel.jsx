@@ -31,6 +31,7 @@ const ProfilePanel = ({ onBack }) => {
                                 boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
                             }}
                             className="large-avatar"
+                            src={auth?.ProfileImageUrl || undefined}
                         >
                             {avatarConfig.children}
                         </Avatar>

@@ -112,7 +112,8 @@ export const normalizeServerMessages = (messagesArray, auth) => {
         const hasTextBody = String(msg?.Message ?? '').trim().length > 0;
         const forceTextReply = isReplyMessage && hasTextBody;
 
-        const resolvedMessageType = forceTextReply
+        const isDeletedForEveryone = msg.IsDeletedForEveryone === 1 || msg.isDeletedForEveryone === 1;
+        const resolvedMessageType = (forceTextReply || isDeletedForEveryone)
             ? 'text'
             : (() => {
                 if (attachmentUrl) {

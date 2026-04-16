@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useCallback } from "react";
+import { getCookie, setCookie, eraseCookie } from "../utils/cookieUtils";
 
 // Create Context
 export const LoginContext = createContext();
@@ -11,14 +12,25 @@ export const LoginData = ({ children }) => {
         try {
             const sessionData = sessionStorage.getItem('token');
             if (sessionData) {
+                const parsed = JSON.parse(sessionData);
                 return {
-                    sv: sessionData?.rd?.[0]?.sv || "",
-                    yc: sessionData?.rd?.[0]?.yc || "",
+                    sv: parsed?.sv || parsed?.rd?.[0]?.sv || "",
+                    yc: parsed?.yc || parsed?.rd?.[0]?.yc || "",
+                };
+            }
+            // Fallback to cookie for Remember Me
+            const cookieData = getCookie('token');
+            if (cookieData) {
+                const parsed = JSON.parse(cookieData);
+                return {
+                    sv: parsed?.sv || "",
+                    yc: parsed?.yc || "",
                 };
             }
         } catch (error) {
-            console.error('❌ LoginContext: Error fetching token from sessionStorage:', error);
+            console.error('❌ LoginContext: Error fetching token:', error);
             sessionStorage.removeItem('token');
+            eraseCookie('token');
         }
 
         return {
@@ -31,8 +43,18 @@ export const LoginData = ({ children }) => {
     const [auth, setAuth] = useState(() => {
         try {
             const sessionData = sessionStorage.getItem('userData');
+            let parsed = null;
             if (sessionData) {
-                const parsed = JSON.parse(sessionData);
+                parsed = JSON.parse(sessionData);
+            } else {
+                // Fallback to cookie for Remember Me
+                const cookieData = getCookie('userData');
+                if (cookieData) {
+                    parsed = JSON.parse(cookieData);
+                }
+            }
+
+            if (parsed) {
                 return {
                     ...parsed,
                     userId: parsed?.userId || "",
@@ -44,9 +66,10 @@ export const LoginData = ({ children }) => {
                 };
             }
         } catch (error) {
-            console.error('❌ LoginContext: Error parsing userData from sessionStorage:', error);
+            console.error('❌ LoginContext: Error parsing userData:', error);
             sessionStorage.removeItem('userData');
             sessionStorage.removeItem('isLoggedIn');
+            eraseCookie('userData');
         }
         return {
             userId: "",
@@ -93,6 +116,7 @@ export const LoginData = ({ children }) => {
     useEffect(() => {
         if (auth?.userId) {  // Check for userId instead of ukey
             sessionStorage.setItem('userData', JSON.stringify(auth));
+            sessionStorage.setItem('isLoggedIn', 'true');
         }
     }, [auth]);
 

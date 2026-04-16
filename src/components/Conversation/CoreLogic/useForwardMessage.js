@@ -25,8 +25,6 @@ export function useForwardMessage({ auth, selectedCustomer, uiState, dispatchUI,
       toast.error('Please select at least one contact.');
       return;
     }
-    console.log("selectedContactsArr", selectedCustomer)
-
     const conversationIdsArr = [];
     const userIdsArr = [];
 

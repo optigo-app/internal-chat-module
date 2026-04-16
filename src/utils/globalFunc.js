@@ -1,10 +1,12 @@
 import React from 'react';
+import axios from 'axios';
 import { SHA1 } from "crypto-js";
 import Hex from "crypto-js/enc-hex";
 import imageCompression from 'browser-image-compression';
 import JSZip from 'jszip';
 import { toast } from 'react-hot-toast';
 import { renderEmojiText } from './EmojiRenderer';
+import { getHeaders } from '../API/InitialApi/Config';
 
 // Global cache for images that return 404/error to prevent flickering from stale API data
 const deadImageCache = new Set();
@@ -221,20 +223,22 @@ export function passwordToSha1(password) {
     return SHA1(password.toString()).toString(Hex);
 }
 
+
 export const handleDownloadFile = async (fileUrlOrMessage, filename = null, options = {}) => {
+
     // 0️⃣ Support for Message Object or Bulk Download
     if (typeof fileUrlOrMessage === 'object' && fileUrlOrMessage !== null && !options?.isRecursive) {
         const msg = fileUrlOrMessage;
         const mediaItems = Array.isArray(msg?.mediaItems) ? msg.mediaItems : [];
 
-        // CASE A: Single file within a message or legacy object
+        // CASE A: Single file within message
         if (mediaItems.length === 1 || (!mediaItems.length && (msg.FileUrl || msg.src || msg.FileUrlOrMessage))) {
             const url = mediaItems[0]?.url || msg.FileUrl || msg.src || msg.FileUrlOrMessage;
             const name = mediaItems[0]?.filename || msg.FileName || msg.name || filename;
             return handleDownloadFile(url, name, { ...options, isRecursive: true });
         }
 
-        // CASE B: Multiple files -> Create ZIP
+        // CASE B: Multiple files -> ZIP
         if (mediaItems.length > 1) {
             try {
                 const zip = new JSZip();
@@ -246,77 +250,103 @@ export const handleDownloadFile = async (fileUrlOrMessage, filename = null, opti
                         const url = item.url;
                         if (!url) return;
 
-                        const name = item.filename || `file_${idx + 1}${getFileExt(url) ? '.' + getFileExt(url) : ''}`;
-                        const response = await fetch(url);
-                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                        const blob = await response.blob();
-                        zip.file(name, blob);
+                        const name =
+                            item.filename ||
+                            `file_${idx + 1}${getFileExt(url) ? "." + getFileExt(url) : ""}`;
+
+                        try {
+                            const response = await axios.get(url, {
+                                responseType: 'blob',
+                                headers: {
+                                    ...(url.startsWith('http') ? {} : getHeaders())
+                                }
+                            });
+
+                            const blob = response.data;
+                            zip.file(name, blob);
+                        } catch (err) {
+                            console.warn("CORS or Download blocked for:", url, err);
+                            // Skip file if download blocked
+                        }
+
                     } catch (err) {
                         console.error(`Failed to add item ${idx} to ZIP:`, err);
                     }
                 });
 
                 await Promise.all(fetchPromises);
+
                 const content = await zip.generateAsync({ type: "blob" });
                 const zipUrl = window.URL.createObjectURL(content);
 
-                const link = document.createElement('a');
+                const link = document.createElement("a");
                 link.href = zipUrl;
                 link.download = zipFileName;
-                link.style.display = 'none';
+                link.style.display = "none";
+
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+
                 window.URL.revokeObjectURL(zipUrl);
 
                 return { success: true, filename: zipFileName };
             } catch (error) {
-                console.error('Bulk download ZIP creation failed:', error);
+                console.error("Bulk download ZIP creation failed:", error);
                 return { success: false, error: error.message };
             }
         }
     }
 
-    // 1️⃣ Original Single File Logic
-    const fileUrl = typeof fileUrlOrMessage === 'string' ? fileUrlOrMessage : (fileUrlOrMessage?.FileUrl || fileUrlOrMessage?.src);
+    // 1️⃣ Single File Logic
+    const fileUrl =
+        typeof fileUrlOrMessage === "string"
+            ? fileUrlOrMessage
+            : fileUrlOrMessage?.FileUrl || fileUrlOrMessage?.src;
+
     if (!fileUrl) return { success: false, error: "No URL provided" };
 
     try {
-        // Generate filename if not provided
+        // Generate filename
         if (!filename) {
-            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            const timestamp = new Date()
+                .toISOString()
+                .slice(0, 19)
+                .replace(/:/g, "-");
+
             const extMatch = String(fileUrl).match(/\.[a-zA-Z0-9]+$/);
-            const ext = extMatch ? extMatch[0] : '';
+            const ext = extMatch ? extMatch[0] : "";
+
             filename = `file-${timestamp}${ext}`;
         }
 
-        // Ensure filename has extension
-        if (!filename.includes('.')) {
+        if (!filename.includes(".")) {
             const extMatch = String(fileUrl).match(/\.[a-zA-Z0-9]+$/);
-            filename += extMatch ? extMatch[0] : '';
+            filename += extMatch ? extMatch[0] : "";
         }
 
-        const fullFileUrl = String(fileUrl).startsWith('http') ? fileUrl : fileUrl;
+        const fullFileUrl = String(fileUrl).startsWith("http")
+            ? fileUrl
+            : fileUrl;
 
-        const response = await fetch(fullFileUrl, {
-            method: 'GET',
+        // Try axios first (most robust for Blobs and CORS)
+        const response = await axios.get(fullFileUrl, {
+            responseType: 'blob',
             headers: {
-                'Accept': '*/*',
+                Accept: "*/*",
+                ...(fullFileUrl.startsWith('http') ? {} : getHeaders()),
                 ...options.headers,
-            },
+            }
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
-        }
-
-        const blob = await response.blob();
+        const blob = response.data;
         const url = window.URL.createObjectURL(blob);
 
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = url;
         link.download = filename;
-        link.style.display = 'none';
+        link.style.display = "none";
+
         document.body.appendChild(link);
         link.click();
 
@@ -325,24 +355,25 @@ export const handleDownloadFile = async (fileUrlOrMessage, filename = null, opti
 
         return { success: true, filename };
     } catch (error) {
-        console.error('Download failed:', error);
 
-        // 7️⃣ Fallback: open file in new tab
+        console.warn("Fetch blocked (likely CORS). Using direct download fallback.");
+
+        // Fallback direct download (bypass CORS)
         try {
-            const fallbackUrl = fileUrl.startsWith('http') ? fileUrl : fileUrl;
-            const link = document.createElement('a');
-            link.href = fallbackUrl;
-            link.download = filename || 'file';
-            link.target = '_blank';
-            link.style.display = 'none';
+            const link = document.createElement("a");
+            link.href = fileUrl;
+            link.download = filename || "file";
+            link.target = "_blank";
+            link.rel = "noopener";
+
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
 
             return { success: true, filename, fallback: true };
         } catch (fallbackError) {
-            console.error('Fallback download also failed:', fallbackError);
-            return { success: false, error: error.message };
+            console.error("Fallback download failed:", fallbackError);
+            return { success: false, error: fallbackError.message };
         }
     }
 };
@@ -489,6 +520,17 @@ export const getTimeLabel = (input) => {
         return date.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' });
     }
 };
+
+
+export function formatISOTimeUTC(isoString) {
+    const date = new Date(isoString);
+    let hours = date.getUTCHours();
+    let minutes = date.getUTCMinutes();
+    let period = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours === 0 ? 12 : hours;
+    return `${hours}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
 
 
 export const highlightText = (text, query) => {

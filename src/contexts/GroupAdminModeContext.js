@@ -18,11 +18,21 @@ export const GroupAdminModeProvider = ({ children }) => {
 
     // Unified helper to update any group setting
     const updateGroupSettings = useCallback((conversationId, settings) => {
+        if (!conversationId || !settings) return;
+
+        // Filter out undefined values to prevent pollution of state
+        const filteredSettings = Object.entries(settings).reduce((acc, [key, value]) => {
+            if (value !== undefined) acc[key] = value;
+            return acc;
+        }, {});
+
+        if (Object.keys(filteredSettings).length === 0) return;
+
         setGroupSettingsState(prev => ({
             ...prev,
             [conversationId]: {
                 ...(prev[conversationId] || {}),
-                ...settings
+                ...filteredSettings
             }
         }));
     }, []);
@@ -34,6 +44,9 @@ export const GroupAdminModeProvider = ({ children }) => {
 
     // Backward compatibility: Update admin mode (who can send messages)
     const updateGroupAdminMode = useCallback((conversationId, isOnlyAdminSend) => {
+        // Only trigger update if we have a valid boolean status
+        if (isOnlyAdminSend === undefined || isOnlyAdminSend === null) return;
+        
         // 0 means only admins can send, 1 means everyone can send
         updateGroupSettings(conversationId, { SendNewMessage: isOnlyAdminSend ? 0 : 1 });
     }, [updateGroupSettings]);

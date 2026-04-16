@@ -156,7 +156,7 @@ const ReplyPreview = ({ msg, original, isOutgoing, scrollToMessage, containerRef
                                     border: `1px solid ${alpha(theme.palette.text.primary, 0.08)}`,
                                 }}
                             >
-                                <img src={thumbSrc} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <img src={thumbSrc} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable="false" />
                                 {idx === 1 && overflowCount > 0 && (
                                     <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: alpha('#000', 0.45), color: '#fff', fontWeight: 700, fontSize: 14 }}>
                                         +{overflowCount}
@@ -183,7 +183,7 @@ const ReplyPreview = ({ msg, original, isOutgoing, scrollToMessage, containerRef
                     {String(replyMediaUrl).match(/\.(mp4|webm|ogg|mov)(\?|$)/i) ? (
                         <video src={replyMediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                        <img src={replyMediaUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={replyMediaUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable="false" />
                     )}
                 </Box>
             )}

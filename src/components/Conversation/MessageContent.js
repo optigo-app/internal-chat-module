@@ -163,41 +163,52 @@ const MessageContent = ({
                 )}
 
                 {/* Main Message Content */}
-                {msg.MessageType === 'text' ? (
-                    msg.IsDeletedForEveryone === 1 ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.6, fontStyle: 'italic', pr: 1 }}>
-                            <CircleMinus size={16} />
-                            <Typography variant="body2" sx={{ fontSize: 13.5 }}>
-                                {msg.IsMyMessage ? (msg.Message1 || msg.Message) : msg.Message}
-                            </Typography>
-                        </Box>
-                    ) : (
-                        <Typography variant="body2" className="message-text" sx={{ color: theme.palette.text.primary, fontSize: 14, lineHeight: 1.45, pr: 1 }}>
-                            {linkifyText(msg.Message)}
+                {msg.IsDeletedForEveryone === 1 ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.6, fontStyle: 'italic', pr: 1 }}>
+                        <CircleMinus size={16} />
+                        <Typography variant="body2" sx={{ fontSize: 13.5 }}>
+                            {msg.IsMyMessage ? (msg.Message1 || msg.Message) : msg.Message}
                         </Typography>
-                    )
-                ) : (
-                    <MediaMessage
-                        msg={msg}
-                        handleMediaClick={handleMediaClick}
-                        getMediaKey={getMediaKey}
-                        getMediaSrcForMessage={getMediaSrcForMessage}
-                        loadedMedia={loadedMedia}
-                        markLoaded={markLoaded}
-                        imageNotFound={imageNotFound}
-                        theme={theme}
-                        videoLoadError={videoLoadError}
-                        setVideoLoadError={setVideoLoadError}
-                        getDocumentMeta={getDocumentMeta}
-                        handleDownloadFile={handleDownloadFile}
-                    />
-                )}
-
-                {/* Caption under media */}
-                {msg?.MessageType !== 'text' && msg?.Message && (
-                    <Typography variant="body2" className="message-text" sx={{ mt: 0.5, color: theme.palette.text.primary }}>
-                        {msg.Message}
+                    </Box>
+                ) : msg.MessageType === 'text' ? (
+                    <Typography variant="body2" className="message-text" sx={{ color: theme.palette.text.primary, fontSize: 14, lineHeight: 1.45, pr: 1 }}>
+                        {linkifyText(msg.Message)}
                     </Typography>
+                ) : (
+                    <Box sx={{ maxWidth: msg.MessageType === 'document' ? 350 : 250, width: '100%' }}>
+                        <MediaMessage
+                            msg={msg}
+                            handleMediaClick={handleMediaClick}
+                            getMediaKey={getMediaKey}
+                            getMediaSrcForMessage={getMediaSrcForMessage}
+                            loadedMedia={loadedMedia}
+                            markLoaded={markLoaded}
+                            imageNotFound={imageNotFound}
+                            theme={theme}
+                            videoLoadError={videoLoadError}
+                            setVideoLoadError={setVideoLoadError}
+                            getDocumentMeta={getDocumentMeta}
+                            handleDownloadFile={handleDownloadFile}
+                        />
+
+                        {/* Caption under media */}
+                        {msg?.Message && (
+                            <Typography
+                                variant="body2"
+                                className="message-text"
+                                sx={{
+                                    mt: 0.5,
+                                    color: theme.palette.text.primary,
+                                    fontSize: 14,
+                                    lineHeight: 1.45,
+                                    wordBreak: 'break-word',
+                                    whiteSpace: 'pre-wrap'
+                                }}
+                            >
+                                {linkifyText(msg.Message)}
+                            </Typography>
+                        )}
+                    </Box>
                 )}
 
                 {/* Footer Status & Time */}
@@ -244,11 +255,60 @@ const MessageContent = ({
                                 try {
                                     const reactions = JSON.parse(msg.ReactionEmojis);
                                     if (Array.isArray(reactions)) {
-                                        return reactions.map((r, idx) => {
+                                        const emojiGroups = new Map();
+                                        reactions.forEach(r => {
                                             const emojiChar = r?.Reaction || r?.Emoji;
-                                            const unified = r?.Unified || charToUnified(emojiChar);
-                                            return unified ? <Emoji key={idx} unified={unified} size={18} emojiStyle="apple" /> : emojiChar;
+                                            if (!emojiGroups.has(emojiChar)) {
+                                                emojiGroups.set(emojiChar, { ...r, count: 1 });
+                                            } else {
+                                                emojiGroups.get(emojiChar).count++;
+                                            }
                                         });
+
+                                        const uniqueReactions = Array.from(emojiGroups.values());
+                                        const displayReactions = uniqueReactions.slice(0, 2);
+                                        const remainingCount = uniqueReactions.length - 2;
+
+                                        return (
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
+                                                {displayReactions.map((r, idx) => {
+                                                    const emojiChar = r?.Reaction || r?.Emoji;
+                                                    const unified = r?.Unified || charToUnified(emojiChar);
+                                                    return (
+                                                        <Box key={idx} className="emoji-item" sx={{ display: 'flex', alignItems: 'center', gap: 0.2 }}>
+                                                            {unified ? <Emoji unified={unified} size={18} emojiStyle="apple" /> : emojiChar}
+                                                            {r.count > 1 && (
+                                                                <Typography
+                                                                    variant="caption"
+                                                                    sx={{
+                                                                        fontSize: '10.5px',
+                                                                        fontWeight: 700,
+                                                                        opacity: 0.85,
+                                                                        lineHeight: 1
+                                                                    }}
+                                                                >
+                                                                    {r.count}
+                                                                </Typography>
+                                                            )}
+                                                        </Box>
+                                                    );
+                                                })}
+                                                {remainingCount > 0 && (
+                                                    <Typography
+                                                        variant="caption"
+                                                        sx={{
+                                                            fontSize: '11px',
+                                                            fontWeight: 600,
+                                                            ml: 0.2,
+                                                            color: 'inherit',
+                                                            opacity: 0.9
+                                                        }}
+                                                    >
+                                                        +{remainingCount}
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                        );
                                     }
                                 } catch (e) { console.error("ReactionEmojis parse error:", e); }
                                 return "";

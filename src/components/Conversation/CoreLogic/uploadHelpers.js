@@ -8,7 +8,7 @@ export const uploadFiles = async ({ files, conversationId, type, onProgress }) =
   const uploaded = await uploadMediaAPi({ folderName, files, onProgress });
   const arr = Array.isArray(uploaded) ? uploaded : [];
 
-  const getUrl  = u => u?.url ?? u?.Url ?? u?.fileUrl ?? u?.fileURL ?? u?.FileUrl ?? u?.path ?? null;
+  const getUrl = u => u?.url ?? u?.Url ?? u?.fileUrl ?? u?.fileURL ?? u?.FileUrl ?? u?.path ?? null;
   const getName = u => u?.fileName ?? u?.filename ?? u?.FileName ?? u?.name ?? null;
 
   return files.map((f, i) => {
@@ -45,6 +45,8 @@ export const buildMediaPayload = ({
     FirstName: auth?.firstName || auth?.FirstName,
     LastName: auth?.lastName || auth?.LastName,
     SenderEmail: auth?.email,
-    SenderProfilePicture: auth?.profilePicture,
+    SenderProfilePicture: auth?.ProfileImageUrl || auth?.profilePicture || auth?.profileImage || '',
+    ProfileImageUrl: auth?.ProfileImageUrl || auth?.profileImage || auth?.AvatarUrl || '',
+    ProfileImage: auth?.ProfileImage || auth?.profileImage || auth?.AvatarUrl || '',
   }),
 });

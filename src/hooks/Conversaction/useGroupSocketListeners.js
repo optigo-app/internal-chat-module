@@ -123,11 +123,29 @@ export const useGroupSocketListeners = ({
 
                 if (data.changedPermission && data.changedPermission.name === 'SendNewMessage') {
                     updateGroupAdminMode(conversationId, data.changedPermission.value === 0);
-                } else if (data.permissions) {
+                } else if (data.permissions && data.permissions.SendNewMessage !== undefined) {
                     updateGroupAdminMode(conversationId, data.permissions.SendNewMessage === 0);
                 }
-                if (refresh) {
-                    setTimeout(() => refresh(), 500);
+
+                // Add client-side system message for permission change
+                if (addUniqueMessage && data.changedPermission) {
+                    const permissionFriendlyNames = {
+                        'SendNewMessage': 'sending messages',
+                        'EditGroup': 'editing group settings',
+                        'AddOtherMember': 'adding members',
+                        'inviteToGroup': 'inviting via link',
+                        'ApproveNewMembers': 'approving new members',
+                        'AllowDeleteForAll': 'deleting messages'
+                    };
+                    const friendlyName = permissionFriendlyNames[data.changedPermission.name] || data.changedPermission.name;
+                    const permissionMsg = {
+                        Id: `temp_permission_${Date.now()}`,
+                        ConversationId: data.conversationId,
+                        Message: `${data.changedBy?.name || 'Someone'} ${data.changedPermission.value ? 'enabled' : 'disabled'} ${friendlyName}`,
+                        SystemMsg: 1,
+                        DateTime: new Date().toISOString(),
+                    };
+                    addUniqueMessage(permissionMsg);
                 }
             }
         };

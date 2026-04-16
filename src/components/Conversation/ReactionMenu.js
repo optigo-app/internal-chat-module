@@ -5,10 +5,9 @@ import {
     Box,
     Typography,
     Divider,
-    IconButton,
-    Chip
+    Chip,
+    alpha
 } from "@mui/material";
-import AddReactionIcon from "@mui/icons-material/AddReaction";
 
 export default function ReactionDetailsMenu({
     anchorEl,
@@ -36,11 +35,20 @@ export default function ReactionDetailsMenu({
         return groups;
     }, [reactions]);
 
-    const filteredReactions = filter === "all"
-        ? reactions
-        : (reactionGroups[filter] || []);
-
     const currentUserId = auth?.id ?? auth?.userId;
+    const filteredReactions = React.useMemo(() => {
+        const list = filter === "all"
+            ? reactions
+            : (reactionGroups[filter] || []);
+
+        return [...list].sort((a, b) => {
+            const aIsMe = String(a.UserId) === String(currentUserId);
+            const bIsMe = String(b.UserId) === String(currentUserId);
+            if (aIsMe) return -1;
+            if (bIsMe) return 1;
+            return 0;
+        });
+    }, [filter, reactions, reactionGroups, currentUserId]);
 
     return (
         <Menu
@@ -50,30 +58,45 @@ export default function ReactionDetailsMenu({
             disablePortal={disablePortal}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+            TransitionProps={{ timeout: 350 }}
             PaperProps={{
                 sx: {
                     width: 320,
-                    borderRadius: 2,
+                    borderRadius: 3,
                     maxHeight: 400,
                     zIndex: 11000,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                    backdropFilter: 'blur(8px)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
                 }
             }}
         >
             {/* Emoji filters */}
             <Box
                 px={2}
-                py={1}
+                py={1.5}
                 display="flex"
                 alignItems="center"
                 justifyContent="space-between"
             >
-                <Box display="flex" gap={1} sx={{ overflowX: 'auto', pb: 0.5 }}>
+                <Box
+                    display="flex"
+                    gap={1}
+                    sx={{
+                        overflowX: 'auto',
+                        pb: 0.5,
+                        '&::-webkit-scrollbar': { display: 'none' },
+                        msOverflowStyle: 'none',
+                        scrollbarWidth: 'none'
+                    }}
+                >
                     <Chip
                         label={`All ${reactions.length}`}
                         size="small"
                         clickable
                         color={filter === "all" ? "primary" : "default"}
                         onClick={() => setFilter("all")}
+                        sx={{ transition: 'all 0.2s', borderRadius: '8px' }}
                     />
 
                     {Object.entries(reactionGroups).map(([emoji, group]) => (
@@ -84,6 +107,7 @@ export default function ReactionDetailsMenu({
                             clickable
                             color={filter === emoji ? "primary" : "default"}
                             onClick={() => setFilter(emoji)}
+                            sx={{ transition: 'all 0.2s', borderRadius: '8px' }}
                         />
                     ))}
                 </Box>
@@ -92,7 +116,7 @@ export default function ReactionDetailsMenu({
             <Divider />
 
             {/* User list */}
-            <Box sx={{ maxHeight: 240, overflowY: "auto" }}>
+            <Box sx={{ maxHeight: 240, overflowY: "auto", py: 1, px: 1 }}>
                 {filteredReactions.map((r, i) => {
                     const isCurrentUser = String(r.UserId) === String(currentUserId);
                     const emojiValue = r.Emoji || r.Reaction;
@@ -105,7 +129,17 @@ export default function ReactionDetailsMenu({
                                 cursor: isCurrentUser ? "pointer" : "default",
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: 1
+                                gap: 1.5,
+                                py: 1.2,
+                                px: 1.5,
+                                mb: 0.5,
+                                borderRadius: '12px',
+                                transition: 'all 0.2s ease',
+                                overflow: 'hidden',
+                                '&:hover': {
+                                    backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.08),
+                                    transform: 'translateX(4px)',
+                                }
                             }}
                         >
                             <Box flex={1}>

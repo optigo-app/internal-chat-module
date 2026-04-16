@@ -31,10 +31,66 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
   useEffect(() => { selectedCustomerRef.current = selectedCustomer; dispatchUI({ type: UI.SET_MEDIA_FILES, value: [] }); dispatchUI({ type: UI.SET_SHOW_MEDIA, value: false }); }, [selectedCustomer]);
   useEffect(() => { messagesRef.current = msgState.data; }, [msgState.data]);
 
+  const draftsRef = useRef((() => {
+    try {
+      const storageKey = auth?.id ? `chat_drafts_${auth.id}` : 'chat_drafts';
+      const saved = localStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  })());
+  const isInternalInputUpdate = useRef(false);
+
+  const saveDraft = useCallback((convoId, text) => {
+    if (!convoId) return;
+    const cleanText = text?.trim();
+    if (cleanText) {
+      draftsRef.current[convoId] = cleanText;
+    } else {
+      delete draftsRef.current[convoId];
+    }
+    try {
+      const storageKey = auth?.id ? `chat_drafts_${auth.id}` : 'chat_drafts';
+      localStorage.setItem(storageKey, JSON.stringify(draftsRef.current));
+      window.dispatchEvent(new CustomEvent('CHAT_DRAFTS_UPDATED', { detail: draftsRef.current }));
+    } catch (e) { console.error('Error saving drafts:', e); }
+  }, [auth?.id]);
+
+  // Save on tab close
   useEffect(() => {
-    const timer = setTimeout(() => { isAppFirstLoad.current = false; }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
+    const handleBeforeUnload = () => {
+      const currentId = selectedCustomerRef.current?.ConversationId;
+      if (currentId) {
+        saveDraft(currentId, latestInputValueRef.current);
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saveDraft]);
+
+  const latestInputValueRef = useRef('');
+  useEffect(() => {
+    latestInputValueRef.current = uiState.inputValue;
+  }, [uiState.inputValue]);
+
+  // Load draft when switching conversations
+  useEffect(() => {
+    if (!selectedCustomer?.ConversationId) return;
+    const draft = draftsRef.current[selectedCustomer.ConversationId] || '';
+    if (draft !== uiState.inputValue) {
+      isInternalInputUpdate.current = true;
+      dispatchUI({ type: UI.SET_INPUT, value: draft });
+    }
+  }, [selectedCustomer?.ConversationId]);
+
+  // Load draft when switching conversations
+  useEffect(() => {
+    if (!selectedCustomer?.ConversationId) return;
+    const draft = draftsRef.current[selectedCustomer.ConversationId] || '';
+    if (draft !== uiState.inputValue) {
+      isInternalInputUpdate.current = true;
+      dispatchUI({ type: UI.SET_INPUT, value: draft });
+    }
+  }, [selectedCustomer?.ConversationId]);
 
   // ── Group members ──────────────────────────────────────────────────────────
   const fetchAndCacheGroupMembers = useCallback(async (conversationId, force = false) => {
@@ -90,17 +146,41 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     auth, selectedCustomer, uiState, dispatchUI, dispatchMsg,
   });
 
-  // ── Conversation-switch effects ────────────────────────────────────────────
+  const prevConvIdRef = useRef(null);
   useEffect(() => {
-    if (!selectedCustomer?.ConversationId) {
+    const nextId = selectedCustomer?.ConversationId;
+    const prevId = prevConvIdRef.current;
+
+    // COMMIT DRAFT FOR PREVIOUS CONVERSATION
+    if (prevId && prevId !== nextId) {
+      saveDraft(prevId, latestInputValueRef.current);
+    }
+
+    if (!nextId) {
       dispatchMsg({ type: MSG.CLEAR });
+      prevConvIdRef.current = null;
       return;
     }
+
+    dispatchUI({ type: UI.SET_REPLY, value: null });
+    dispatchUI({ type: UI.SET_FORWARD, value: null });
+
     loadConversation(1, true);
     groupMembersRef.current = [];
     processedMsgIds.current.clear();
-    handleReadMessage(selectedCustomer.ConversationId, abortControllerRef.current?.signal);
-  }, [selectedCustomer?.ConversationId]);
+    handleReadMessage(nextId, abortControllerRef.current?.signal);
+
+    prevConvIdRef.current = nextId;
+  }, [selectedCustomer?.ConversationId, saveDraft]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (prevConvIdRef.current) {
+        saveDraft(prevConvIdRef.current, latestInputValueRef.current);
+      }
+    };
+  }, [saveDraft]);
 
   useEffect(() => {
     const handleClear = (e) => {

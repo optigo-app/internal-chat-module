@@ -7,7 +7,7 @@ const Header = () => {
             <div className="header_main">
                 <div className="header_left">
                     <div className="header_brand">
-                        <img src="./icons/logo.png" alt="logo" className="header_left_logo" loading='lazy'/>
+                        <img src="./icons/logo.png" alt="logo" className="header_left_logo" loading='lazy' draggable="false" />
                     </div>
                 </div>
                 <div className="header_right">

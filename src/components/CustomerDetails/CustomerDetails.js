@@ -1,4 +1,4 @@
-import { getCustomerAvatarSeed, getCustomerDisplayName, markImageAsDead } from '../../utils/globalFunc';
+import { getCustomerAvatarSeed, getCustomerDisplayName, markImageAsDead, handleDownloadFile } from '../../utils/globalFunc';
 import { useState, useEffect, useContext, useRef } from 'react';
 import './CustomerDetails.scss';
 import { LoginContext } from '../../context/LoginData';
@@ -124,6 +124,7 @@ const CustomerDetails = ({
 
     // Initialize/Sync permissions when customer prop changes or global state updates
     useEffect(() => {
+        debugger;
         if (customer && customer.IsGroup === 1) {
             const globalSettings = groupSettingsState[customer.ConversationId] || {};
             setGroupPermissions({
@@ -189,7 +190,8 @@ const CustomerDetails = ({
 
     const fetchMediaData = async (type, page = 1) => {
         if (!customer?.ConversationId) return;
-        const requestKey = `${customer.ConversationId}:all:${page}`;
+        const effectiveUserId = (customer.IsGroup === 1) ? 0 : (customer.id || customer.UserId || 0);
+        const requestKey = `${customer.ConversationId}:${effectiveUserId}:${page}`;
         if (inFlightRequestsRef.current.has(requestKey) || fetchedPagesRef.current.has(requestKey)) return;
         inFlightRequestsRef.current.add(requestKey);
         if (pagination[type]?.isLoading) {
@@ -201,8 +203,8 @@ const CustomerDetails = ({
             [type]: { ...prev[type], isLoading: true }
         }));
         try {
-            console.log("customer", customer)
-            const response = await fetchMediaLists(page, pageSize, customer.ConversationId, auth, (customer.id ?? auth?.id));
+            const effectiveUserId = (customer.IsGroup === 1) ? 0 : (customer.id || customer.UserId || 0);
+            const response = await fetchMediaLists(page, pageSize, customer.ConversationId, auth, effectiveUserId);
             if (response?.data) {
                 const categorized = processMediaItems(response.data);
                 setMediaItems(prev => ({
@@ -270,7 +272,7 @@ const CustomerDetails = ({
             inFlightRequestsRef.current.clear();
             fetchedPagesRef.current.clear();
         }
-    }, [customer.ConversationId]);
+    }, [customer.ConversationId, customer.id, customer.UserId]);
 
     // Fetch group details and initial media only when the drawer is actually opened
     useEffect(() => {
@@ -280,7 +282,7 @@ const CustomerDetails = ({
             }
             fetchMediaData('images', 1);
         }
-    }, [open, customer.ConversationId]);
+    }, [open, customer.ConversationId, customer.id, customer.UserId]);
 
     // Fetch contact info when viewing a non-group contact or a member's profile
     useEffect(() => {
@@ -296,7 +298,7 @@ const CustomerDetails = ({
         if (open && currentViewState === 'media' && customer.ConversationId) {
             fetchMediaData('images', 1);
         }
-    }, [open, currentViewState, customer.ConversationId, fetchMediaData]);
+    }, [open, currentViewState, customer.ConversationId, customer.id, customer.UserId]);
 
     useEffect(() => {
         if (open && initialViewState) {
@@ -409,7 +411,16 @@ const CustomerDetails = ({
                 if (name === 'sendMessages') {
                     updateGroupAdminMode(customer.ConversationId, value === false);
                 }
-                toast.success('Permission updated successfully');
+                const friendlyNames = {
+                    editGroupSettings: 'Edit group settings',
+                    sendMessages: 'Send messages',
+                    addOtherMembers: 'Add members',
+                    inviteToGroup: 'Invite to group',
+                    approveNewMembers: 'Approve new members',
+                    deleteMessages: 'Delete messages'
+                };
+                const friendlyName = friendlyNames[name] || 'Permission';
+                toast.success(`${friendlyName} ${value ? 'Permission enabled' : 'Permission disabled'}`);
             } else {
                 setGroupPermissions(prev => ({ ...prev, [name]: !value }));
                 toast.error(response?.Message || 'Failed to update permission');
@@ -811,23 +822,11 @@ const CustomerDetails = ({
             setInitialMediaIndex(index >= 0 ? index : 0);
             setMediaOpen(true);
         } else {
-            handleDownload(media.src || media.FileUrl, media.name || media.FileName || `document_${media.Id}`);
+            handleDownloadFile(media.src || media.FileUrl, media.name || media.FileName || `document_${media.Id}`);
         }
     };
 
-    const handleDownload = async (url, filename) => {
-        try {
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = filename || 'download';
-            link.target = '_blank';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        } catch (error) {
-            console.error('Download failed:', error);
-        }
-    };
+    // handleDownload function moved to global utils/globalFunc.js as handleDownloadFile
 
     useEffect(() => {
         if (!open) return;
@@ -1038,7 +1037,7 @@ const CustomerDetails = ({
                             loadMoreMedia={loadMoreMedia}
                             loadMoreDocuments={loadMoreDocuments}
                             handleMediaClick={handleMediaClick}
-                            handleDownload={handleDownload}
+                            handleDownload={handleDownloadFile}
                             enablePagination={enablePagination}
                             messages={messages}
                             searchQuery={searchQuery}

@@ -2,31 +2,9 @@ import React from 'react';
 import { Typography, Avatar, alpha, useTheme, Box, IconButton } from '@mui/material';
 import { CheckCheck, Check, Play, FileText, Download, File, Image as ImageIcon, Video as VideoIcon, Forward } from 'lucide-react';
 import { Emoji } from 'emoji-picker-react';
-import { getWhatsAppAvatarConfig, getDocumentMeta } from '../../utils/globalFunc';
+import { getWhatsAppAvatarConfig, getDocumentMeta, formatISOTimeUTC } from '../../utils/globalFunc';
 import { readMessageMemberList } from '../../API/Groups/ReadMessageMemberListApi';
 import { FormatDateIST } from '../../utils/DateFnc';
-
-const formatTimeStatus = (dateStr) => {
-    if (!dateStr) return '';
-    const formatted = FormatDateIST(dateStr);
-    const date = new Date(dateStr);
-    const now = new Date();
-
-    // Simple today/yesterday check using UTC dates to be safe
-    const isToday = date.getUTCDate() === now.getUTCDate() &&
-        date.getUTCMonth() === now.getUTCMonth() &&
-        date.getUTCFullYear() === now.getUTCFullYear();
-
-    const yesterday = new Date(now);
-    yesterday.setUTCDate(now.getUTCDate() - 1);
-    const isYesterday = date.getUTCDate() === yesterday.getUTCDate() &&
-        date.getUTCMonth() === yesterday.getUTCMonth() &&
-        date.getUTCFullYear() === yesterday.getUTCFullYear();
-
-    if (isToday) return formatted.time;
-    if (isYesterday) return "Yesterday";
-    return formatted.date;
-};
 
 const charToUnified = (char) => {
     if (!char) return null;
@@ -59,14 +37,11 @@ const MessageInfo = ({ messageInfo, localGroupData, auth, selectedCustomer, mess
         fetchStatus();
     }, [fetchStatus]);
 
-    const displayTime = React.useMemo(() => {
-        if (!messageInfo?.DateTime) return "";
-        return FormatDateIST(messageInfo.DateTime, "dd-mm-yyyy").time;
-    }, [messageInfo?.DateTime]);
-
     if (!messageInfo) return null;
 
     const isOutgoing = messageInfo?.Direction === 1;
+
+    console.log("djkjjs", messageInfo)
 
     return (
         <div className="message-info-container">
@@ -129,7 +104,8 @@ const MessageInfo = ({ messageInfo, localGroupData, auth, selectedCustomer, mess
                     {messageInfo.ContextType === 2 && (
                         <div className="reply-preview-wrapper" style={{ marginBottom: '8px' }}>
                             {(() => {
-                                const original = messages?.find(m => (m.MessageId || m.id) === messageInfo.ContextId);
+                                debugger
+                                const original = messages?.data?.find(m => (m.MessageId || m.id) === messageInfo.ContextId);
                                 const isGenericReply = !messageInfo?.ReplyContextMsg || String(messageInfo.ReplyContextMsg).trim() === '' || String(messageInfo.ReplyContextMsg).trim().toLowerCase() === 'media';
                                 const mediaCount = Array.isArray(original?.mediaItems) ? original.mediaItems.length : 0;
                                 const originalType = original?.MessageType;
@@ -250,37 +226,67 @@ const MessageInfo = ({ messageInfo, localGroupData, auth, selectedCustomer, mess
                                             backgroundColor: alpha(theme.palette.text.primary, 0.05)
                                         }}
                                     >
-                                        <img
-                                            src={messageInfo?.previewUrl || messageInfo?.MediaUrl || (mediaItems[0]?.url)}
-                                            alt="preview"
-                                            style={{
-                                                width: '100%',
-                                                height: '100%',
-                                                objectFit: 'cover',
-                                                display: 'block'
-                                            }}
-                                        />
+                                        {messageInfo?.MessageType !== 'video' && (
+                                            <img
+                                                src={messageInfo?.previewUrl || messageInfo?.MediaUrl || (mediaItems[0]?.url)}
+                                                alt="preview"
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'cover',
+                                                    display: 'block'
+                                                }}
+                                            />
+                                        )}
                                         {messageInfo?.MessageType === 'video' && (
-                                            <div style={{
-                                                position: 'absolute',
-                                                inset: 0,
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                backgroundColor: 'rgba(0,0,0,0.3)'
-                                            }}>
-                                                <Box sx={{
-                                                    width: 44,
-                                                    height: 44,
-                                                    borderRadius: '50%',
-                                                    backgroundColor: 'rgba(255,255,255,0.9)',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    color: '#000'
-                                                }}>
-                                                    <Play size={24} fill="currentColor" />
-                                                </Box>
+                                            <div
+                                                style={{
+                                                    position: 'relative',
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    overflow: 'hidden',
+                                                    borderRadius: '8px'
+                                                }}
+                                            >
+                                                {/* Video Thumbnail */}
+                                                <video
+                                                    src={messageInfo?.previewUrl || messageInfo?.MediaUrl || mediaItems[0]?.url}
+                                                    muted
+                                                    playsInline
+                                                    preload="metadata"
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        objectFit: 'cover'
+                                                    }}
+                                                />
+
+                                                {/* Overlay */}
+                                                <div
+                                                    style={{
+                                                        position: 'absolute',
+                                                        inset: 0,
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        backgroundColor: 'rgba(0,0,0,0.3)'
+                                                    }}
+                                                >
+                                                    <Box
+                                                        sx={{
+                                                            width: 50,
+                                                            height: 50,
+                                                            borderRadius: '50%',
+                                                            backgroundColor: 'rgba(255,255,255,0.9)',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            color: '#000'
+                                                        }}
+                                                    >
+                                                        <Play size={24} fill="#000" />
+                                                    </Box>
+                                                </div>
                                             </div>
                                         )}
                                     </Box>
@@ -383,7 +389,7 @@ const MessageInfo = ({ messageInfo, localGroupData, auth, selectedCustomer, mess
                                 color: alpha(theme.palette.text.primary, 0.6)
                             }}
                         >
-                            {displayTime}
+                            {messageInfo?.Time}
                         </Typography>
                         {isOutgoing && (
                             <CheckCheck size={15} color={theme.palette.primary.main} />
@@ -461,7 +467,7 @@ const MessageInfo = ({ messageInfo, localGroupData, auth, selectedCustomer, mess
                                     </div>
                                     <div className="setting-right">
                                         <Typography variant="caption" className="sub-text status-chip">
-                                            {member.ReadAt ? formatTimeStatus(member.ReadAt) : ''}
+                                            {member.ReadAt ? formatISOTimeUTC(member.ReadAt) : ''}
                                         </Typography>
                                     </div>
                                 </div>
@@ -495,7 +501,7 @@ const MessageInfo = ({ messageInfo, localGroupData, auth, selectedCustomer, mess
                                     </div>
                                     <div className="setting-right">
                                         <Typography variant="caption" className="sub-text status-chip">
-                                            {member.EntryDate ? formatTimeStatus(member.EntryDate) : 'Delivered'}
+                                            {member.EntryDate ? formatISOTimeUTC(member.EntryDate) : 'Delivered'}
                                         </Typography>
                                     </div>
                                 </div>

@@ -40,7 +40,7 @@ const ConversationAvatar = ({ member, size = 45 }) => {
     if (!hasCustomerName(member)) {
         const cfg = getWhatsAppAvatarConfig(getCustomerAvatarSeed(member), size);
         return (
-            <Avatar {...cfg} sx={{ ...cfg.sx, width: size, height: size }}>
+            <Avatar {...cfg} sx={{ ...cfg.sx, width: size, height: size }} imgProps={{ draggable: false }}>
                 <PersonIcon fontSize="small" />
             </Avatar>
         );
@@ -65,6 +65,7 @@ const ConversationAvatar = ({ member, size = 45 }) => {
                     src={imageUrl}
                     onLoad={handleLoad}
                     onError={handleError}
+                    imgProps={{ draggable: false }}
                     sx={{
                         width: size,
                         height: size,
@@ -82,6 +83,7 @@ const ConversationAvatar = ({ member, size = 45 }) => {
                     onError={handleError}
                     style={{ display: 'none' }}
                     alt=""
+                    draggable="false"
                 />
             </div>
         );
@@ -91,6 +93,7 @@ const ConversationAvatar = ({ member, size = 45 }) => {
     return (
         <Avatar
             {...avatarConfig}
+            imgProps={{ draggable: false }}
             sx={{
                 ...avatarConfig.sx,
                 width: size,

@@ -55,15 +55,17 @@ const ProfileAvatar = () => {
         try {
             await LogoutApi(auth?.id || getId?.id);
             disconnectSocket();
+            sessionStorage.clear();
             setAuth({ userId: '', username: '', ukey: '', token: '' });
             setToken({ sv: '', yc: '' });
-            sessionStorage.clear();
             navigate('/login');
             closeConfirm();
         } catch (error) {
             console.error('Error during logout:', error);
             navigate('/login');
             closeConfirm();
+            disconnectSocket();
+            sessionStorage.clear();
         }
     };
 
@@ -83,6 +85,7 @@ const ProfileAvatar = () => {
                     alt={username || "User"}
                     src={auth?.ProfileImageUrl || undefined}
                     sx={avatarConfig.sx}
+                    imgProps={{ draggable: false }}
                 >
                     {avatarConfig.children}
                 </Avatar>

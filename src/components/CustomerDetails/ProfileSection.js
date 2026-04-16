@@ -86,6 +86,7 @@ const ProfileSection = ({
                             {...(getWhatsAppAvatarConfig(avatarSeed, 130))}
                             className="profile-avatar"
                             src={(customer?.ProfileImageUrl && !isImageDead(customer?.ProfileImageUrl)) ? customer?.ProfileImageUrl : undefined}
+                            imgProps={{ draggable: false }}
                         />
                     </StyledBadge>
                 </div>

@@ -103,17 +103,16 @@ const ChatBox = ({
             ReceiverId: receiverIdValue,
             IsGroup: isGroup ? 1 : 0,
             UserName: auth?.username || auth?.name,
+            ProfileImageUrl: auth?.ProfileImageUrl || auth?.profileImage || auth?.AvatarUrl || '',
+            ProfileImage: auth?.ProfileImage || auth?.profileImage || auth?.AvatarUrl || '',
             ufcc: auth?.ufcc,
             isTyping: isTyping
         });
     }, [selectedCustomer, auth]);
 
     useEffect(() => {
-        if (prevInputValueRef.current !== '' && inputValue === '') {
-            setTempQuery('')
-        }
-        prevInputValueRef.current = inputValue
-    }, [inputValue])
+        setTempQuery(inputValue || '');
+    }, [inputValue]);
 
     const onEmojiClick = (emojiData) => {
         const emoji = emojiData?.emoji || '';

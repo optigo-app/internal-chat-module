@@ -16,6 +16,7 @@ import {
     InputAdornment,
     IconButton,
     Tooltip,
+    Skeleton,
     CircularProgress
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
@@ -50,7 +51,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const { archieve, addArchieve } = useArchieveContext();
     const [searchTerm, setSearchTerm] = useState('');
     const [tabValue, setTabValue] = useState(0);
-    const [chatMembers, setChatMembers] = useState([]);
+    const [chatMembers, setChatMembers] = useState({ data: null, total: 0 });
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
@@ -59,9 +60,10 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const [hoveredId, setHoveredId] = useState(null);
     const [typingStates, setTypingStates] = useState({});
     const typingTimeoutsRef = useRef({});
-    const [selectedIndex, setSelectedIndex] = useState(-1);
     const [showNewChat, setShowNewChat] = useState(false);
     const [showCreateGroup, setShowCreateGroup] = useState(false);
+    const [showEmptyState, setShowEmptyState] = useState(false);
+    const [selectedIndex, setSelectedIndex] = useState(-1);
     const containerRef = useRef(null);
     const pageSize = 100;
     const searchTimeoutRef = useRef(null);
@@ -72,6 +74,42 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
 
     // Get Context favorite state
     const { favoriteState } = useFavorite();
+
+    // Drafts management
+    const draftsRef = useRef((() => {
+        try {
+            const storageKey = auth?.id ? `chat_drafts_${auth.id}` : 'chat_drafts';
+            const saved = localStorage.getItem(storageKey);
+            return saved ? JSON.parse(saved) : {};
+        } catch { return {}; }
+    })());
+    const [drafts, setDrafts] = useState(draftsRef.current);
+
+    useEffect(() => {
+        const storageKey = auth?.id ? `chat_drafts_${auth.id}` : 'chat_drafts';
+        const handleDraftsUpdate = (e) => {
+            if (e.detail) {
+                draftsRef.current = e.detail;
+                setDrafts(e.detail);
+            }
+        };
+        const handleStorage = (e) => {
+            if (e.key === storageKey) {
+                try {
+                    const parsed = JSON.parse(e.newValue || '{}');
+                    draftsRef.current = parsed;
+                    setDrafts(parsed);
+                } catch { }
+            }
+        };
+        window.addEventListener('CHAT_DRAFTS_UPDATED', handleDraftsUpdate);
+        window.addEventListener('storage', handleStorage);
+        return () => {
+            window.removeEventListener('CHAT_DRAFTS_UPDATED', handleDraftsUpdate);
+            window.removeEventListener('storage', handleStorage);
+        };
+    }, [auth?.id]);
+
 
     const getMemberTimeValue = useCallback((member) => {
         const raw = member?.lastMessageTimeValue || member?.LastMessageDate || member?.LastUpdatedDate || member?.lastMessageTime || 0;
@@ -113,6 +151,10 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
         const controller = new AbortController();
         fetchControllerRef.current = controller;
 
+        if (reset) {
+            setChatMembers({ data: null, total: 0 });
+            setShowEmptyState(false);
+        }
         setLoading(true);
 
         try {
@@ -163,9 +205,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
             }
             console.error('Error loading members:', error);
         } finally {
-            setTimeout(() => {
-                setLoading(false);
-            }, 100);
+            setLoading(false);
         }
     }, [loading, hasMore, auth?.token, auth?.userId, pageSize, processApiResponse, searchTerm, conversationComparator]);
 
@@ -730,8 +770,7 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 notify(data, 'PERMISSION_CHANGED', auth);
             }
 
-            // Refresh conversation list
-            loadMembers(1, true, searchTerm);
+            // No need to refresh conversation list for permission changes
         };
 
         const removeGroupEventHandler = addGroupEventHandler(handleGroupEvent);
@@ -834,8 +873,9 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     };
 
     const getFilteredMembers = useCallback((isForArchiveOverlay) => {
-        return chatMembers?.data
-            ?.filter((member) => {
+        if (!chatMembers?.data) return [];
+        return chatMembers.data
+            .filter((member) => {
                 if (isForArchiveOverlay) {
                     return member.IsArchived === 1;
                 } else {
@@ -850,7 +890,8 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                 // Check Context state first, fallback to member.IsStar
                 const isFavoriteStatus = (favoriteState[member.ConversationId]?.isStar ?? member.IsStar) === 1;
                 switch (tabValue) {
-                    case 2: return isFavoriteStatus && tabValue === 2;
+                    case 2: return isFavoriteStatus;
+                    case 3: return member.IsGroup === 1;
                     default: return true;
                 }
             })
@@ -919,6 +960,18 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
     const archivedCount = chatMembers?.data?.filter(m => m.IsArchived === 1)?.length || 0;
 
     const filteredMembers = React.useMemo(() => getFilteredMembers(isArchiveOpen), [getFilteredMembers, isArchiveOpen]);
+
+    useEffect(() => {
+        let timeout;
+        if (!loading && chatMembers.data !== null && filteredMembers.length === 0) {
+            timeout = setTimeout(() => {
+                setShowEmptyState(true);
+            }, 1000);
+        } else {
+            setShowEmptyState(false);
+        }
+        return () => clearTimeout(timeout);
+    }, [loading, chatMembers.data, filteredMembers.length]);
 
     const getMessageStatusIcon = (member) => {
         const direction = Number(member?.LastMessageDirection ?? member?.lastMessageDirection);
@@ -1210,7 +1263,11 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                         padding: '6px',
                     }}
                 >
-                    {[{ label: 'All', value: 0 }, { label: 'Favorite', value: 2 }].map((item) => {
+                    {[
+                        { label: 'All', value: 0 },
+                        { label: 'Groups', value: 3 },
+                        { label: 'Favorite', value: 2 }
+                    ].map((item) => {
                         const isActive = tabValue === item.value;
 
                         return (
@@ -1277,229 +1334,244 @@ const CustomerLists = ({ onCustomerSelect = () => { }, selectedCustomer = null, 
                         </li>
                     )}
 
-                    {loading && (!chatMembers?.data || chatMembers?.data.length === 0) ? (
-                        <li
-                            style={{
-                                textAlign: 'center',
-                                display: 'flex',
-                                justify_content: 'center',
-                                padding: '20px'
-                            }}
-                        >
-                            <CircularProgress />
-                        </li>
-                    ) : (
-                        filteredMembers?.length > 0 ? (
-                            <>
-                                {filteredMembers
-                                    .filter(member => !member.isSearchResult)
-                                    .map((member, index) => {
-                                        const isSelectedAndReading =
-                                            selectedCustomer?.ConversationId === member.ConversationId &&
-                                            ((isConversationRead || viewConversationRead) ||
-                                                (isConversationRead && viewConversationRead));
-                                        const isSelected = selectedCustomer?.ConversationId === member.ConversationId;
-                                        const isKeyboardSelected = index === selectedIndex;
-                                        const isMenuOpen = Boolean(anchorEl) && selectMember?.ConversationId === member.ConversationId;
-                                        const shouldShowUnreadBadge =
-                                            member.unreadCount > 0 && !isSelectedAndReading;
+                    {((loading || chatMembers.data === null) || (filteredMembers.length === 0 && !showEmptyState)) ? (
+                        <>
+                            {[...Array(12)].map((_, i) => (
+                                <li key={i} className="member-item" style={{ pointerEvents: 'none' }}>
+                                    <div className="member-item">
+                                        <div className="member-avatar">
+                                            <Skeleton variant="circular" width={48} height={48} />
+                                        </div>
+                                        <div className="member-info" style={{ flexGrow: 1 }}>
+                                            <div className="member-header">
+                                                <Skeleton variant="text" width="60%" height={24} />
+                                                <Skeleton variant="text" width="40px" height={16} />
+                                            </div>
+                                            <div className="member-message">
+                                                <Skeleton variant="text" width="80%" height={16} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+                            ))}
+                        </>
+                    ) : filteredMembers?.length > 0 ? (
+                        <>
+                            {filteredMembers
+                                .filter(member => !member.isSearchResult)
+                                .map((member, index) => {
+                                    const isSelectedAndReading =
+                                        selectedCustomer?.ConversationId === member.ConversationId &&
+                                        ((isConversationRead || viewConversationRead) ||
+                                            (isConversationRead && viewConversationRead));
+                                    const isSelected = selectedCustomer?.ConversationId === member.ConversationId;
+                                    const isKeyboardSelected = index === selectedIndex;
+                                    const isMenuOpen = Boolean(anchorEl) && selectMember?.ConversationId === member.ConversationId;
+                                    const shouldShowUnreadBadge =
+                                        member.unreadCount > 0 && !isSelectedAndReading;
 
 
-                                        return (
-                                            <li
-                                                key={member.ConversationId}
-                                                className={`member-item ${isSelected ? 'active' : ''} ${isSelectedAndReading ? 'reading' : ''} ${isMenuOpen ? 'menu-open' : ''} ${isKeyboardSelected ? 'keyboard-selected' : ''}`}
-                                                onClick={() => handleCustomerClick(member)}
-                                                onMouseEnter={() => setHoveredId(member.ConversationId)}
-                                                onMouseLeave={() => setHoveredId(null)}
-                                            >
-                                                <div className={`member-item ${isSelected ? 'active' : ''} ${isSelectedAndReading ? 'reading' : ''}`}>
-                                                    <div className="member-avatar">
-                                                        <ConversationAvatar member={member} />
+                                    return (
+                                        <li
+                                            key={member.ConversationId}
+                                            className={`member-item ${isSelected ? 'active' : ''} ${isSelectedAndReading ? 'reading' : ''} ${isMenuOpen ? 'menu-open' : ''} ${isKeyboardSelected ? 'keyboard-selected' : ''}`}
+                                            onClick={() => handleCustomerClick(member)}
+                                            onMouseEnter={() => setHoveredId(member.ConversationId)}
+                                            onMouseLeave={() => setHoveredId(null)}
+                                        >
+                                            <div className={`member-item ${isSelected ? 'active' : ''} ${isSelectedAndReading ? 'reading' : ''}`}>
+                                                <div className="member-avatar">
+                                                    <ConversationAvatar member={member} />
+                                                </div>
+
+                                                <div className="member-info">
+                                                    <div className="member-header">
+                                                        <Typography
+                                                            variant="subtitle1"
+                                                            className={shouldShowUnreadBadge ? 'member-name-unread' : 'member-name'}
+                                                        >
+                                                            {highlightText(member.name, searchTerm)}
+                                                        </Typography>
+
+                                                        <Typography variant="caption" className="member-time">
+                                                            {member?.lastMessageTime}
+                                                        </Typography>
                                                     </div>
 
-                                                    <div className="member-info">
-                                                        <div className="member-header">
-                                                            <Typography
-                                                                variant="subtitle1"
-                                                                className={shouldShowUnreadBadge ? 'member-name-unread' : 'member-name'}
-                                                            >
-                                                                {highlightText(member.name, searchTerm)}
-                                                            </Typography>
-
-                                                            <Typography variant="caption" className="member-time">
-                                                                {member?.lastMessageTime}
-                                                            </Typography>
-                                                        </div>
-
-                                                        <div className="member-message">
-                                                            <Typography
-                                                                variant="body2"
-                                                                className={shouldShowUnreadBadge ? 'last-message-unread' : 'last-message'}
-                                                                style={{ display: 'flex', alignItems: 'center' }}
-                                                            >
-                                                                {typingStates[member.ConversationId] ? (
-                                                                    <span className='typing_indecator'>
-                                                                        <div className="typing-dots-container sidebar-dots">
-                                                                            <div className="typing-dot"></div>
-                                                                            <div className="typing-dot"></div>
-                                                                            <div className="typing-dot"></div>
-                                                                        </div>
-                                                                        {member.IsGroup === 1
-                                                                            ? `${typingStates[member.ConversationId].userName} is typing...`
-                                                                            : 'typing...'}
+                                                    <div className="member-message">
+                                                        <Typography
+                                                            variant="body2"
+                                                            className={shouldShowUnreadBadge ? 'last-message-unread' : 'last-message'}
+                                                            style={{ display: 'flex', alignItems: 'center' }}
+                                                        >
+                                                            {typingStates[member.ConversationId] ? (
+                                                                <span className='typing_indecator'>
+                                                                    <div className="typing-dots-container sidebar-dots">
+                                                                        <div className="typing-dot"></div>
+                                                                        <div className="typing-dot"></div>
+                                                                        <div className="typing-dot"></div>
+                                                                    </div>
+                                                                    {member.IsGroup === 1
+                                                                        ? `${typingStates[member.ConversationId].userName} is typing...`
+                                                                        : 'typing...'}
+                                                                </span>
+                                                            ) : (drafts[member.ConversationId] && member.ConversationId !== selectedCustomer?.ConversationId) ? (
+                                                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                    <span style={{ color: '#7367f0', fontWeight: 600 }}>Draft: </span>
+                                                                    <span style={{ color: '#4b4b4b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                        {renderEmojiText(drafts[member.ConversationId], { size: 16 })}
                                                                     </span>
-                                                                ) : (
-                                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                        {getMessageStatusIcon(member)}
+                                                                </span>
+                                                            ) : (
+                                                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                    {getMessageStatusIcon(member)}
 
-                                                                        {/* TEXT MESSAGE */}
-                                                                        {member.LastMessageType === 1 && (
-                                                                            renderEmojiText(member.LastMessage || 'Text', { size: 16 })
-                                                                        )}
+                                                                    {/* TEXT MESSAGE */}
+                                                                    {member.LastMessageType === 1 && (
+                                                                        renderEmojiText(member.LastMessage || 'Text', { size: 16 })
+                                                                    )}
 
-                                                                        {/* IMAGE */}
-                                                                        {member.LastMessageType === 2 && (
-                                                                            <>
-                                                                                <Image size={12} />
-                                                                                <span>Image</span>
-                                                                            </>
-                                                                        )}
+                                                                    {/* IMAGE */}
+                                                                    {member.LastMessageType === 2 && (
+                                                                        <>
+                                                                            <Image size={12} />
+                                                                            <span>Image</span>
+                                                                        </>
+                                                                    )}
 
-                                                                        {/* VIDEO */}
-                                                                        {member.LastMessageType === 3 && (
-                                                                            <>
-                                                                                <Video size={14} />
-                                                                                <span>Video</span>
-                                                                            </>
-                                                                        )}
+                                                                    {/* VIDEO */}
+                                                                    {member.LastMessageType === 3 && (
+                                                                        <>
+                                                                            <Video size={14} />
+                                                                            <span>Video</span>
+                                                                        </>
+                                                                    )}
 
-                                                                        {/* DOCUMENT */}
-                                                                        {member.LastMessageType === 4 && (
-                                                                            <>
-                                                                                <FileText size={12} />
-                                                                                <span>Document</span>
-                                                                            </>
-                                                                        )}
+                                                                    {/* DOCUMENT */}
+                                                                    {member.LastMessageType === 4 && (
+                                                                        <>
+                                                                            <FileText size={12} />
+                                                                            <span>Document</span>
+                                                                        </>
+                                                                    )}
 
-                                                                        {/* FALLBACK */}
-                                                                        {!member.LastMessageType && <span>Text</span>}
-                                                                    </span>
-                                                                )}
+                                                                    {/* FALLBACK */}
+                                                                    {!member.LastMessageType && <span>Text</span>}
+                                                                </span>
+                                                            )}
 
-                                                            </Typography>
+                                                        </Typography>
 
-                                                            <div className="member-trailing">
-                                                                {shouldShowUnreadBadge && (
-                                                                    <Badge
-                                                                        badgeContent={member?.unreadCount ?? member?.UnreadCount}
-                                                                        color="primary"
-                                                                        className="unread-badge"
-                                                                    />
-                                                                )}
+                                                        <div className="member-trailing">
+                                                            {shouldShowUnreadBadge && (
+                                                                <Badge
+                                                                    badgeContent={member?.unreadCount ?? member?.UnreadCount}
+                                                                    color="primary"
+                                                                    className="unread-badge"
+                                                                />
+                                                            )}
 
-                                                                <div className="member-actions-bar">
-                                                                    {member?.IsPin === 1 &&
-                                                                        <Tooltip title={member?.IsPin === 1 ? "Unpin" : "Pin"} arrow>
-                                                                            <IconButton
-                                                                                size="small"
-                                                                                className={`action-btn ${member?.IsPin === 1 ? 'is-on' : ''}`}
-                                                                            >
-                                                                                <Pin size={17} />
-                                                                            </IconButton>
-                                                                        </Tooltip>
-                                                                    }
-                                                                    {((favoriteState[member.ConversationId]?.isStar ?? member?.IsStar) === 1) &&
-                                                                        <Tooltip title="Unfavorite" arrow>
-                                                                            <IconButton
-                                                                                size="small"
-                                                                                className="action-btn is-on"
-                                                                            >
-                                                                                <Star size={17} />
-                                                                            </IconButton>
-                                                                        </Tooltip>
-                                                                    }
-                                                                    {(hoveredId === member.ConversationId || isSelected || isMenuOpen) &&
-                                                                        <Tooltip
-                                                                            title="More"
-                                                                            arrow
+                                                            <div className="member-actions-bar">
+                                                                {member?.IsPin === 1 &&
+                                                                    <Tooltip title={member?.IsPin === 1 ? "Unpin" : "Pin"} arrow>
+                                                                        <IconButton
+                                                                            size="small"
+                                                                            className={`action-btn ${member?.IsPin === 1 ? 'is-on' : ''}`}
                                                                         >
-                                                                            <IconButton
-                                                                                className={'action-btn'}
-                                                                                size="small"
-                                                                                tabIndex={(hoveredId === member.ConversationId || isSelected || isMenuOpen) ? 0 : -1}
-                                                                                aria-hidden={!(hoveredId === member.ConversationId || isSelected || isMenuOpen)}
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
+                                                                            <Pin size={17} />
+                                                                        </IconButton>
+                                                                    </Tooltip>
+                                                                }
+                                                                {((favoriteState[member.ConversationId]?.isStar ?? member?.IsStar) === 1) &&
+                                                                    <Tooltip title="Unfavorite" arrow>
+                                                                        <IconButton
+                                                                            size="small"
+                                                                            className="action-btn is-on"
+                                                                        >
+                                                                            <Star size={17} />
+                                                                        </IconButton>
+                                                                    </Tooltip>
+                                                                }
+                                                                {(hoveredId === member.ConversationId || isSelected || isMenuOpen) &&
+                                                                    <Tooltip
+                                                                        title="More"
+                                                                        arrow
+                                                                    >
+                                                                        <IconButton
+                                                                            className={'action-btn'}
+                                                                            size="small"
+                                                                            tabIndex={(hoveredId === member.ConversationId || isSelected || isMenuOpen) ? 0 : -1}
+                                                                            aria-hidden={!(hoveredId === member.ConversationId || isSelected || isMenuOpen)}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
 
-                                                                                    if (!(hoveredId === member.ConversationId || isSelected || isMenuOpen)) return;
+                                                                                if (!(hoveredId === member.ConversationId || isSelected || isMenuOpen)) return;
 
-                                                                                    setAnchorEl(e.currentTarget);
-                                                                                    setSelectMember(member);
-                                                                                    onConversationList(Array.isArray(chatMembers?.data) ? chatMembers.data : []);
-                                                                                }}
-                                                                            >
-                                                                                <ChevronDown size={17} />
-                                                                            </IconButton>
-                                                                        </Tooltip>
-                                                                    }
-                                                                </div>
+                                                                                setAnchorEl(e.currentTarget);
+                                                                                setSelectMember(member);
+                                                                                onConversationList(Array.isArray(chatMembers?.data) ? chatMembers.data : []);
+                                                                            }}
+                                                                        >
+                                                                            <ChevronDown size={17} />
+                                                                        </IconButton>
+                                                                    </Tooltip>
+                                                                }
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </li>
-                                        );
-                                    })}
+                                            </div>
+                                        </li>
+                                    );
+                                })}
 
-                                {/* Search Results Group */}
-                                {searchTerm && filteredMembers.some(m => m.isSearchResult) && (
-                                    <div className="search-results-group">
-                                        {filteredMembers
-                                            .filter(member => member.isSearchResult)
-                                            .map((member) => {
-                                                const memberIdx = filteredMembers.indexOf(member);
-                                                const isKeyboardSelectedResult = memberIdx === selectedIndex;
-                                                return (
-                                                    <li
-                                                        key={`search-${member.Id}`}
-                                                        className={`member-item search-result ${isKeyboardSelectedResult ? 'keyboard-selected' : ''}`}
-                                                        onClick={() => onCustomerSelect(member)}
-                                                    >
-                                                        <div className="member-avatar">
-                                                            <ConversationAvatar member={member} />
+                            {/* Search Results Group */}
+                            {searchTerm && filteredMembers.some(m => m.isSearchResult) && (
+                                <div className="search-results-group">
+                                    {filteredMembers
+                                        .filter(member => member.isSearchResult)
+                                        .map((member) => {
+                                            const memberIdx = filteredMembers.indexOf(member);
+                                            const isKeyboardSelectedResult = memberIdx === selectedIndex;
+                                            return (
+                                                <li
+                                                    key={`search-${member.Id}`}
+                                                    className={`member-item search-result ${isKeyboardSelectedResult ? 'keyboard-selected' : ''}`}
+                                                    onClick={() => onCustomerSelect(member)}
+                                                >
+                                                    <div className="member-avatar">
+                                                        <ConversationAvatar member={member} />
+                                                    </div>
+                                                    <div className="member-info">
+                                                        <div className="member-name" style={{ fontWeight: 500, fontSize: '15px', color: '#111827' }}>
+                                                            {highlightText(member.name, searchTerm)}
                                                         </div>
-                                                        <div className="member-info">
-                                                            <div className="member-name" style={{ fontWeight: 500, fontSize: '15px', color: '#111827' }}>
-                                                                {highlightText(member.name, searchTerm)}
+                                                        {(member.email || member.UserEmail) && (
+                                                            <div className="member-email" style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>
+                                                                {highlightText(member.email || member.UserEmail, searchTerm)}
                                                             </div>
-                                                            {(member.email || member.UserEmail) && (
-                                                                <div className="member-email" style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>
-                                                                    {highlightText(member.email || member.UserEmail, searchTerm)}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </li>
-                                                );
-                                            })}
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            !loading && (
-                                <li
-                                    style={{
-                                        textAlign: 'center',
-                                        display: 'flex',
-                                        justifyContent: 'center',
-                                        padding: '20px'
-                                    }}
-                                >
-                                    <Typography variant="body2" color="textSecondary">
-                                        No conversations found.
-                                    </Typography>
-                                </li>
-                            )
+                                                        )}
+                                                    </div>
+                                                </li>
+                                            );
+                                        })}
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        showEmptyState && (
+                            <li
+                                style={{
+                                    textAlign: 'center',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    padding: '20px'
+                                }}
+                            >
+                                <Typography variant="body2" color="textSecondary">
+                                    No conversations found.
+                                </Typography>
+                            </li>
                         )
                     )}
 

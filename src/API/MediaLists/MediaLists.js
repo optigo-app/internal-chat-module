@@ -2,9 +2,17 @@ import { CommonAPI } from "../InitialApi/CommonApi";
 
 export const fetchMediaLists = async (page = 1, pageSize = 6, conversationId, auth, userId) => {
     try {
+        const conObj = { id: "", mode: "FilesList", appuserid: auth?.userId || "" };
+        const pObj = { ConversationId: conversationId };
+        
+        // Only include UserId if it's provided and non-zero
+        if (userId) {
+            pObj.UserId = userId;
+        }
+
         const body = {
-            "con": `{\"id\":\"\",\"mode\":\"FilesList\",\"appuserid\":\"${auth?.userId}\"}`,
-            "p": `{\"ConversationId\": ${conversationId},\"UserId\":${userId ?? 0}}`,
+            "con": JSON.stringify(conObj),
+            "p": JSON.stringify(pObj),
             "f": "Chat ( File list )"
         }
 

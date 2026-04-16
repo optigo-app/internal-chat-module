@@ -1,4 +1,4 @@
-import React, { useContext, useRef, useState } from "react";
+import React, { useContext, useRef, useState, useEffect } from "react";
 import "./LoginPage1.scss";
 import {
     TextField,
@@ -8,7 +8,9 @@ import {
     useMediaQuery,
     InputAdornment,
     IconButton,
-    Box
+    Box,
+    FormControlLabel,
+    Checkbox
 } from "@mui/material";
 import { fetchLoginApi } from "../../API/LoginAPI/LoginAPI";
 import { Eye, EyeOff } from "lucide-react";
@@ -19,6 +21,7 @@ import { emitInternalStoreSocketData, initializeSocket } from "../../socket";
 import { LoginContext } from "../../context/LoginData";
 import { getToken } from "../../API/GetToken/GetToken";
 import Lottie from "lottie-react";
+import { setCookie, eraseCookie, getCookie } from "../../utils/cookieUtils";
 
 export const commonTextFieldProps = {
     fullWidth: true,
@@ -32,9 +35,28 @@ const LoginPage1 = () => {
     const navigate = useNavigate();
     const [showPassword, setShowPassword] = useState(false);
     const [credentials, setCredentials] = useState({ companycode: "", userId: "", password: "" });
+    const [rememberMe, setRememberMe] = useState(false);
     const [errors, setErrors] = useState({});
     const [formError, setFormError] = useState("");
     const { setAuth, token, setToken } = useContext(LoginContext);
+
+    // Initial check for remembered credentials
+    useEffect(() => {
+        const savedCreds = getCookie('remembered_creds');
+        if (savedCreds) {
+            try {
+                const parsed = JSON.parse(savedCreds);
+                setCredentials(prev => ({
+                    ...prev,
+                    companycode: parsed.companycode || "",
+                    userId: parsed.userId || ""
+                }));
+                setRememberMe(true);
+            } catch (e) {
+                console.error("Error parsing remembered credentials");
+            }
+        }
+    }, []);
 
     const companyCodeRef = useRef(null);
     const userIdRef = useRef(null);
@@ -157,6 +179,22 @@ const LoginPage1 = () => {
                 const updatedUserData = { ...userData };
                 sessionStorage.setItem("userData", JSON.stringify(updatedUserData));
                 sessionStorage.setItem("isLoggedIn", true);
+
+                if (rememberMe) {
+                    // Set cookies for 15 days
+                    setCookie("userData", updatedUserData, 15);
+                    setCookie("token", token, 15);
+                    // Also remember credentials for auto-fill (optional but common)
+                    setCookie("remembered_creds", {
+                        companycode: credentials.companycode,
+                        userId: credentials.userId
+                    }, 15);
+                } else {
+                    eraseCookie("userData");
+                    eraseCookie("token");
+                    eraseCookie("remembered_creds");
+                }
+
                 setAuth(updatedUserData);
                 setFormError("");
                 toast.success("Login successful! Welcome back!", { icon: "🎉" });
@@ -348,6 +386,24 @@ const LoginPage1 = () => {
                                             </InputAdornment>
                                         )
                                     }}
+                                />
+                            </div>
+
+                            <div className="remember-me-container">
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            size="small"
+                                            checked={rememberMe}
+                                            onChange={(e) => setRememberMe(e.target.checked)}
+                                            style={{ color: '#7367f0' }}
+                                        />
+                                    }
+                                    label={
+                                        <Typography variant="body2" style={{ color: '#667781' }}>
+                                            Remember me
+                                        </Typography>
+                                    }
                                 />
                             </div>
 

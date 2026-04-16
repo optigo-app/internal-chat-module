@@ -72,7 +72,7 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
     dispatchUI({ type: UI.SET_INPUT, value: '' });
     dispatchUI({ type: UI.SET_REPLY, value: null });
     if (typeof scrollToBottom === 'function') scrollToBottom();
-
+debugger
     try {
       const isReply = !!(replySnapshot && replyToMessageId);
       const resp = isReply

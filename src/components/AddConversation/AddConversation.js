@@ -6,7 +6,8 @@ import {
     InputAdornment,
     Box,
     Button,
-    IconButton
+    IconButton,
+    Skeleton
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { Search, Clear, Person as PersonIcon, ChatBubbleOutline, ArrowBack, } from '@mui/icons-material';
@@ -21,16 +22,17 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
 
     const [searchTerm, setSearchTerm] = useState('');
     const [tabValue, setTabValue] = useState(0);
-    const [chatMembers, setChatMembers] = useState([]);
+    const [chatMembers, setChatMembers] = useState({ data: null, total: 0 });
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const location = useLocation();
-    const [currentPage, setCurrentPage] = useState(1);
+    const [showEmptyState, setShowEmptyState] = useState(false);
     const containerRef = useRef(null);
     const pageSize = 100;
     const searchTimeoutRef = useRef(null);
     const { auth } = useContext(LoginContext);
     const [selectedIndex, setSelectedIndex] = useState(-1);
+    const [currentPage, setCurrentPage] = useState(1);
 
     const transformMemberData = useCallback((items) => {
         return items?.map((item) => {
@@ -55,6 +57,10 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
         if (!auth?.token || !auth?.userId) {
             console.log('⚠️ No auth token available, skipping conversation load');
             return;
+        }
+        if (reset) {
+            setChatMembers({ data: null, total: 0 });
+            setShowEmptyState(false);
         }
         setLoading(true);
         try {
@@ -134,41 +140,53 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
     };
 
     const filteredMembers =
-        chatMembers?.data
-            ?.filter((member) => {
+        (chatMembers?.data || [])
+            .filter((member) => {
                 if (location.pathname === '/archieve') {
                     return member.IsArchived === 1;
                 } else {
                     return member.IsArchived !== 1;
                 }
             })
-            ?.filter((member) => {
+            .filter((member) => {
                 // Hide currently logged in user
                 const myId = Number(auth?.id ?? auth?.userId);
                 const memberId = Number(member?.UserId ?? member?.id);
                 return myId !== memberId;
             })
-            ?.filter((member) => {
+            .filter((member) => {
                 const isFavorite = member.IsStar === 1;
                 switch (tabValue) {
                     case 2: return isFavorite && tabValue === 2;
                     default: return true;
                 }
             })
-            ?.filter((member) => {
+            .filter((member) => {
                 if (!selectedStatus || selectedStatus === 'All') return true;
                 const statusKey = selectedStatus.toLowerCase();
                 const isFavorite = member.IsStar === 1;
                 return member.ticketStatus === statusKey || (isFavorite && statusKey === 'favorite');
             })
-            ?.filter((member) => {
+            .filter((member) => {
                 if (!selectedTag || selectedTag === 'All') return true;
                 return member.tags && member.tags.some(tag => tag.TagId === selectedTag.Id);
-            }) || [];
+            });
 
     useEffect(() => {
         setSelectedIndex(-1);
     }, [searchTerm, tabValue, chatMembers]);
+
+    useEffect(() => {
+        let timeout;
+        if (!loading && chatMembers.data !== null && filteredMembers.length === 0) {
+            timeout = setTimeout(() => {
+                setShowEmptyState(true);
+            }, 1000);
+        } else {
+            setShowEmptyState(false);
+        }
+        return () => clearTimeout(timeout);
+    }, [loading, chatMembers.data, filteredMembers.length]);
 
     const scrollToSelectedIndex = useCallback((index) => {
         if (containerRef.current && index >= 0) {
@@ -322,12 +340,26 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
             <div className="customer_lists_main">
                 <ul ref={containerRef}>
                     <>
-                        {loading && (!chatMembers?.data || chatMembers?.data.length === 0) ? (
-                            <li style={{ textAlign: 'center', padding: '20px' }}>
-                                <Typography variant="body2" color="textSecondary">
-                                    Loading conversations...
-                                </Typography>
-                            </li>
+                        {((loading || chatMembers.data === null) || (filteredMembers.length === 0 && !showEmptyState)) ? (
+                            <>
+                                {[...Array(8)].map((_, i) => (
+                                    <li key={i} className="member-item" style={{ pointerEvents: 'none' }}>
+                                        <div className="member-item">
+                                            <div className="member-avatar">
+                                                <Skeleton variant="circular" width={42} height={42} />
+                                            </div>
+                                            <div className="member-info" style={{ flexGrow: 1 }}>
+                                                <div className="member-header">
+                                                    <Skeleton variant="text" width="60%" height={24} />
+                                                </div>
+                                                <div className="member-message">
+                                                    <Skeleton variant="text" width="70%" height={16} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                ))}
+                            </>
                         ) : filteredMembers?.length > 0 ? (
                             filteredMembers.map((member) => {
                                 const isSelected = selectedCustomer?.UserId === member.UserId;
@@ -370,14 +402,16 @@ const AddConversation = ({ onCustomerSelect = () => { }, selectedCustomer = null
                                 );
                             })
                         ) : (
-                            <li style={{ textAlign: 'center', padding: '20px' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                                    <ChatBubbleOutline sx={{ fontSize: 34, color: 'rgba(0,0,0,0.35)' }} />
-                                    <Typography variant="body2" color="textSecondary">
-                                        No conversations found.
-                                    </Typography>
-                                </div>
-                            </li>
+                            showEmptyState && (
+                                <li style={{ textAlign: 'center', padding: '20px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                                        <ChatBubbleOutline sx={{ fontSize: 34, color: 'rgba(0,0,0,0.35)' }} />
+                                        <Typography variant="body2" color="textSecondary">
+                                            No conversations found.
+                                        </Typography>
+                                    </div>
+                                </li>
+                            )
                         )}
 
                         {/* ✅ Show pagination loader only when fetching next pages */}

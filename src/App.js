@@ -26,10 +26,10 @@ import NotificationPermissionModal from './components/_ui/NotificationPermission
 const PagenotFound = () => <div>404 - Page Not Found</div>;
 
 function RedirectIfAuthenticated({ children }) {
-  const isLoggedIn = sessionStorage.getItem('isLoggedIn');
-  const userData = sessionStorage.getItem('userData');
+  const { auth } = useContext(LoginContext);
+  const isLoggedIn = auth?.userId && (auth?.token || auth?.ukey);
 
-  if (isLoggedIn && userData) {
+  if (isLoggedIn) {
     return <Navigate to="/" replace />;
   }
 
@@ -275,18 +275,12 @@ function App() {
 
   useEffect(() => {
     const checkSession = () => {
-      const isLoggedIn = sessionStorage.getItem('isLoggedIn');
-      const userData = JSON.parse(sessionStorage.getItem('userData') || '{}');
+      const isLoggedIn = auth?.userId && (auth?.token || auth?.ukey);
       const hasExistingSocket = sessionStorage.getItem('hasSocketId');
 
       if (!isLoggedIn) {
         if (hasExistingSocket) {
           navigate('/session-check');
-        } else if (userData?.id) {
-          // If we have user data but notLoggedIn (maybe a stale session or partial load), 
-          // we might want to try to recover or just go to login.
-          // For now, let's stick to the existing logic but without the timeout.
-          navigate('/');
         } else {
           disconnectSocket(true);
           navigate('/login');
@@ -296,11 +290,30 @@ function App() {
     };
 
     checkSession();
-  }, [navigate]);
+  }, [navigate, auth?.userId, auth?.token, auth?.ukey]);
 
   useEffect(() => {
     window.addEventListener('click', unlockAudio, { once: true });
     return () => window.removeEventListener('click', unlockAudio);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
+        const target = event.target;
+        const isEditable =
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable;
+
+        if (!isEditable) {
+          event.preventDefault();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   return (

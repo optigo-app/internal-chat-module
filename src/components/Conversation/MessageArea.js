@@ -58,7 +58,7 @@ const VirtualRow = React.memo(({ data, index, style }) => {
     if (row.type === 'typing') {
         return (
             <div style={style}>
-                <div ref={rowRef}>
+                <div ref={rowRef} style={{ padding: '0 50px 4px 24px' }}>
                     <TypingIndicator typingStatus={typingStatus} isGroup={selectedCustomer?.IsGroup === 1} />
                 </div>
             </div>
@@ -189,32 +189,42 @@ const MessageArea = ({
         if (row.type === 'typing') return TYPING_ROW_HEIGHT;
         if (row.type === 'spacer-top' || row.type === 'spacer-bottom') return 8;
         if (row.type === 'message') {
-            const mt = row.msg?.MessageType;
+            const m = row.msg;
+            if (m?.IsDeletedForEveryone === 1) return 46; // System message estimate
+
+            const mt = m?.MessageType;
             if (mt === 'image' || mt === 'video') return 300;
             if (mt === 'document' || mt === 'audio') return 120;
-            const msgLen = (row.msg?.Message || '').length;
-            const isGroup = selectedCustomer?.IsGroup === 1 && row.msg?.Direction === 0;
+
+            const msgLen = (m?.Message || '').length;
+            const isGroup = selectedCustomer?.IsGroup === 1 && m?.Direction === 0;
             const base = isGroup ? 95 : 72;
-            return msgLen > 100 ? base + Math.floor(msgLen / 60) * 20 : base;
+
+            // Adjust base for multi-line messages
+            if (msgLen > 50) return base + Math.min(100, Math.floor(msgLen / 45) * 20);
+            return base;
         }
         return 80;
     }, [rows, selectedCustomer?.IsGroup]);
 
     const setSize = useCallback((stableKey, index, size) => {
-        if (stableKeyToHeight.current[stableKey] === size) return;
+        const prevSize = stableKeyToHeight.current[stableKey];
+        // Only trigger update if height has changed significantly (avoiding sub-pixel jitter)
+        if (prevSize != null && Math.abs(prevSize - size) < 1.5) return;
+
         stableKeyToHeight.current[stableKey] = size;
-        indexToStableKey.current[index] = stableKey;
         listRef.current?.resetAfterIndex(index, false);
 
-        // After a media row resizes (image/video loaded), re-pin to bottom
-        // if the user was already at the bottom — prevents the upward jump
-        if (distanceFromBottomRef.current < 200) {
+        // Sticky bottom: if user was already at the bottom, stay there.
+        // We check distanceFromBottomRef which is updated in onScroll.
+        if (distanceFromBottomRef.current < 40) {
             requestAnimationFrame(() => {
+                listRef.current?.scrollToItem(rows.length - 1, 'end');
                 const o = outerRef.current;
                 if (o) o.scrollTop = o.scrollHeight;
             });
         }
-    }, []);
+    }, [rows.length]);
 
     // ── Conversation change: reset & hide list ────────────────────────────
     const prevConvIdRef = useRef(null);
@@ -299,23 +309,27 @@ const MessageArea = ({
         const outer = outerRef.current;
         if (!outer) return;
 
-        // Find the last real message to check direction
+        // Check if the last real message is outgoing
         const lastMsgRow = [...rows].reverse().find(r => r.type === 'message');
         const isOutgoing = lastMsgRow?.msg?.Direction === 1;
 
-        // Use the ref value — accurate even when react-window's scrollHeight
-        // has just changed due to the new row being added
-        const isNearBottom = distanceFromBottomRef.current < 200;
+        // Calculate distance from bottom; be more forgiving when pinned
+        const isNearBottom = distanceFromBottomRef.current < 250;
 
         if (isOutgoing || isNearBottom) {
-            listRef.current?.scrollToItem(rows.length - 1, 'end');
+            // Use smooth behavior for new messages to feel "premium"
             requestAnimationFrame(() => {
                 const o = outerRef.current;
-                if (o) o.scrollTop = o.scrollHeight;
+                if (o) {
+                    o.scrollTo({
+                        top: o.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }
             });
             setShowScrollBtn(false);
         }
-    }, [msgRowCount]);
+    }, [msgRowCount, rows]);
 
     // ── Expose scroll container ───────────────────────────────────────────
     useEffect(() => {
@@ -364,24 +378,38 @@ const MessageArea = ({
     // ── Drag-and-drop ─────────────────────────────────────────────────────
     const handleDragEnter = useCallback((e) => {
         e.preventDefault(); e.stopPropagation();
+        // Only trigger overlay for actual external files
+        const isFile = e.dataTransfer.types?.includes('Files');
+        if (!isFile) return;
+
         dragCounter.current++;
         if (e.dataTransfer.items?.length > 0) setIsDragging(true);
     }, []);
 
     const handleDragLeave = useCallback((e) => {
         e.preventDefault(); e.stopPropagation();
+        const isFile = e.dataTransfer.types?.includes('Files');
+        if (!isFile) return;
+
         if (--dragCounter.current === 0) setIsDragging(false);
     }, []);
 
-    const handleDragOver = useCallback((e) => { e.preventDefault(); e.stopPropagation(); }, []);
+    const handleDragOver = useCallback((e) => {
+        e.preventDefault(); e.stopPropagation();
+    }, []);
 
     const handleDrop = useCallback((e) => {
         e.preventDefault(); e.stopPropagation();
-        setIsDragging(false); dragCounter.current = 0;
-        if (e.dataTransfer.files?.length > 0) {
-            captureMessageScrollState?.();
-            processFiles?.(Array.from(e.dataTransfer.files));
-            e.dataTransfer.clearData();
+        const isFile = e.dataTransfer.types?.includes('Files');
+
+        if (isFile) {
+            setIsDragging(false);
+            dragCounter.current = 0;
+            if (e.dataTransfer.files?.length > 0) {
+                captureMessageScrollState?.();
+                processFiles?.(Array.from(e.dataTransfer.files));
+                e.dataTransfer.clearData();
+            }
         }
     }, [processFiles, captureMessageScrollState]);
 

@@ -273,6 +273,7 @@ const ProfileAvatarUpload = ({
                     {...getWhatsAppAvatarConfig(avatarSeed, size)}
                     className="profile-avatar"
                     src={displayImage || undefined}
+                    imgProps={{ draggable: false }}
                     sx={{
                         width: size,
                         height: size,

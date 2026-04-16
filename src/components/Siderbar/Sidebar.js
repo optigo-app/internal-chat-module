@@ -83,7 +83,7 @@ const Sidebar = ({ isCollapsed = false, onCollapsedChange = () => { } }) => {
                     <div className="agentic-chat-header">
                         <div className="agentic-chat-header__icon" onClick={handleHeaderClick}>
                             <div className="icon-bg">
-                                <img src={logo} alt="TeCoChat" className="icon" loading="lazy" />
+                                <img src={logo} alt="TeCoChat" className="icon" loading="lazy" draggable="false" />
                             </div>
                             {!isCollapsed && <h1 className="title">TeCoChat</h1>}
                         </div>
@@ -156,7 +156,7 @@ const Sidebar = ({ isCollapsed = false, onCollapsedChange = () => { } }) => {
                 <div className={isCollapsed ? "powered-by collapsed" : "powered-by"}>
                     <span>Powered by </span>
                     <div className="optigo-logo">
-                        <img src="/icons/logo1.png" alt="Optigo logo" loading='lazy'/>
+                        <img src="/icons/logo1.png" alt="Optigo logo" loading='lazy' draggable="false" />
                     </div>
                 </div>
             </div>

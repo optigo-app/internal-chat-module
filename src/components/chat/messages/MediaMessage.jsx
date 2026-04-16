@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Skeleton } from "@mui/material";
+import { Box, Skeleton, alpha } from "@mui/material";
 import VideoMessage from "./VideoMessage";
 import DocumentMessage from "./DocumentMessage";
 import UploadProgressOverlay from "./UploadProgressOverlay";
@@ -47,6 +47,8 @@ const MediaMessage = ({
                         height: hasGrid ? gridHeight : computedHeight,
                         borderRadius: "12px",
                         overflow: 'hidden',
+                        transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        backgroundColor: alpha(theme.palette.text.primary, 0.05)
                     }}
                 >
                     {hasGrid ? (

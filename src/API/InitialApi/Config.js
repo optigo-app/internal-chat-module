@@ -24,15 +24,15 @@ export const SAVEPLAYERID = `${API_BASE_URL}/report`;
 
 export const getApiHeaders = (init = {}) => {
     const normalizedInit = init && typeof init === "object" ? init : {};
-    const { version = "R50B3" } = normalizedInit;
 
     let credentials = null;
-
+    debugger
     const sessionToken = JSON.parse(sessionStorage.getItem("token"));
-    if (sessionToken) {
+    const userData = JSON.parse(sessionStorage.getItem("userData"));
+    if (sessionToken || userData) {
         credentials = {
-            yc: sessionToken.yc,
-            sv: sessionToken.sv,
+            yc: (sessionToken && sessionToken.yc) ?? (userData && userData.yearcode),
+            sv: (sessionToken && sessionToken.sv) ?? (userData && userData.svid),
         };
     }
 

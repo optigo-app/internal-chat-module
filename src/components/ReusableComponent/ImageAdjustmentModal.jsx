@@ -42,10 +42,139 @@ const ImageAdjustmentModal = ({
         }
     }, [open]);
 
+
+
+    const handleImageLoad = () => {
+        setImageLoaded(true);
+        // Auto-fit image to circle on load
+        if (imageRef.current) {
+            const img = imageRef.current;
+            const containerSize = 300; // Circle size
+            const imgAspect = img.naturalWidth / img.naturalHeight;
+
+            // Calculate initial scale to fit image in circle
+            let initialScale;
+            if (imgAspect > 1) {
+                // Landscape - fit height
+                initialScale = containerSize / img.naturalHeight;
+            } else {
+                // Portrait or square - fit width
+                initialScale = containerSize / img.naturalWidth;
+            }
+
+            // Ensure minimum coverage of the circle
+            initialScale = Math.max(initialScale, 1);
+            setScale(initialScale);
+        }
+    };
+
+    const getMaxOffset = (currentScale) => {
+        if (!imageRef.current) return { maxX: 0, maxY: 0 };
+        const img = imageRef.current;
+        const cropSize = 300;
+        const imgAspect = img.naturalWidth / img.naturalHeight;
+
+        let drawWidth, drawHeight;
+        if (imgAspect > 1) {
+            drawHeight = cropSize;
+            drawWidth = cropSize * imgAspect;
+        } else {
+            drawWidth = cropSize;
+            drawHeight = cropSize / imgAspect;
+        }
+
+        const scaledWidth = drawWidth * currentScale;
+        const scaledHeight = drawHeight * currentScale;
+
+        const maxX = Math.max(0, (scaledWidth - cropSize) / 2);
+        const maxY = Math.max(0, (scaledHeight - cropSize) / 2);
+
+        return { maxX, maxY };
+    };
+
+    const handleMouseDown = (e) => {
+        e.preventDefault();
+        setIsDragging(true);
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        setDragStart({
+            x: clientX - position.x,
+            y: clientY - position.y
+        });
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        const newX = clientX - dragStart.x;
+        const newY = clientY - dragStart.y;
+
+        const { maxX, maxY } = getMaxOffset(scale);
+
+        setPosition({
+            x: Math.max(-maxX, Math.min(maxX, newX)),
+            y: Math.max(-maxY, Math.min(maxY, newY))
+        });
+    };;
+
+    const handleMouseUp = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const clampPosition = (pos, newScale) => {
+        const { maxX, maxY } = getMaxOffset(newScale);
+        return {
+            x: Math.max(-maxX, Math.min(maxX, pos.x)),
+            y: Math.max(-maxY, Math.min(maxY, pos.y))
+        };
+    };
+
+    const handleZoomIn = () => {
+        setScale(prev => {
+            const next = Math.min(prev + 0.1, 3);
+            setPosition(p => clampPosition(p, next));
+            return next;
+        });
+    };
+
+    const handleZoomOut = () => {
+        setScale(prev => {
+            const next = Math.max(prev - 0.1, 0.5);
+            setPosition(p => clampPosition(p, next));
+            return next;
+        });
+    };
+
+    const handleWheel = (e) => {
+        e.preventDefault();
+        const zoomIntensity = 0.1;
+        setScale(prev => {
+            const next = e.deltaY < 0
+                ? Math.min(prev + zoomIntensity, 3)
+                : Math.max(prev - zoomIntensity, 0.5);
+            setPosition(p => clampPosition(p, next));
+            return next;
+        });
+    };
+
+    const handleRotate = () => {
+        setRotation(prev => (prev + 90) % 360);
+    };
+
+    const handleReset = () => {
+        setScale(1);
+        setPosition({ x: 0, y: 0 });
+        setRotation(0);
+    };
+
     // Keyboard controls
     useEffect(() => {
         if (!open) return;
-
         const handleKeyDown = (e) => {
             switch (e.key) {
                 case 'Escape':
@@ -56,19 +185,19 @@ const ImageAdjustmentModal = ({
                     break;
                 case 'ArrowUp':
                     e.preventDefault();
-                    setPosition(prev => ({ ...prev, y: prev.y - 10 }));
+                    setPosition(prev => clampPosition({ ...prev, y: prev.y - 10 }, scale));
                     break;
                 case 'ArrowDown':
                     e.preventDefault();
-                    setPosition(prev => ({ ...prev, y: prev.y + 10 }));
+                    setPosition(prev => clampPosition({ ...prev, y: prev.y + 10 }, scale));
                     break;
                 case 'ArrowLeft':
                     e.preventDefault();
-                    setPosition(prev => ({ ...prev, x: prev.x - 10 }));
+                    setPosition(prev => clampPosition({ ...prev, x: prev.x - 10 }, scale));
                     break;
                 case 'ArrowRight':
                     e.preventDefault();
-                    setPosition(prev => ({ ...prev, x: prev.x + 10 }));
+                    setPosition(prev => clampPosition({ ...prev, x: prev.x + 10 }, scale));
                     break;
                 case '+':
                 case '=':
@@ -97,90 +226,9 @@ const ImageAdjustmentModal = ({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [open]);
 
-    const handleImageLoad = () => {
-        setImageLoaded(true);
-        // Auto-fit image to circle on load
-        if (imageRef.current) {
-            const img = imageRef.current;
-            const containerSize = 300; // Circle size
-            const imgAspect = img.naturalWidth / img.naturalHeight;
-
-            // Calculate initial scale to fit image in circle
-            let initialScale;
-            if (imgAspect > 1) {
-                // Landscape - fit height
-                initialScale = containerSize / img.naturalHeight;
-            } else {
-                // Portrait or square - fit width
-                initialScale = containerSize / img.naturalWidth;
-            }
-
-            // Ensure minimum coverage of the circle
-            initialScale = Math.max(initialScale, 1);
-            setScale(initialScale);
-        }
-    };
-
-    const handleMouseDown = (e) => {
-        e.preventDefault();
-        setIsDragging(true);
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        setDragStart({
-            x: clientX - position.x,
-            y: clientY - position.y
-        });
-    };
-
-    const handleMouseMove = (e) => {
-        if (!isDragging) return;
-        e.preventDefault();
-
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-        const newX = clientX - dragStart.x;
-        const newY = clientY - dragStart.y;
-
-        setPosition({ x: newX, y: newY });
-    };
-
-    const handleMouseUp = (e) => {
-        e.preventDefault();
-        setIsDragging(false);
-    };
-
-    const handleZoomIn = () => {
-        setScale(prev => Math.min(prev + 0.1, 3));
-    };
-
-    const handleZoomOut = () => {
-        setScale(prev => Math.max(prev - 0.1, 0.5));
-    };
-
-    const handleWheel = (e) => {
-        e.preventDefault();
-        const zoomIntensity = 0.1;
-        if (e.deltaY < 0) {
-            setScale(prev => Math.min(prev + zoomIntensity, 3));
-        } else {
-            setScale(prev => Math.max(prev - zoomIntensity, 0.5));
-        }
-    };
-
-    const handleRotate = () => {
-        setRotation(prev => (prev + 90) % 360);
-    };
-
-    const handleReset = () => {
-        setScale(1);
-        setPosition({ x: 0, y: 0 });
-        setRotation(0);
-    };
-
     const handleConfirm = async () => {
         if (!imageFile || !imageRef.current) return;
-        
+
         try {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -271,6 +319,7 @@ const ImageAdjustmentModal = ({
             onConfirm(imageFile);
         }
     };
+
     return (
         <Dialog
             open={open}
