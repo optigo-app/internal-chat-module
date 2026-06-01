@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dialog, IconButton, Tooltip, Avatar, Skeleton } from '@mui/material';
-import { X, Download, ChevronLeft, ChevronRight, FileText, FileType, FileSpreadsheet, FileArchive, FileCode, File, ZoomIn, ZoomOut, Reply, Smile, Forward, Trash2, ExternalLink } from 'lucide-react';
+import { X, Download, ChevronLeft, ChevronRight, FileText, FileType, FileSpreadsheet, FileArchive, FileCode, File, ZoomIn, ZoomOut, Reply, Smile, Forward, Trash2, ExternalLink, Smartphone } from 'lucide-react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Keyboard, Mousewheel, Navigation } from 'swiper/modules';
 import 'swiper/css';
@@ -33,6 +33,7 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
   const reactionButtonRef = useRef(null);
   const [reactionAnchorEl, setReactionAnchorEl] = useState(null);
   const [detailAnchorEl, setDetailAnchorEl] = useState(null);
+  const prevIndexRef = useRef(initialIndex);
 
   // Sync with the actual messages array to get live reaction updates
   const liveMessage = React.useMemo(() => {
@@ -289,8 +290,11 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
             }}
             onSlideChange={(swiper) => {
               const nextIndex = typeof swiper?.realIndex === 'number' ? swiper.realIndex : swiper.activeIndex;
-              setCurrentIndex(nextIndex);
-              resetZoom();
+              if (prevIndexRef.current !== nextIndex) {
+                prevIndexRef.current = nextIndex;
+                setCurrentIndex(nextIndex);
+                resetZoom();
+              }
             }}
             keyboard={{ enabled: true }}
             mousewheel={true}
@@ -379,8 +383,41 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
 
                     {item?.type === 'document' && (
                       (() => {
-                        const meta = getDocumentMeta(item?.name);
-                        const IconMap = { FileText, FileType, FileSpreadsheet, FileArchive, FileCode, File };
+                        // Use mimeType to determine file type if available, otherwise fall back to filename
+                        const mimeType = item?.mimeType || '';
+                        let fileName = item?.name || '';
+                        
+                        // If mimeType is available but filename doesn't have extension, append it
+                        if (mimeType && fileName) {
+                          const extMap = {
+                            'application/pdf': '.pdf',
+                            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+                            'application/msword': '.doc',
+                            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+                            'application/vnd.ms-excel': '.xls',
+                            'text/csv': '.csv',
+                            'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+                            'application/vnd.ms-powerpoint': '.ppt',
+                            'application/zip': '.zip',
+                            'application/x-rar-compressed': '.rar',
+                            'application/x-7z-compressed': '.7z',
+                            'text/plain': '.txt',
+                            'application/json': '.json',
+                            'application/xml': '.xml',
+                            'text/html': '.html',
+                            'text/javascript': '.js',
+                            'application/javascript': '.js',
+                            'text/css': '.css',
+                            'application/vnd.android.package-archive': '.apk'
+                          };
+                          const ext = extMap[mimeType];
+                          if (ext && !fileName.toLowerCase().endsWith(ext)) {
+                            fileName = fileName + ext;
+                          }
+                        }
+                        
+                        const meta = getDocumentMeta(fileName);
+                        const IconMap = { FileText, FileType, FileSpreadsheet, FileArchive, FileCode, File, Smartphone };
                         const DocIcon = IconMap[meta.iconName] || File;
 
                         return (
@@ -526,7 +563,7 @@ const MediaViewer = ({ mediaItems, initialIndex = 0, onClose, selectedCustomer, 
                 {item.type === 'document' && (
                   (() => {
                     const meta = getDocumentMeta(item?.name);
-                    const IconMap = { FileText, FileType, FileSpreadsheet, FileArchive, FileCode, File };
+                    const IconMap = { FileText, FileType, FileSpreadsheet, FileArchive, FileCode, File, Smartphone };
                     const DocIcon = IconMap[meta.iconName] || File;
 
                     return (

@@ -21,12 +21,13 @@ export const APIURL = `${API_BASE_URL}/report`;
 export const GETCONVERSATIONURL = `${API_BASE_URL}/report`;
 export const SAVEPLAYERID = `${API_BASE_URL}/report`;
 
+// file Download APIs
+export const DOWNLOAD_FILE_URL = `${API_BASE_URL}/downloadfile`;
+
+
 
 export const getApiHeaders = (init = {}) => {
-    const normalizedInit = init && typeof init === "object" ? init : {};
-
     let credentials = null;
-    debugger
     const sessionToken = JSON.parse(sessionStorage.getItem("token"));
     const userData = JSON.parse(sessionStorage.getItem("userData"));
     if (sessionToken || userData) {

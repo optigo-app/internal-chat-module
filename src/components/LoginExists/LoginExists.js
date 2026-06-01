@@ -8,6 +8,7 @@ import Lottie from "lottie-react";
 import { LogoutApi } from "../../API/Logout/Logout";
 import { initializeSocket } from "../../socket";
 import { Button } from "@mui/material";
+import { eraseCookie } from "../../utils/cookieUtils";
 
 const LoginExists = () => {
     const { setAuth } = useContext(LoginContext);
@@ -46,6 +47,8 @@ const LoginExists = () => {
         try {
             setLoading(true);
             sessionStorage.clear();
+            eraseCookie("userData");
+            eraseCookie("token");
             navigate("/login");
         } catch (error) {
             console.error("Error logging out:", error);

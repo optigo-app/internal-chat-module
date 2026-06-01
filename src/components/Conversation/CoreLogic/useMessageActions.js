@@ -72,7 +72,6 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
     dispatchUI({ type: UI.SET_INPUT, value: '' });
     dispatchUI({ type: UI.SET_REPLY, value: null });
     if (typeof scrollToBottom === 'function') scrollToBottom();
-debugger
     try {
       const isReply = !!(replySnapshot && replyToMessageId);
       const resp = isReply
@@ -172,7 +171,10 @@ debugger
             ufcc: auth?.ufcc, UserId: auth?.id, SenderId: auth?.id,
             ReceiverId: isGroup ? (memberIds.length ? memberIds : [selectedCustomer?.ReceiverId]) : selectedCustomer?.ReceiverId,
             ConversationId: selectedCustomer?.ConversationId, MessageId: messageId,
-            Message: deletedInfo.Message || 'This message was deleted.', IsDeletedForEveryone: 1,
+            Message: deletedInfo.Message || 'This message was deleted.',
+            Message1: deletedInfo.Message1 || 'You deleted this message.',
+            IsDeletedForEveryone: 1,
+            DateTime: deletedInfo.DeletedAt || new Date().toISOString(),
           });
         } else {
           dispatchMsg({ type: MSG.DELETE_ME, messageId });

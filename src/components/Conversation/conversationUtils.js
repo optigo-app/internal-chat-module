@@ -51,40 +51,40 @@ export const normalizeServerMessages = (messagesArray, auth) => {
         const attachmentsArray = Array.isArray(parsedAttachments) ? parsedAttachments : [];
         const firstAttachment = attachmentsArray?.[0] || null;
         const attachmentUrl =
+            firstAttachment?.FileUrl ||
+            firstAttachment?.FileURL ||
             firstAttachment?.url ||
             firstAttachment?.Url ||
             firstAttachment?.fileUrl ||
             firstAttachment?.fileURL ||
-            firstAttachment?.FileUrl ||
-            firstAttachment?.FileURL ||
             null;
         const attachmentMime =
+            firstAttachment?.MimeType ||
             firstAttachment?.mimeType ||
             firstAttachment?.mimetype ||
             firstAttachment?.fileType ||
-            firstAttachment?.MimeType ||
             msg?.fileType ||
             '';
         const attachmentName =
+            firstAttachment?.FileName ||
             firstAttachment?.fileName ||
             firstAttachment?.filename ||
-            firstAttachment?.FileName ||
             msg?.fileName ||
             '';
 
         const mediaItems = attachmentsArray
             .map((a) => {
                 const url =
+                    a?.FileUrl ||
+                    a?.FileURL ||
                     a?.url ||
                     a?.Url ||
                     a?.fileUrl ||
                     a?.fileURL ||
-                    a?.FileUrl ||
-                    a?.FileURL ||
                     null;
                 if (!url) return null;
-                const mimeType = a?.mimeType || a?.mimetype || a?.fileType || a?.MimeType || '';
-                const fileName = a?.fileName || a?.filename || a?.FileName || a?.name || '';
+                const mimeType = a?.MimeType || a?.mimeType || a?.mimetype || a?.fileType || '';
+                const fileName = a?.FileName || a?.fileName || a?.filename || a?.name || '';
                 return {
                     url,
                     mimeType,
@@ -316,23 +316,69 @@ export const updateChatCache = (conversationId, rawData, auth, isStatusChange = 
 
         let updatedMessages;
         if (index !== -1) {
-            // Update existing message (e.g. status change)
+            // Update existing message (e.g. status change or reaction)
             updatedMessages = [...cachedMessages];
-            updatedMessages[index] = {
-                ...updatedMessages[index],
-                ...normalized,
-                // Preserve local-only flags if any
-                isUploading: updatedMessages[index].isUploading,
-                percent: updatedMessages[index].percent,
-            };
-        } else if (!isStatusChange) {
-            // Add new message (only if it's not a status change event for a message we don't have)
+            const existing = updatedMessages[index];
+
+            // Special handling for reactions to prevent overwriting message content
+            const isReactionUpdate = rawData.ReactionEmojis !== undefined && !rawData.Message;
+
+            if (isReactionUpdate) {
+                let current = [];
+                try {
+                    current = typeof existing.ReactionEmojis === 'string'
+                        ? JSON.parse(existing.ReactionEmojis || '[]')
+                        : (existing.ReactionEmojis || []);
+                } catch (e) { current = []; }
+
+                if (!Array.isArray(current)) current = [];
+
+                let incoming = [];
+                try {
+                    incoming = typeof normalized.ReactionEmojis === 'string'
+                        ? JSON.parse(normalized.ReactionEmojis || '[]')
+                        : (normalized.ReactionEmojis || []);
+                } catch (e) { incoming = []; }
+
+                if (Array.isArray(incoming) && incoming.length > 0) {
+                    incoming.forEach(inc => {
+                        const sid = inc.UserId || rawData.SenderId || rawData.userId;
+                        if (!sid) return;
+                        current = current.filter(r => String(r.UserId) !== String(sid));
+                        if (inc.Reaction && inc.Reaction !== "") {
+                            current.push({ ...inc, UserId: sid });
+                        }
+                    });
+                } else if (rawData.SenderId || rawData.userId) {
+                    // It's a removal
+                    const sid = rawData.SenderId || rawData.userId;
+                    current = current.filter(r => String(r.UserId) !== String(sid));
+                }
+
+                updatedMessages[index] = {
+                    ...existing,
+                    ReactionEmojis: JSON.stringify(current)
+                };
+            } else {
+                // Regular update (status change or edit)
+                updatedMessages[index] = {
+                    ...existing,
+                    ...normalized,
+                    // Preserve critical fields if they are missing in the update
+                    Message: normalized.Message ?? existing.Message,
+                    DateTime: normalized.DateTime ?? existing.DateTime,
+                    // Preserve local-only flags
+                    isUploading: existing.isUploading,
+                    percent: existing.percent,
+                };
+            }
+        } else if (!isStatusChange && !rawData.ReactionEmojis) {
+            // Add new message (only if it's not a status change or reaction for a message we don't have)
             updatedMessages = [...cachedMessages, normalized];
             // Sort to ensure correct order
             updatedMessages.sort((a, b) => new Date(a.DateTime).getTime() - new Date(b.DateTime).getTime());
         } else {
-            // It's a status change for a message not in our cache (could be an older message)
-            // In this case, we don't add it to the cache to avoid gaps or incorrect ordering
+            // It's a status change or reaction for a message not in our cache
             return;
         }
 
@@ -343,3 +389,4 @@ export const updateChatCache = (conversationId, rawData, auth, isStatusChange = 
         console.error("Error updating chat cache:", e);
     }
 };
+

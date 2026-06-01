@@ -2,13 +2,14 @@ import { IconButton, Box, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { X } from 'lucide-react';
 import './ReplyPreview.scss';
+import { renderTextWithLinks } from '../../utils/globalFunc';
 
 const ReplyPreview = ({ message, onCancel }) => {
   const theme = useTheme();
 
   const sender = message?.sender ?? 'Customer';
   const rawText = message?.text ?? '';
-  const previewText = rawText.length > 60 ? `${rawText.substring(0, 60)}...` : rawText;
+  const previewText = rawText.length > 80 ? `${rawText.substring(0, 80)}...` : rawText;
 
   return (
     <Box
@@ -80,7 +81,7 @@ const ReplyPreview = ({ message, onCancel }) => {
               lineHeight: 1.2,
             }}
           >
-            {previewText || ' '}
+            {previewText ? renderTextWithLinks(previewText) : ' '}
           </Typography>
         </Box>
 

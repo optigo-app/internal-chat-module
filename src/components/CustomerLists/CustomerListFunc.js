@@ -4,16 +4,18 @@ import React from 'react';
 import { Archive, ArchiveRestore, File, FileText, Image, Pin, PinOff, Star, StarOff, Video } from 'lucide-react';
 
 export const getMessagePreview = (msg) => {
+  const isDeleted = msg?.IsDeletedForEveryone === 1;
   const type = msg?.MessageType;
-  const text = type === 'text' ? (msg?.Message || '')
-    : type === 'image' ? 'Photo'
-      : type === 'video' ? 'Video'
-        : type === 'document' ? 'Document'
-          : type === 'file' ? 'File'
-            : msg?.SystemMsg === 1 ? (msg?.Message || '')
-              : 'New message';
+  const text = isDeleted ? (msg?.Message || 'This message was deleted.')
+    : type === 'text' ? (msg?.Message || '')
+      : type === 'image' ? 'Photo'
+        : type === 'video' ? 'Video'
+          : type === 'document' ? 'Document'
+            : type === 'file' ? 'File'
+              : msg?.SystemMsg === 1 ? (msg?.Message || '')
+                : 'New message';
 
-  const showIcon = type === 'image' || type === 'video' || type === 'document' || type === 'file';
+  const showIcon = !isDeleted && (type === 'image' || type === 'video' || type === 'document' || type === 'file');
   const Icon = type === 'image' ? Image
     : type === 'video' ? Video
       : type === 'document' ? FileText
@@ -67,6 +69,7 @@ export const processApiResponse = (apiData) => {
         Status: conversation.LastMessageStatus,
         Direction: conversation.LastMessageDirection,
         SystemMsg: conversation.LastMessageSystemMsg ?? conversation.SystemMsg,
+        IsDeletedForEveryone: conversation.IsDeletedForEveryone,
       }
       : null;
 
@@ -118,3 +121,85 @@ export const getCustomerListMenuItems = (member) => [
     label: member?.IsArchived === 1 ? 'Unarchive' : 'Archive',
   },
 ];
+
+export const getMemberTimeValue = (member) => {
+  const raw = member?.lastMessageTimeValue || member?.LastMessageDate || member?.LastUpdatedDate || member?.lastMessageTime || 0;
+  const t = new Date(raw).getTime();
+  return Number.isFinite(t) ? t : 0;
+};
+
+export const conversationComparator = (a, b) => {
+  const aIsSearch = Boolean(a?.isSearchResult);
+  const bIsSearch = Boolean(b?.isSearchResult);
+  if (aIsSearch !== bIsSearch) return aIsSearch ? 1 : -1;
+
+  const aPinned = Number(a?.IsPin || 0) === 1;
+  const bPinned = Number(b?.IsPin || 0) === 1;
+  if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
+  const aTime = getMemberTimeValue(a);
+  const bTime = getMemberTimeValue(b);
+  if (aTime !== bTime) return bTime - aTime;
+
+  return Number(b?.ConversationId ?? 0) - Number(a?.ConversationId ?? 0);
+};
+
+export const normalizeMessageType = (type) => {
+  if (typeof type === 'string') return type;
+  switch (Number(type)) {
+    case 1: return 'text';
+    case 2: return 'image';
+    case 3: return 'video';
+    case 4: return 'document';
+    case 5: return 'file';
+    default: return 'text';
+  }
+};
+
+export const mapMessageTypeToCode = (type) => {
+  const t = normalizeMessageType(type);
+  switch (t) {
+    case 'text': return 1;
+    case 'image': return 2;
+    case 'video': return 3;
+    case 'document': return 4;
+    case 'file': return 5;
+    default: return 1;
+  }
+};
+
+export const mapSearchResults = (rd1) => {
+  return (rd1 || []).map(user => ({
+    ...user,
+    ConversationId: null,
+    Id: user.UserId || user.CustomerId || user.id,
+    ReceiverId: user.UserId || user.CustomerId,
+    name: user.UserName || user.CustomerName || user.CustomerPhone || user.name || 'Unknown',
+    email: user.UserEmail || user.DisplayEmail || '',
+    lastMessage: '',
+    lastMessageText: '',
+    lastMessageTimeValue: new Date().toISOString(),
+    lastMessageTime: '',
+    unreadCount: 0,
+    isSearchResult: true
+  }));
+};
+
+export const resolveConversationName = (incoming, getCustomerDisplayName) => {
+  const senderInfo = (incoming?.FirstName || incoming?.LastName)
+    ? ((incoming?.FirstName || '') + ' ' + (incoming?.LastName || '')).trim()
+    : (incoming?.SenderInfo || incoming?.SenderName || incoming?.senderName || '');
+
+  const candidate = String(
+    senderInfo ||
+    incoming?.CustomerName ||
+    incoming?.ConversationName ||
+    incoming?.UserName ||
+    incoming?.name ||
+    incoming?.DisplayEmail ||
+    incoming?.RecieverName ||
+    ''
+  ).trim();
+
+  return candidate || getCustomerDisplayName(incoming);
+};

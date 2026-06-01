@@ -36,9 +36,11 @@ export const createGroupApi = async (auth, {
         // Destructure permissions with default values
         const {
             editGroupSettings = true,
+            editGroupAdmins = true,
             sendMessages = true,
             addOtherMembers = true,
-            approveNewMembers = false
+            approveNewMembers = false,
+            AllowDeleteForAll = true
         } = permissions;
 
         const payload = {
@@ -49,30 +51,32 @@ export const createGroupApi = async (auth, {
             EditGroup: editGroupSettings ? 1 : 0,
             SendNewMessage: sendMessages ? 1 : 0,
             AddOtherMember: addOtherMembers ? 1 : 0,
-            ApproveNewMembers: approveNewMembers ? 1 : 0,
+            // ApproveNewMembers: approveNewMembers ? 1 : 0,
+            // InviteToGroup: inviteToGroup ? 1 : 0,
+            AllowDeleteForAll: AllowDeleteForAll ? 1 : 0,
             GroupMembers: Array.isArray(groupMembers) ? JSON.stringify(groupMembers) : (groupMembers ?? "[]"),
         };
 
         const body = buildCommonBody("CreateGroup", auth, payload, fLabel);
         const response = await CommonAPI(body);
-        
+
         // Extract ConversationId correctly from response.Data.rd[0]
         const rd = response?.Data?.rd?.[0] || (Array.isArray(response?.rd) ? response.rd[0] : (response?.Data?.rd || response?.rd));
-        
+
         // Enrich conversationData with necessary fields
         const enrichedRd = {
             ...rd,
             SystemMsg: 1
         };
-        
+
         const convId = rd?.ConversationId || response?.rd?.ConversationId;
 
         // Emit socket event if group created successfully
         if (response?.Status === "200" && convId) {
-            const memberIds = Array.isArray(groupMembers) 
+            const memberIds = Array.isArray(groupMembers)
                 ? groupMembers.map(m => Number(m.UserId || m.userId || m.id))
                 : [];
-            
+
             emitGroupCreated({
                 ufcc: auth?.ufcc,
                 eventType: 'group_created',
@@ -98,7 +102,7 @@ export const createGroupApi = async (auth, {
                 receiveEvent: "internal:group_created"
             });
         }
-        
+
         return response;
     } catch (error) {
         console.error("createGroupApi Error:", error);

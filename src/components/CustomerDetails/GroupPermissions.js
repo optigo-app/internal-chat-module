@@ -3,7 +3,8 @@ import {
     styled,
     Switch,
     Divider,
-    Box
+    Box,
+    Tooltip
 } from "@mui/material";
 import {
     Edit,
@@ -54,6 +55,7 @@ const GroupPermissions = ({
     groupMembers = [],
     onEditAdmins
 }) => {
+    console.log("permissions", permissions)
     const admins = groupMembers.filter(
         (m) => m.IsAdmin === 1 || m.IsAdmin === true
     );
@@ -132,14 +134,14 @@ const GroupPermissions = ({
                         </div>
 
                         <IOSSwitch
-                            checked={permissions?.deleteMessages ?? true}
+                            checked={permissions?.AllowDeleteForAll ?? true}
                             onChange={(e) =>
-                                onPermissionChange("deleteMessages", e.target.checked)
+                                onPermissionChange("AllowDeleteForAll", e.target.checked)
                             }
                         />
                     </div>
 
-                    <div className="permission_item">
+                    <div className="permission_item" style={{ opacity: 0.6, cursor: 'not-allowed' }}>
                         <Link2 className="item_icon" />
                         <div className="item_text">
                             <Typography variant="body1">
@@ -164,7 +166,7 @@ const GroupPermissions = ({
                         Admins can:
                     </Typography>
 
-                    <div className="permission_item">
+                    <div className="permission_item" style={{ opacity: 0.6, cursor: 'not-allowed' }}>
                         <UserCheck className="item_icon" />
                         <div className="item_text">
                             <Typography variant="body1">
@@ -187,32 +189,33 @@ const GroupPermissions = ({
                 <Divider />
 
                 {/* ADMIN MANAGEMENT */}
-                <div className="permission_group">
-                    <Typography className="group_label">
-                        Group admin:
-                    </Typography>
+                {permissions?.editGroupAdmins && (
+                    <div className="permission_group">
+                        <Typography className="group_label">
+                            Group admin:
+                        </Typography>
 
-                    <Box className="permission_item clickable" onClick={onEditAdmins}>
-                        <UserStar className="item_icon" />
+                        <Box className="permission_item clickable" onClick={onEditAdmins}>
+                            <UserStar className="item_icon" />
 
-                        <Box className="item_text">
-                            <Typography variant="body1">
-                                Edit group admins
-                            </Typography>
-
-                            {adminNames && (
-                                <Typography variant="caption" className="admin_names">
-                                    {adminNames}
+                            <Box className="item_text">
+                                <Typography variant="body1">
+                                    Edit group admins
                                 </Typography>
-                            )}
+
+                                {adminNames && (
+                                    <Typography variant="caption" className="admin_names">
+                                        {adminNames}
+                                    </Typography>
+                                )}
+                            </Box>
+
+                            <ChevronRight className="chevron_icon" />
                         </Box>
-
-                        <ChevronRight className="chevron_icon" />
-                    </Box>
-                </div>
-
+                    </div>
+                )}
             </div>
-        </div>
+        </div >
     );
 };
 

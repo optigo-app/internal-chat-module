@@ -5,6 +5,8 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
+  alpha,
+  useTheme,
 } from "@mui/material";
 import {
   Reply,
@@ -34,6 +36,7 @@ const MessageContextMenu = ({
   canDelete = true,
   selectedCustomer,
 }) => {
+  const theme = useTheme();
   const timeLimit = parseInt(process.env.REACT_APP_MESSAGE_EDIT_TIME_LIMIT || "15", 10);
 
   const isWithinTimeLimit = useMemo(() => {
@@ -124,39 +127,61 @@ const MessageContextMenu = ({
       PaperProps={{
         elevation: 0,
         sx: {
-          minWidth: 180,
-          borderRadius: 2,
-          py: 0.5,
-          boxShadow:
-            "0px 6px 18px rgba(0,0,0,0.12), 0px 3px 6px rgba(0,0,0,0.08)",
+          minWidth: 220,
+          borderRadius: "16px",
+          py: 0.8,
+          mt: 0.5,
+          backgroundColor: alpha(theme.palette.background.paper, 0.9),
+          backdropFilter: "blur(12px) saturate(180%)",
+          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          boxShadow: `
+            0 4px 6px -1px rgba(0, 0, 0, 0.1),
+            0 10px 15px -3px rgba(0, 0, 0, 0.1),
+            0 20px 25px -5px rgba(0, 0, 0, 0.1)
+          `,
+          "& .MuiList-root": {
+            padding: "6px",
+          },
         },
       }}
+      TransitionProps={{ timeout: 150 }}
       transformOrigin={{ horizontal: "left", vertical: "top" }}
     >
       {items?.map((item, index) =>
         item.divider ? (
-          <Divider key={index} sx={{ my: 0.5 }} />
+          <Divider key={index} sx={{ my: 0.8, opacity: 0.6 }} />
         ) : (
           <MenuItem
             key={index}
             onClick={() => handleClick(item.action)}
             sx={{
-              py: 1.1,
-              px: 2,
-              mb: 0.5,
-              borderRadius: 1.5,
-              transition: "all 0.2s ease",
-              background: item.danger ? "error.main" : "text.primary",
+              py: 1,
+              px: 1.5,
+              borderRadius: "10px",
+              mb: 0.2,
+              gap: 1.5,
+              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
               "&:hover": {
                 backgroundColor: item.danger
-                  ? "rgba(255,0,0,0.08)"
-                  : "action.hover",
-                transform: "translateX(3px)",
+                  ? alpha(theme.palette.error.main, 0.08)
+                  : alpha(theme.palette.primary.main, 0.08),
+                color: item.danger ? theme.palette.error.main : theme.palette.primary.main,
+                transform: "translateX(4px)",
+                "& .MuiListItemIcon-root": {
+                  color: item.danger ? theme.palette.error.main : theme.palette.primary.main,
+                  transform: "scale(1.1)",
+                },
               },
             }}
           >
             {item.icon && (
-              <ListItemIcon sx={{ minWidth: "30px !important" }}>
+              <ListItemIcon
+                sx={{
+                  minWidth: "auto !important",
+                  color: item.danger ? alpha(theme.palette.error.main, 0.8) : alpha(theme.palette.text.secondary, 0.8),
+                  transition: "all 0.2s ease",
+                }}
+              >
                 {item.icon}
               </ListItemIcon>
             )}
@@ -166,8 +191,9 @@ const MessageContextMenu = ({
               sx={{
                 m: 0,
                 "& .MuiTypography-root": {
-                  fontSize: 14,
+                  fontSize: "13.5px",
                   fontWeight: 500,
+                  letterSpacing: "-0.01em",
                 },
               }}
             />
@@ -175,6 +201,7 @@ const MessageContextMenu = ({
         )
       )}
     </Menu>
+
   );
 };
 

@@ -8,6 +8,8 @@ import {
     Chip,
     alpha
 } from "@mui/material";
+import { Emoji } from 'emoji-picker-react';
+import { charToUnified } from '../../utils/EmojiUtils';
 
 export default function ReactionDetailsMenu({
     anchorEl,
@@ -99,17 +101,25 @@ export default function ReactionDetailsMenu({
                         sx={{ transition: 'all 0.2s', borderRadius: '8px' }}
                     />
 
-                    {Object.entries(reactionGroups).map(([emoji, group]) => (
-                        <Chip
-                            key={emoji}
-                            label={`${emoji} ${group.length}`}
-                            size="small"
-                            clickable
-                            color={filter === emoji ? "primary" : "default"}
-                            onClick={() => setFilter(emoji)}
-                            sx={{ transition: 'all 0.2s', borderRadius: '8px' }}
-                        />
-                    ))}
+                    {Object.entries(reactionGroups).map(([emoji, group]) => {
+                        const unified = charToUnified(emoji);
+                        return (
+                            <Chip
+                                key={emoji}
+                                label={
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                        {unified ? <Emoji unified={unified} size={16} emojiStyle="apple" /> : emoji}
+                                        <Typography variant="body2">{group.length}</Typography>
+                                    </Box>
+                                }
+                                size="small"
+                                clickable
+                                color={filter === emoji ? "primary" : "default"}
+                                onClick={() => setFilter(emoji)}
+                                sx={{ transition: 'all 0.2s', borderRadius: '8px', px: 0.5 }}
+                            />
+                        );
+                    })}
                 </Box>
             </Box>
 
@@ -157,7 +167,12 @@ export default function ReactionDetailsMenu({
                                 )}
                             </Box>
 
-                            <Typography fontSize={18}>{emojiValue}</Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                {(() => {
+                                    const unified = charToUnified(emojiValue);
+                                    return unified ? <Emoji unified={unified} size={20} emojiStyle="apple" /> : <Typography fontSize={18}>{emojiValue}</Typography>;
+                                })()}
+                            </Box>
                         </MenuItem>
                     );
                 })}

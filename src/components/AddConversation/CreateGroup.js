@@ -37,7 +37,10 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
         editGroupSettings: true,
         sendMessages: true,
         addOtherMembers: true,
-        approveNewMembers: false
+        AllowDeleteForAll: true,
+        approveNewMembers: false,
+        inviteToGroup: false,
+        editGroupAdmins: false
     });
     const [emojiAnchorEl, setEmojiAnchorEl] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -233,6 +236,10 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
     };
 
     const handlePermissionChange = (name, value) => {
+        if (name === 'inviteToGroup' || name === 'approveNewMembers') {
+            toast(`${name} — coming soon!`);
+            return;
+        }
         setPermissions(prev => ({ ...prev, [name]: value }));
     };
 
@@ -249,6 +256,12 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
         // Validate group name length
         if (groupName.length > 50) {
             toast.error('Group name cannot exceed 50 characters');
+            return;
+        }
+
+        // Validate at least one member is selected
+        if (selectedMembers.length === 0) {
+            toast.error('At least one member is required to create a group');
             return;
         }
 
@@ -485,7 +498,7 @@ const CreateGroup = ({ onBack, onClose, onContinue }) => {
                                     currentImageUrl={groupProfileUrl}
                                     avatarSeed={groupName || 'New Group'}
                                     showOverlay={true}
-                                    overlayText="Add group\nicon"
+                                    overlayText="Add group icon"
                                     onImageSelected={(file, previewUrl) => {
                                         setSelectedProfileFile(file);
                                         setGroupProfileUrl(previewUrl); // Set preview URL for display

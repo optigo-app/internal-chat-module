@@ -19,11 +19,15 @@ export const fetchConversationLists = async (
         const body = buildCommonBody("GetConversationList", auth, payload, fLabel);
         const response = await CommonAPI(body, { signal });
         if (response?.Data) {
+            const rdLength = response.Data.rd?.length || 0;
+            const rd1Length = response.Data.rd1?.length || 0;
+            const totalItems = rdLength + rd1Length;
+
             return {
                 data: response?.Data || [],
-                total: response?.Data?.total || response?.Data?.length || 0,
+                total: response?.Data?.total || totalItems || 0,
                 currentPage: page,
-                hasMore: response?.Data?.length === pageSize
+                hasMore: rdLength === pageSize // Check against rd length for pagination
             };
         } else {
             return {

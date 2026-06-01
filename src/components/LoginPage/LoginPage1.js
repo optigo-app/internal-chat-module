@@ -42,8 +42,39 @@ const LoginPage1 = () => {
 
     // Initial check for remembered credentials
     useEffect(() => {
+        const localCC = localStorage.getItem('remembered_companycode');
+        const localUI = localStorage.getItem('remembered_userId');
         const savedCreds = getCookie('remembered_creds');
-        if (savedCreds) {
+
+        if (localCC || localUI) {
+            setCredentials(prev => ({
+                ...prev,
+                companycode: localCC || "",
+                userId: localUI || ""
+            }));
+            setRememberMe(true);
+
+            // Auto-fetch token if companycode exists
+            if (localCC) {
+                getToken(localCC).then(token => {
+                    if (token?.rd?.[0]?.stat === 1) {
+                        const tokenData = token.rd[0];
+                        setToken({
+                            sv: tokenData.sv.toString(),
+                            yc: tokenData.yc || "",
+                        });
+                        sessionStorage.setItem("token", JSON.stringify(tokenData));
+                    }
+                }).catch(err => console.error("Auto-fetch token error:", err));
+            }
+
+            // Focus password field if both are pre-filled
+            if (localCC && localUI) {
+                setTimeout(() => {
+                    passwordRef.current?.focus?.();
+                }, 100);
+            }
+        } else if (savedCreds) {
             try {
                 const parsed = JSON.parse(savedCreds);
                 setCredentials(prev => ({
@@ -52,11 +83,30 @@ const LoginPage1 = () => {
                     userId: parsed.userId || ""
                 }));
                 setRememberMe(true);
+
+                if (parsed.companycode) {
+                    getToken(parsed.companycode).then(token => {
+                        if (token?.rd?.[0]?.stat === 1) {
+                            const tokenData = token.rd[0];
+                            setToken({
+                                sv: tokenData.sv.toString(),
+                                yc: tokenData.yc || "",
+                            });
+                            sessionStorage.setItem("token", JSON.stringify(tokenData));
+                        }
+                    });
+                }
+
+                if (parsed.companycode && parsed.userId) {
+                    setTimeout(() => {
+                        passwordRef.current?.focus?.();
+                    }, 100);
+                }
             } catch (e) {
                 console.error("Error parsing remembered credentials");
             }
         }
-    }, []);
+    }, [setToken]);
 
     const companyCodeRef = useRef(null);
     const userIdRef = useRef(null);
@@ -64,9 +114,20 @@ const LoginPage1 = () => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setCredentials({ ...credentials, [name]: value });
+        setCredentials(prev => ({
+            ...prev,
+            [name]: value
+        }));
         setErrors(prev => ({ ...prev, [name]: "" }));
         if (formError) setFormError("");
+        if (name === "companycode") {
+            if (!value.trim()) {
+                setToken({ sv: "", yc: "" });
+                sessionStorage.removeItem("token");
+            } else {
+                setToken({ sv: "", yc: "" });
+            }
+        }
     };
 
     // Add this function inside your component
@@ -180,11 +241,15 @@ const LoginPage1 = () => {
                 sessionStorage.setItem("userData", JSON.stringify(updatedUserData));
                 sessionStorage.setItem("isLoggedIn", true);
 
+                // Always update localStorage for pre-filling fields (independent of Remember Me)
+                localStorage.setItem('remembered_companycode', credentials.companycode);
+                localStorage.setItem('remembered_userId', credentials.userId);
+
                 if (rememberMe) {
-                    // Set cookies for 15 days
+                    // Set cookies for 15 days for auto-login
                     setCookie("userData", updatedUserData, 15);
                     setCookie("token", token, 15);
-                    // Also remember credentials for auto-fill (optional but common)
+                    // Also remember credentials for auto-fill (legacy support)
                     setCookie("remembered_creds", {
                         companycode: credentials.companycode,
                         userId: credentials.userId
@@ -281,7 +346,7 @@ const LoginPage1 = () => {
                                         {...commonTextFieldProps}
                                     />
 
-                                    {((token?.sv && token?.yc) && credentials.companycode.trim() !== "") && (
+                                    {(token?.sv && token?.yc && credentials.companycode?.trim()) && (
                                         <Box
                                             sx={{
                                                 position: "absolute",

@@ -96,49 +96,65 @@
             display: flex;
             gap: 12px;
             justify-content: center;
+            margin-top: 8px;
 
             &.vertical {
                 flex-direction: column;
-                gap: 8px;
+                gap: 10px;
+                
+                button {
+                    width: 100%;
+                    padding: 14px 20px;
+                }
             }
 
             button {
                 flex: 1;
-                padding: 12px 20px;
-                border-radius: 12px;
+                padding: 12px 24px;
+                border-radius: 16px;
                 font-weight: 600;
                 font-size: 15px;
                 cursor: pointer;
-                transition: all 0.2s ease;
+                transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
                 border: none;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                gap: 8px;
+                gap: 10px;
+                outline: none;
 
                 &.btn-action {
                     background: #f0f2f5;
                     color: $primary-main;
-                    width: 100%;
+                    
+                    &:hover {
+                        background: #e9edef;
+                        transform: translateY(-1px);
+                    }
 
                     &.danger {
+                        background: rgba(#ea4335, 0.05);
                         color: #ea4335;
+                        
                         &:hover {
-                            background: rgba(#ea4335, 0.08);
+                            background: rgba(#ea4335, 0.1);
+                            transform: translateY(-1px);
                         }
                     }
 
-                    &:hover {
-                        background: #e9edef;
+                    &:active {
+                        transform: translateY(0);
                     }
                 }
 
                 &.btn-cancel {
-                    background: #f0f2f5;
-                    color: #54656f;
+                    background: transparent;
+                    color: #667781;
+                    border: 1.5px solid #e9edef;
 
                     &:hover {
-                        background: #e9edef;
+                        background: #f8f9fa;
+                        border-color: #d1d7db;
                     }
                 }
 
@@ -151,22 +167,30 @@
 
                         &:hover {
                             background: darken($primary-main, 5%);
-                            transform: translateY(-1px);
-                            box-shadow: 0 6px 16px rgba($primary-main, 0.3);
+                            transform: translateY(-2px);
+                            box-shadow: 0 8px 20px rgba($primary-main, 0.3);
                         }
                     }
 
                     &.danger {
                         background: #ea4335;
-                        &:hover { background: #d33426; }
+                        box-shadow: 0 4px 12px rgba(#ea4335, 0.2);
+
+                        &:hover {
+                            background: #d33426;
+                            transform: translateY(-2px);
+                            box-shadow: 0 8px 20px rgba(#ea4335, 0.3);
+                        }
                     }
 
                     &:active {
                         transform: translateY(0);
+                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
                     }
                 }
             }
         }
+
     }
 }
 

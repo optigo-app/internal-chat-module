@@ -31,7 +31,6 @@ const VideoMessage = ({
                     height: hasGrid ? gridHeight : "auto",
                     borderRadius: 12,
                     overflow: "hidden",
-                    transition: "height 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                     backgroundColor: "rgba(0,0,0,0.05)"
                 }}
             >

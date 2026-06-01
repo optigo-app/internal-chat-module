@@ -55,7 +55,8 @@ const CustomerDetails = ({
         addOtherMembers: true,
         inviteToGroup: false,
         approveNewMembers: false,
-        deleteMessages: true
+        AllowDeleteForAll: true,
+        editGroupAdmins: true,
     });
     const [pagination, setPagination] = useState({
         images: { page: 1, hasMore: true, isLoading: false },
@@ -124,7 +125,6 @@ const CustomerDetails = ({
 
     // Initialize/Sync permissions when customer prop changes or global state updates
     useEffect(() => {
-        debugger;
         if (customer && customer.IsGroup === 1) {
             const globalSettings = groupSettingsState[customer.ConversationId] || {};
             setGroupPermissions({
@@ -133,7 +133,7 @@ const CustomerDetails = ({
                 addOtherMembers: globalSettings.AddOtherMember !== undefined ? globalSettings.AddOtherMember === 1 : (customer.AddOtherMember === 1 || customer.AddOtherMember === true),
                 inviteToGroup: globalSettings.InviteToGroup !== undefined ? globalSettings.InviteToGroup === 1 : (customer.InviteToGroup === 1 || customer.InviteToGroup === true),
                 approveNewMembers: globalSettings.ApproveNewMembers !== undefined ? globalSettings.ApproveNewMembers === 1 : (customer.ApproveNewMembers === 1 || customer.ApproveNewMembers === true),
-                deleteMessages: globalSettings.AllowDeleteForAll !== undefined ? globalSettings.AllowDeleteForAll === 1 : (customer.AllowDeleteForAll === 1 || customer.AllowDeleteForAll === true)
+                AllowDeleteForAll: globalSettings.AllowDeleteForAll !== undefined ? globalSettings.AllowDeleteForAll === 1 : (customer.AllowDeleteForAll === 1 || customer.AllowDeleteForAll === true)
             });
         }
     }, [customer, groupSettingsState]);
@@ -390,7 +390,7 @@ const CustomerDetails = ({
             addOtherMembers: 'AddOtherMember',
             inviteToGroup: 'inviteToGroup',
             approveNewMembers: 'ApproveNewMembers',
-            deleteMessages: 'AllowDeleteForAll'
+            AllowDeleteForAll: 'AllowDeleteForAll'
         };
 
         const apiPermissionName = permissionMap[name];
@@ -417,7 +417,7 @@ const CustomerDetails = ({
                     addOtherMembers: 'Add members',
                     inviteToGroup: 'Invite to group',
                     approveNewMembers: 'Approve new members',
-                    deleteMessages: 'Delete messages'
+                    AllowDeleteForAll: 'Allow delete for everyone'
                 };
                 const friendlyName = friendlyNames[name] || 'Permission';
                 toast.success(`${friendlyName} ${value ? 'Permission enabled' : 'Permission disabled'}`);

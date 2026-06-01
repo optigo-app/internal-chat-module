@@ -1,6 +1,8 @@
 import { Typography, Avatar, IconButton, Box, TextField, InputAdornment, Badge, styled } from '@mui/material';
 import { User, Pencil, X, Check } from 'lucide-react';
+import { useState } from 'react';
 import ProfileAvatarUpload from '../ReusableComponent/ProfileAvatarUpload';
+import ViewPhotoDialog from '../ReusableComponent/ViewPhotoDialog';
 import { getWhatsAppAvatarConfig, hasCustomerName, isImageDead } from '../../utils/globalFunc';
 import { renderEmojiText } from '../../utils/EmojiRenderer';
 
@@ -52,7 +54,15 @@ const ProfileSection = ({
     handleProfileRemoveComplete,
     groupPermissions
 }) => {
+    const [viewPhotoDialog, setViewPhotoDialog] = useState({ open: false, imageUrl: '' });
     const canEditGroup = isCurrentUserAdmin || groupPermissions?.editGroupSettings;
+
+    const handleAvatarDoubleClick = () => {
+        const imageUrl = customer?.ProfileImageUrl;
+        if (imageUrl && !isImageDead(imageUrl)) {
+            setViewPhotoDialog({ open: true, imageUrl });
+        }
+    };
     return (
         <div className={`profile-section ${customer?.IsGroup === 1 ? 'group-profile' : ''}`}>
             {customer?.IsGroup === 1 && canEditGroup ? (
@@ -62,17 +72,19 @@ const ProfileSection = ({
                     variant="dot"
                     invisible={customer?.IsGroup === 1}
                 >
-                    <ProfileAvatarUpload
-                        size={130}
-                        currentImageUrl={customer?.ProfileImageUrl}
-                        avatarSeed={avatarSeed}
-                        showOverlay={true}
-                        overlayText={customer?.ProfileImageUrl ? "Change group\nicon" : "Add group\nicon"}
-                        onUploadComplete={handleProfileUploadComplete}
-                        onRemoveComplete={handleProfileRemoveComplete}
-                        className="group-avatar-container"
-                        folderName="tecochat/profileImage"
-                    />
+                    <div onDoubleClick={handleAvatarDoubleClick} style={{ cursor: 'zoom-in' }}>
+                        <ProfileAvatarUpload
+                            size={130}
+                            currentImageUrl={customer?.ProfileImageUrl}
+                            avatarSeed={avatarSeed}
+                            showOverlay={true}
+                            overlayText={customer?.ProfileImageUrl ? "Change group\nicon" : "Add group\nicon"}
+                            onUploadComplete={handleProfileUploadComplete}
+                            onRemoveComplete={handleProfileRemoveComplete}
+                            className="group-avatar-container"
+                            folderName="tecochat/profileImage"
+                        />
+                    </div>
                 </StyledBadge>
             ) : (
                 <div className={`avatar-container ${customer?.IsGroup === 1 ? 'group-avatar-container' : ''}`}>
@@ -87,6 +99,8 @@ const ProfileSection = ({
                             className="profile-avatar"
                             src={(customer?.ProfileImageUrl && !isImageDead(customer?.ProfileImageUrl)) ? customer?.ProfileImageUrl : undefined}
                             imgProps={{ draggable: false }}
+                            onDoubleClick={handleAvatarDoubleClick}
+                            sx={{ cursor: customer?.ProfileImageUrl && !isImageDead(customer?.ProfileImageUrl) ? 'zoom-in' : 'default' }}
                         />
                     </StyledBadge>
                 </div>
@@ -151,6 +165,13 @@ const ProfileSection = ({
                     {(customer?.Designation || customer?.UserId) || ''}
                 </Typography>
             )}
+
+            <ViewPhotoDialog
+                open={viewPhotoDialog.open}
+                onClose={() => setViewPhotoDialog({ open: false, imageUrl: '' })}
+                imageUrl={viewPhotoDialog.imageUrl}
+                title="View Profile Photo"
+            />
         </div>
     );
 };

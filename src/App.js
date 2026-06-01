@@ -22,6 +22,7 @@ import LoginExists from './components/LoginExists/LoginExists';
 import Lottie from 'lottie-react';
 import loader from './assets/lotties/loader.json';
 import NotificationPermissionModal from './components/_ui/NotificationPermissionModal';
+import { eraseCookie } from './utils/cookieUtils';
 
 const PagenotFound = () => <div>404 - Page Not Found</div>;
 
@@ -108,7 +109,7 @@ function Layout({ children }) {
 
 function App() {
   const navigate = useNavigate();
-  const { auth, isSyncing } = useContext(LoginContext);
+  const { auth, setAuth, setToken, isSyncing } = useContext(LoginContext);
 
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [selectedTag, setSelectedTag] = useState('All');
@@ -148,11 +149,21 @@ function App() {
   // Stable callback for session logout
   const handleSessionLogout = useCallback(() => {
     console.log('🔒 Session logout received');
+    
     sessionStorage.clear();
+    
+    // Clear cookies that cause auto-login
+    eraseCookie("userData");
+    eraseCookie("token");
+
+    // Clear context state to force a full re-render/redirect
+    setAuth({ userId: '', username: '', ukey: '', token: '' });
+    setToken({ sv: '', yc: '' });
+
     disconnectSocket(true);
     navigateRef.current('/login');
     notify({}, 'SESSION_LOGOUT');
-  }, []);
+  }, [setAuth, setToken]);
 
   useEffect(() => {
     let isMounted = true;

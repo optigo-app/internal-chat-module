@@ -7,11 +7,11 @@ import { isMessageEditable } from '../utils/globalFunc';
 
 const INITIAL_STATE = { isOpen: false, actionType: null };
 
-export function useConfirmModal({ 
-    selectedCustomer, 
-    auth, 
-    onCustomerSelect, 
-    refresh, 
+export function useConfirmModal({
+    selectedCustomer,
+    auth,
+    onCustomerSelect,
+    refresh,
     handleDeleteMessage,
     fetchAndCacheGroupMembers,
     isCurrentUserAdmin,

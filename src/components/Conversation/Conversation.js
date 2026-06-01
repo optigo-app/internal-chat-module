@@ -61,6 +61,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
     const messagesRef = useRef(null);
     const [isCurrentUserAdmin, setIsCurrentUserAdmin] = useState(false);
+    const messageAreaRef = useRef(null);
 
     // Initialize drawer state first (needed by useConversation)
     const {
@@ -264,7 +265,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         messagesRef.current = messages;
     }, [messages]);
 
-    const docsParams = ".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.csv";
+    const docsParams = ".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.csv,.apk";
     const videoParams = "video/*";
     const imageParams = "image/*";
 
@@ -538,6 +539,13 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         setShowPicker(false);
     }, [handleSendMessage, scrollToBottom]);
 
+    const handleScrollToMessage = useCallback(async (messageId, attachmentId = null) => {
+        if (messageAreaRef.current?.scrollToMessage) {
+            return messageAreaRef.current.scrollToMessage(messageId, attachmentId);
+        }
+        return scrollToMessage(messageId, containerRef, attachmentId);
+    }, [scrollToMessage]);
+
     if (!isOnline) {
         return (
             <div className="conversation-container">
@@ -675,12 +683,13 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                 initialViewState={drawerViewState}
                                 messageInfo={selectedMessageForInfo}
                                 messages={messages}
-                                scrollToMessage={scrollToMessage}
+                                scrollToMessage={handleScrollToMessage}
                             />
                         </div>
                     ) : (
                         <>
                             <MessageArea
+                                ref={messageAreaRef}
                                 auth={auth}
                                 showMedia={showMedia}
                                 setShowMedia={setShowMedia}
@@ -766,7 +775,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                             initialViewState={drawerViewState}
                             messageInfo={selectedMessageForInfo}
                             messages={messages}
-                            scrollToMessage={scrollToMessage}
+                            scrollToMessage={handleScrollToMessage}
                             searchResults={searchResults}
                             isSearching={isSearching}
                             onSearchMessages={searchMessages}
@@ -783,7 +792,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                     initialViewState={drawerViewState}
                                     messageInfo={selectedMessageForInfo}
                                     messages={messages}
-                                    scrollToMessage={scrollToMessage}
+                                    scrollToMessage={handleScrollToMessage}
                                     searchResults={searchResults}
                                     isSearching={isSearching}
                                     onSearchMessages={searchMessages}

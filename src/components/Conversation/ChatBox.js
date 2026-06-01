@@ -49,6 +49,13 @@ const ChatBox = ({
         }
     }, [replyToMessage, showOnlyAdminNotice, isRemovedFromGroup]);
 
+    // Focus input when conversation changes
+    useEffect(() => {
+        if (selectedCustomer?.ConversationId && inputRef.current && !showOnlyAdminNotice && !isRemovedFromGroup) {
+            inputRef.current.focus();
+        }
+    }, [selectedCustomer?.ConversationId, showOnlyAdminNotice, isRemovedFromGroup]);
+
     const [tempQuery, setTempQuery] = useState(inputValue || '')
     const prevInputValueRef = useRef(inputValue)
     const typingTimeoutRef = useRef(null)
@@ -57,9 +64,14 @@ const ChatBox = ({
     const lastTypingEmitRef = useRef(0);
 
     const onInputChange = (e) => {
-        const val = e.target.value;
+        let val = e.target.value;
+        // Prevent leading whitespace (spaces, newlines, tabs, etc.)
+        if (/^\s/.test(val)) {
+            val = val.trimStart();
+        }
         setTempQuery(val);
-        setInputValue(val); // Sync with parent state for media preview
+        
+        // Sync typing status
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         const now = Date.now();
         if (now - lastTypingEmitRef.current > 1000) {
@@ -72,13 +84,51 @@ const ChatBox = ({
         }, 1000);
     };
 
+    // Sync with parent state for drafts and media preview with debounce
+    // This prevents the entire Conversation component from re-rendering on every keystroke
+    useEffect(() => {
+        if (tempQuery === inputValue) return;
+
+        const syncTimeout = setTimeout(() => {
+            setInputValue(tempQuery);
+        }, 800); // Sync after 800ms of inactivity
+
+        return () => clearTimeout(syncTimeout);
+    }, [tempQuery, setInputValue, inputValue]);
+
     const handlePaste = useCallback((e) => {
+        // Handle files pasting
         if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
             const files = Array.from(e.clipboardData.files);
             if (captureMessageScrollState) captureMessageScrollState();
             if (processFiles) processFiles(files);
+            // We don't preventDefault here to allow text that might be pasted alongside files
         }
-    }, [processFiles, captureMessageScrollState]);
+
+        // Handle text pasting with trimming (including newlines)
+        const pastedText = e.clipboardData.getData('text');
+        if (pastedText && pastedText !== pastedText.trim()) {
+            e.preventDefault();
+            const trimmedText = pastedText.trim();
+            
+            const input = e.target;
+            const start = input.selectionStart || 0;
+            const end = input.selectionEnd || 0;
+            const textBefore = tempQuery.substring(0, start);
+            const textAfter = tempQuery.substring(end);
+            
+            const newValue = textBefore + trimmedText + textAfter;
+            setTempQuery(newValue);
+            setInputValue(newValue);
+
+            // Set cursor position after the pasted trimmed text
+            setTimeout(() => {
+                if (input) {
+                    input.selectionStart = input.selectionEnd = start + trimmedText.length;
+                }
+            }, 0);
+        }
+    }, [processFiles, captureMessageScrollState, tempQuery, setInputValue]);
 
     const handleTyping = useCallback(async (isTyping) => {
         if (!selectedCustomer?.ConversationId || !auth) return;
@@ -111,7 +161,9 @@ const ChatBox = ({
     }, [selectedCustomer, auth]);
 
     useEffect(() => {
-        setTempQuery(inputValue || '');
+        if (inputValue !== tempQuery) {
+            setTempQuery(inputValue || '');
+        }
     }, [inputValue]);
 
     const onEmojiClick = (emojiData) => {

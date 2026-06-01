@@ -34,8 +34,8 @@ const MediaMessage = ({
         const dimsForCalc = imageDims || cachedDims;
         const mediaWidth = 250;
         const computedHeight = dimsForCalc?.w && dimsForCalc?.h
-            ? Math.max('100%', Math.min(250, Math.round(mediaWidth * (dimsForCalc.h / dimsForCalc.w))))
-            : '100%';
+            ? Math.max(100, Math.min(250, Math.round(mediaWidth * (dimsForCalc.h / dimsForCalc.w))))
+            : 200;
 
         return (
             <Box sx={{ position: 'relative' }}>
@@ -47,7 +47,6 @@ const MediaMessage = ({
                         height: hasGrid ? gridHeight : computedHeight,
                         borderRadius: "12px",
                         overflow: 'hidden',
-                        transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         backgroundColor: alpha(theme.palette.text.primary, 0.05)
                     }}
                 >

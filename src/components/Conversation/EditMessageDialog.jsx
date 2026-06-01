@@ -30,8 +30,9 @@ const EditMessageDialog = ({ open, onClose, onSave, originalMessage }) => {
     }, [open, originalMessage]);
 
     const handleSave = () => {
-        if (editText.trim() && editText !== originalMessage?.Message) {
-            onSave(originalMessage.MessageId || originalMessage.Id, editText);
+        const trimmedText = editText.trim();
+        if (trimmedText && trimmedText !== originalMessage?.Message) {
+            onSave(originalMessage.MessageId || originalMessage.Id, trimmedText);
         }
         onClose();
     };
@@ -151,7 +152,7 @@ const EditMessageDialog = ({ open, onClose, onSave, originalMessage }) => {
                 <Button
                     onClick={handleSave}
                     variant="contained"
-                    disabled={!editText.trim() || editText === originalMessage?.Message}
+                    disabled={!editText.trim() || editText.trim() === originalMessage?.Message}
                     className='primaryBtnClassname'
                 >
                     Save

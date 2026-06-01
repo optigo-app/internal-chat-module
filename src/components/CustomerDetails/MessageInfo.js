@@ -2,7 +2,7 @@ import React from 'react';
 import { Typography, Avatar, alpha, useTheme, Box, IconButton } from '@mui/material';
 import { CheckCheck, Check, Play, FileText, Download, File, Image as ImageIcon, Video as VideoIcon, Forward } from 'lucide-react';
 import { Emoji } from 'emoji-picker-react';
-import { getWhatsAppAvatarConfig, getDocumentMeta, formatISOTimeUTC } from '../../utils/globalFunc';
+import { getWhatsAppAvatarConfig, getDocumentMeta, formatMessageFullDate } from '../../utils/globalFunc';
 import { readMessageMemberList } from '../../API/Groups/ReadMessageMemberListApi';
 import { FormatDateIST } from '../../utils/DateFnc';
 
@@ -14,6 +14,7 @@ const charToUnified = (char) => {
 };
 
 const MessageInfo = ({ messageInfo, localGroupData, auth, selectedCustomer, messages = [] }) => {
+    console.log("messageInfo", messageInfo)
     const theme = useTheme();
     const [readMembers, setReadMembers] = React.useState([]);
     const [deliveredMembers, setDeliveredMembers] = React.useState([]);
@@ -104,7 +105,6 @@ const MessageInfo = ({ messageInfo, localGroupData, auth, selectedCustomer, mess
                     {messageInfo.ContextType === 2 && (
                         <div className="reply-preview-wrapper" style={{ marginBottom: '8px' }}>
                             {(() => {
-                                debugger
                                 const original = messages?.data?.find(m => (m.MessageId || m.id) === messageInfo.ContextId);
                                 const isGenericReply = !messageInfo?.ReplyContextMsg || String(messageInfo.ReplyContextMsg).trim() === '' || String(messageInfo.ReplyContextMsg).trim().toLowerCase() === 'media';
                                 const mediaCount = Array.isArray(original?.mediaItems) ? original.mediaItems.length : 0;
@@ -389,7 +389,7 @@ const MessageInfo = ({ messageInfo, localGroupData, auth, selectedCustomer, mess
                                 color: alpha(theme.palette.text.primary, 0.6)
                             }}
                         >
-                            {messageInfo?.Time}
+                            {formatMessageFullDate(messageInfo?.DateTime)}
                         </Typography>
                         {isOutgoing && (
                             <CheckCheck size={15} color={theme.palette.primary.main} />
@@ -467,7 +467,7 @@ const MessageInfo = ({ messageInfo, localGroupData, auth, selectedCustomer, mess
                                     </div>
                                     <div className="setting-right">
                                         <Typography variant="caption" className="sub-text status-chip">
-                                            {member.ReadAt ? formatISOTimeUTC(member.ReadAt) : ''}
+                                            {member.ReadAt ? formatMessageFullDate(member.ReadAt) : ''}
                                         </Typography>
                                     </div>
                                 </div>
@@ -501,7 +501,7 @@ const MessageInfo = ({ messageInfo, localGroupData, auth, selectedCustomer, mess
                                     </div>
                                     <div className="setting-right">
                                         <Typography variant="caption" className="sub-text status-chip">
-                                            {member.EntryDate ? formatISOTimeUTC(member.EntryDate) : 'Delivered'}
+                                            {member.EntryDate ? formatMessageFullDate(member.EntryDate) : 'Delivered'}
                                         </Typography>
                                     </div>
                                 </div>

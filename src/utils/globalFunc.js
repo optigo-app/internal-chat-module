@@ -43,6 +43,25 @@ const getInitials = (name) => {
     return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
 };
 
+const formatWhatsAppText = (text) => {
+    if (!text || typeof text !== 'string') return text;
+    const regex = /(```[\s\S]*?```|\*\S(?:.*?\S)?\*|_\S(?:.*?\S)?_|~\S(?:.*?\S)?~)/g;
+    const parts = text.split(regex);
+    
+    return parts.map((part, index) => {
+        if (part.startsWith('```') && part.endsWith('```')) {
+            return <code key={index} style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: '4px' }}>{renderEmojiText(part.slice(3, -3))}</code>;
+        } else if (part.startsWith('*') && part.endsWith('*')) {
+            return <strong key={index}>{renderEmojiText(part.slice(1, -1))}</strong>;
+        } else if (part.startsWith('_') && part.endsWith('_')) {
+            return <em key={index}>{renderEmojiText(part.slice(1, -1))}</em>;
+        } else if (part.startsWith('~') && part.endsWith('~')) {
+            return <s key={index}>{renderEmojiText(part.slice(1, -1))}</s>;
+        }
+        return renderEmojiText(part);
+    });
+};
+
 export const renderTextWithLinks = (rawText, options = {}) => {
     const { linkStyle = {} } = options;
 
@@ -66,7 +85,7 @@ export const renderTextWithLinks = (rawText, options = {}) => {
                 const textPart = line.slice(lastIndex, start);
                 nodes.push(
                     <React.Fragment key={`t-${lineIndex}-${matchIndex}`}>
-                        {renderEmojiText(textPart)}
+                        {formatWhatsAppText(textPart)}
                     </React.Fragment>
                 );
             }
@@ -102,7 +121,7 @@ export const renderTextWithLinks = (rawText, options = {}) => {
             const textPart = line.slice(lastIndex);
             nodes.push(
                 <React.Fragment key={`e-${lineIndex}`}>
-                    {renderEmojiText(textPart)}
+                    {formatWhatsAppText(textPart)}
                 </React.Fragment>
             );
         }
@@ -225,20 +244,15 @@ export function passwordToSha1(password) {
 
 
 export const handleDownloadFile = async (fileUrlOrMessage, filename = null, options = {}) => {
-
-    // 0️⃣ Support for Message Object or Bulk Download
+    console.log("filename",filename)
     if (typeof fileUrlOrMessage === 'object' && fileUrlOrMessage !== null && !options?.isRecursive) {
         const msg = fileUrlOrMessage;
         const mediaItems = Array.isArray(msg?.mediaItems) ? msg.mediaItems : [];
-
-        // CASE A: Single file within message
         if (mediaItems.length === 1 || (!mediaItems.length && (msg.FileUrl || msg.src || msg.FileUrlOrMessage))) {
             const url = mediaItems[0]?.url || msg.FileUrl || msg.src || msg.FileUrlOrMessage;
             const name = mediaItems[0]?.filename || msg.FileName || msg.name || filename;
             return handleDownloadFile(url, name, { ...options, isRecursive: true });
         }
-
-        // CASE B: Multiple files -> ZIP
         if (mediaItems.length > 1) {
             try {
                 const zip = new JSZip();
@@ -253,9 +267,8 @@ export const handleDownloadFile = async (fileUrlOrMessage, filename = null, opti
                         const name =
                             item.filename ||
                             `file_${idx + 1}${getFileExt(url) ? "." + getFileExt(url) : ""}`;
-
                         try {
-                            const response = await axios.get(url, {
+                            const response = await fetch(url, {
                                 responseType: 'blob',
                                 headers: {
                                     ...(url.startsWith('http') ? {} : getHeaders())
@@ -266,30 +279,23 @@ export const handleDownloadFile = async (fileUrlOrMessage, filename = null, opti
                             zip.file(name, blob);
                         } catch (err) {
                             console.warn("CORS or Download blocked for:", url, err);
-                            // Skip file if download blocked
                         }
-
                     } catch (err) {
                         console.error(`Failed to add item ${idx} to ZIP:`, err);
                     }
                 });
 
                 await Promise.all(fetchPromises);
-
                 const content = await zip.generateAsync({ type: "blob" });
                 const zipUrl = window.URL.createObjectURL(content);
-
                 const link = document.createElement("a");
                 link.href = zipUrl;
                 link.download = zipFileName;
                 link.style.display = "none";
-
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-
                 window.URL.revokeObjectURL(zipUrl);
-
                 return { success: true, filename: zipFileName };
             } catch (error) {
                 console.error("Bulk download ZIP creation failed:", error);
@@ -297,8 +303,6 @@ export const handleDownloadFile = async (fileUrlOrMessage, filename = null, opti
             }
         }
     }
-
-    // 1️⃣ Single File Logic
     const fileUrl =
         typeof fileUrlOrMessage === "string"
             ? fileUrlOrMessage
@@ -306,70 +310,48 @@ export const handleDownloadFile = async (fileUrlOrMessage, filename = null, opti
 
     if (!fileUrl) return { success: false, error: "No URL provided" };
 
+    // Generate filename with timestamp
+    const timestamp = new Date().getTime();
+    if (!filename) {
+        const extensionMatch = fileUrl.match(/\.([a-zA-Z0-9]+)(?:$|[?#])/);
+        const extension = extensionMatch?.[1] || 'jpg';
+        filename = `generated-${timestamp}.${extension}`;
+    } else {
+        // Append timestamp to existing filename
+        const lastDotIndex = filename.lastIndexOf('.');
+        if (lastDotIndex > 0) {
+            const nameWithoutExt = filename.substring(0, lastDotIndex);
+            const extension = filename.substring(lastDotIndex);
+            filename = `${nameWithoutExt}_${timestamp}${extension}`;
+        } else {
+            filename = `${filename}_${timestamp}`;
+        }
+    }
+
+    // Try fetch blob first
     try {
-        // Generate filename
-        if (!filename) {
-            const timestamp = new Date()
-                .toISOString()
-                .slice(0, 19)
-                .replace(/:/g, "-");
-
-            const extMatch = String(fileUrl).match(/\.[a-zA-Z0-9]+$/);
-            const ext = extMatch ? extMatch[0] : "";
-
-            filename = `file-${timestamp}${ext}`;
-        }
-
-        if (!filename.includes(".")) {
-            const extMatch = String(fileUrl).match(/\.[a-zA-Z0-9]+$/);
-            filename += extMatch ? extMatch[0] : "";
-        }
-
-        const fullFileUrl = String(fileUrl).startsWith("http")
-            ? fileUrl
-            : fileUrl;
-
-        // Try axios first (most robust for Blobs and CORS)
-        const response = await axios.get(fullFileUrl, {
-            responseType: 'blob',
-            headers: {
-                Accept: "*/*",
-                ...(fullFileUrl.startsWith('http') ? {} : getHeaders()),
-                ...options.headers,
-            }
-        });
-
-        const blob = response.data;
-        const url = window.URL.createObjectURL(blob);
-
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        link.style.display = "none";
-
-        document.body.appendChild(link);
-        link.click();
-
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-
+        const response = await fetch(fileUrl);
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(objectUrl);
         return { success: true, filename };
-    } catch (error) {
-
-        console.warn("Fetch blocked (likely CORS). Using direct download fallback.");
-
-        // Fallback direct download (bypass CORS)
+    } catch {
+        // Fallback to direct anchor download
         try {
-            const link = document.createElement("a");
-            link.href = fileUrl;
-            link.download = filename || "file";
-            link.target = "_blank";
-            link.rel = "noopener";
-
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
+            const anchor = document.createElement('a');
+            anchor.href = fileUrl;
+            anchor.download = filename;
+            anchor.target = '_blank';
+            anchor.rel = 'noopener noreferrer';
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
             return { success: true, filename, fallback: true };
         } catch (fallbackError) {
             console.error("Fallback download failed:", fallbackError);
@@ -403,21 +385,145 @@ export const getFileExt = (name = '') => {
     return idx >= 0 ? cleaned.slice(idx + 1) : '';
 };
 
-export const getDocumentMeta = (name = '') => {
-    const ext = getFileExt(name);
-
-    if (ext === 'pdf') return { label: 'PDF', tone: 'pdf', iconName: 'FileText', iconUrl: '/icons/pdf.png' };
-    if (ext === 'doc' || ext === 'docx') return { label: 'DOCS', tone: 'doc', iconName: 'FileType', iconUrl: '/icons/doc.png' };
-    if (ext === 'xls' || ext === 'xlsx' || ext === 'csv') return { label: 'EXCEL', tone: 'sheet', iconName: 'FileSpreadsheet', iconUrl: '/icons/xls.png' };
-    if (ext === 'ppt' || ext === 'pptx') return { label: 'PPT', tone: 'ppt', iconName: 'FileType', iconUrl: '/icons/ppt.png' };
-    if (ext === 'zip' || ext === 'rar' || ext === '7z') return { label: 'ZIP', tone: 'archive', iconName: 'FileArchive', iconUrl: '/icons/doc.png' };
-    if (ext === 'psd') return { label: 'PSD', tone: 'psd', iconName: 'FileType', iconUrl: '/icons/doc.png' };
-    if (ext === 'txt') return { label: 'TEXT', tone: 'default', iconName: 'FileText', iconUrl: '/icons/txt.png' };
-    if (ext === 'json' || ext === 'xml' || ext === 'html' || ext === 'js' || ext === 'ts' || ext === 'css') {
-        return { label: 'CODE', tone: 'code', iconName: 'FileCode', iconUrl: '/icons/doc.png' };
+const FILE_TYPES = {
+    pdf: {
+        label: 'PDF',
+        tone: 'pdf',
+        iconName: 'FileText',
+        iconUrl: '/icons/pdf.png'
+    },
+    doc: {
+        label: 'DOCS',
+        tone: 'doc',
+        iconName: 'FileType',
+        iconUrl: '/icons/doc.png'
+    },
+    docx: {
+        label: 'DOCS',
+        tone: 'doc',
+        iconName: 'FileType',
+        iconUrl: '/icons/doc.png'
+    },
+    dcs: {
+        label: 'DOCS',
+        tone: 'doc',
+        iconName: 'FileType',
+        iconUrl: '/icons/doc.png'
+    },
+    xls: {
+        label: 'EXCEL',
+        tone: 'sheet',
+        iconName: 'FileSpreadsheet',
+        iconUrl: '/icons/xls.png'
+    },
+    xlsx: {
+        label: 'EXCEL',
+        tone: 'sheet',
+        iconName: 'FileSpreadsheet',
+        iconUrl: '/icons/xls.png'
+    },
+    csv: {
+        label: 'EXCEL',
+        tone: 'sheet',
+        iconName: 'FileSpreadsheet',
+        iconUrl: '/icons/xls.png'
+    },
+    ppt: {
+        label: 'PPT',
+        tone: 'ppt',
+        iconName: 'FileType',
+        iconUrl: '/icons/ppt.png'
+    },
+    pptx: {
+        label: 'PPT',
+        tone: 'ppt',
+        iconName: 'FileType',
+        iconUrl: '/icons/ppt.png'
+    },
+    zip: {
+        label: 'ZIP',
+        tone: 'archive',
+        iconName: 'FileArchive',
+        iconUrl: '/icons/doc.png'
+    },
+    rar: {
+        label: 'ZIP',
+        tone: 'archive',
+        iconName: 'FileArchive',
+        iconUrl: '/icons/doc.png'
+    },
+    '7z': {
+        label: 'ZIP',
+        tone: 'archive',
+        iconName: 'FileArchive',
+        iconUrl: '/icons/doc.png'
+    },
+    psd: {
+        label: 'PSD',
+        tone: 'psd',
+        iconName: 'FileType',
+        iconUrl: '/icons/doc.png'
+    },
+    apk: {
+        label: 'APK',
+        tone: 'apk',
+        iconName: 'Smartphone',
+        iconUrl: '/icons/apk.png'
+    },
+    txt: {
+        label: 'TEXT',
+        tone: 'default',
+        iconName: 'FileText',
+        iconUrl: '/icons/txt.png'
+    },
+    json: {
+        label: 'CODE',
+        tone: 'code',
+        iconName: 'FileCode',
+        iconUrl: '/icons/doc.png'
+    },
+    xml: {
+        label: 'CODE',
+        tone: 'code',
+        iconName: 'FileCode',
+        iconUrl: '/icons/doc.png'
+    },
+    html: {
+        label: 'CODE',
+        tone: 'code',
+        iconName: 'FileCode',
+        iconUrl: '/icons/doc.png'
+    },
+    js: {
+        label: 'CODE',
+        tone: 'code',
+        iconName: 'FileCode',
+        iconUrl: '/icons/doc.png'
+    },
+    ts: {
+        label: 'CODE',
+        tone: 'code',
+        iconName: 'FileCode',
+        iconUrl: '/icons/doc.png'
+    },
+    css: {
+        label: 'CODE',
+        tone: 'code',
+        iconName: 'FileCode',
+        iconUrl: '/icons/doc.png'
     }
+};
 
-    return { label: ext.toUpperCase() || 'FILE', tone: 'default', iconName: 'File', iconUrl: '/icons/doc.png' };
+export const getDocumentMeta = (name = '') => {
+    const ext = getFileExt(name)?.toLowerCase();
+    return (
+        FILE_TYPES[ext] || {
+            label: ext?.toUpperCase() || 'FILE',
+            tone: 'default',
+            iconName: 'File',
+            iconUrl: '/icons/doc.png'
+        }
+    );
 };
 
 export const validateMediaFiles = (files) => {
@@ -552,4 +658,32 @@ export const isMessageEditable = (message, timeLimit = 15) => {
     const currentTime = Date.now();
     const diffInMinutes = (currentTime - sentTime) / (1000 * 60);
     return diffInMinutes <= timeLimit;
+};
+
+export const formatMessageFullDate = (dateStr, timeStr) => {
+    if (!dateStr) return timeStr || '';
+
+    try {
+        // Combine date + time (fallback safe)
+        const combined = timeStr ? `${dateStr} ${timeStr}` : dateStr;
+        const dateObj = new Date(combined);
+
+        if (isNaN(dateObj.getTime())) {
+            return combined;
+        }
+
+        // Format Date (DD/MM/YYYY)
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const year = dateObj.getFullYear();
+        const formattedDate = `${day}/${month}/${year}`;
+
+        // Use your existing UTC formatter
+        const isoString = dateObj.toISOString();
+        const formattedTime = formatISOTimeUTC(isoString);
+
+        return `${formattedDate} at ${formattedTime}`;
+    } catch (e) {
+        return dateStr + (timeStr ? ` ${timeStr}` : '');
+    }
 };

@@ -407,6 +407,13 @@ export const emitInternalTyping = (payload) => {
 export const emitInternalMessageDelete = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:delete_message', { ...payload, receiveEvent: "internal:delete_message" });
+    internalMessageDeletionHandlers.forEach(handler => {
+        try {
+            handler(payload);
+        } catch (error) {
+            console.error('Error dispatching local delete event:', error);
+        }
+    });
     return true;
 };
 

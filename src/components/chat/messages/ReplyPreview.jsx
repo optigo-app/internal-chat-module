@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { Image as ImageIcon, Video as VideoIcon, FileText } from "lucide-react";
+import { renderTextWithLinks } from "../../../utils/globalFunc";
 
 const ReplyPreview = ({ msg, original, isOutgoing, scrollToMessage, containerRef }) => {
     const theme = useTheme();
@@ -123,7 +124,7 @@ const ReplyPreview = ({ msg, original, isOutgoing, scrollToMessage, containerRef
                             whiteSpace: 'nowrap'
                         }}
                     >
-                        {computedReplyText?.length > 50 ? `${computedReplyText.substring(0, 50)}...` : computedReplyText}
+                        {computedReplyText ? renderTextWithLinks(computedReplyText.length > 80 ? `${computedReplyText.substring(0, 80)}...` : computedReplyText) : ''}
                     </Typography>
                 </Box>
                 {!msg.ContextId && (

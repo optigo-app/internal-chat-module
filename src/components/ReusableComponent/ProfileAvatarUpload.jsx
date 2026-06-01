@@ -9,13 +9,14 @@ import toast from 'react-hot-toast';
 import ConfirmationDialog from './ConfirmationDialog';
 import WhatsAppMenu from './WhatsAppMenu';
 import ImageAdjustmentModal from './ImageAdjustmentModal';
+import ViewPhotoDialog from './ViewPhotoDialog';
 
 const ProfileAvatarUpload = ({
     size = 130,
     currentImageUrl = null,
     avatarSeed = '',
     showOverlay = true,
-    overlayText = 'Add group\nicon',
+    overlayText = 'Add group icon',
     onImageSelected,
     onUploadComplete,
     onUploadError,
@@ -30,6 +31,7 @@ const ProfileAvatarUpload = ({
     const [cameraDialog, setCameraDialog] = useState({ open: false, message: '' });
     const [removeDialog, setRemoveDialog] = useState({ open: false });
     const [adjustmentModal, setAdjustmentModal] = useState({ open: false, file: null });
+    const [viewDialog, setViewDialog] = useState({ open: false, imageUrl: '' });
 
     // Update preview when currentImageUrl changes
     useEffect(() => {
@@ -113,7 +115,7 @@ const ProfileAvatarUpload = ({
         handleMenuClose();
         const imageUrl = previewImage || currentImageUrl;
         if (imageUrl) {
-            window.open(imageUrl, '_blank');
+            setViewDialog({ open: true, imageUrl });
         }
     };
 
@@ -372,6 +374,13 @@ const ProfileAvatarUpload = ({
                 imageFile={adjustmentModal.file}
                 onConfirm={handleAdjustmentComplete}
                 title="Adjust Profile Image"
+            />
+
+            {/* View Photo Dialog */}
+            <ViewPhotoDialog
+                open={viewDialog.open}
+                onClose={() => setViewDialog({ open: false, imageUrl: '' })}
+                imageUrl={viewDialog.imageUrl}
             />
         </>
     );

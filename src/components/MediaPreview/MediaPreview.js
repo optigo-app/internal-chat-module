@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { X, Trash2, Plus } from 'lucide-react';
+import { Skeleton } from '@mui/material';
 import './MediaPreview.scss';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, FreeMode, Thumbs } from 'swiper/modules';
@@ -20,6 +21,24 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
     const [mediaItems, setMediaItems] = useState([]);
     const [textPreview, setTextPreview] = useState('');
     const [textPreviewError, setTextPreviewError] = useState('');
+    const [loadedVideos, setLoadedVideos] = useState(new Set());
+    const [loadedVideoThumbs, setLoadedVideoThumbs] = useState(new Set());
+
+    const handleVideoLoad = useCallback((id) => {
+        setLoadedVideos((prev) => {
+            const next = new Set(prev);
+            next.add(id);
+            return next;
+        });
+    }, []);
+
+    const handleVideoThumbLoad = useCallback((id) => {
+        setLoadedVideoThumbs((prev) => {
+            const next = new Set(prev);
+            next.add(id);
+            return next;
+        });
+    }, []);
 
     const safeCreateObjectUrl = useCallback((maybeBlob) => {
         try {
@@ -320,7 +339,22 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
 
                                         {item.type === 'video' && (
                                             <div className="media-stage">
-                                                <video src={url} className="media-itemscl media-item--video" controls />
+                                                {!loadedVideos.has(item.id) && (
+                                                    <Skeleton
+                                                        variant="rectangular"
+                                                        width="100%"
+                                                        height="100%"
+                                                        animation="wave"
+                                                        sx={{ bgcolor: 'rgba(0,0,0,0.05)', position: 'absolute', inset: 0, borderRadius: '16px' }}
+                                                    />
+                                                )}
+                                                <video
+                                                    src={url}
+                                                    className="media-itemscl media-item--video"
+                                                    controls
+                                                    onLoadedData={() => handleVideoLoad(item.id)}
+                                                    style={{ opacity: loadedVideos.has(item.id) ? 1 : 0 }}
+                                                />
                                             </div>
                                         )}
 
@@ -370,11 +404,23 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                                         </div>
                                                         <div className="no-preview-text">No preview available</div>
                                                     </div>
-                                                ) : (
-                                                    <div className="file-placeholder">
-                                                        <span>Preview not available for {item.name || item.file?.name}</span>
-                                                    </div>
-                                                )}
+                                                ) :
+                                                    ((item.name || item.file?.name || '').toLowerCase()).endsWith('.apk') ? (
+                                                        <div className="no-preview-container">
+                                                            <div className="file-icon">
+                                                                <img src="./icons/apk.png" alt="Apk" style={{ height: "100px", width: "100%" }} />
+                                                            </div>
+                                                            <div className="file-name">{item.name || item.file?.name}</div>
+                                                            <div className="file-meta">
+                                                                {currentFileMeta.sizeText} · {currentFileMeta.extText}
+                                                            </div>
+                                                            <div className="no-preview-text">No preview available</div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="file-placeholder">
+                                                            <span>Preview not available for {item.name || item.file?.name}</span>
+                                                        </div>
+                                                    )}
                                             </>
                                         )}
                                     </div>
@@ -402,14 +448,13 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                     {mediaItems.map((item, index) => {
                                         const mime = getMime(item.file);
                                         const name = (item.name || getAnyName(item.file) || '').toLowerCase();
-                                        let thumbSrc = "./txt.png";
                                         const ext = getExtLower(item.name || getAnyName(item.file));
                                         const isPhotoThumb = mime.startsWith('image') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'tif', 'tiff', 'ico'].includes(ext);
+                                        const isVideo = item.type === 'video';
 
-                                        if (mime.startsWith('image') || isPhotoThumb) {
+                                        let thumbSrc = "./txt.png";
+                                        if (isPhotoThumb) {
                                             thumbSrc = item.url || item.file.preview;
-                                        } else if (mime.startsWith('video')) {
-                                            thumbSrc = "./icons/video.png";
                                         } else if (name.endsWith('.pdf')) {
                                             thumbSrc = "./icons/pdf.png";
                                         } else if (name.endsWith('.doc') || name.endsWith('.docx')) {
@@ -418,6 +463,8 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                             thumbSrc = "./icons/xls.png";
                                         } else if (name.endsWith('.txt')) {
                                             thumbSrc = "./icons/txt.png";
+                                        } else if (name.endsWith('.apk') || name.endsWith('.ipa')) {
+                                            thumbSrc = "./icons/apk.png";
                                         }
 
                                         return (
@@ -425,7 +472,33 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                                 <div
                                                     className={`thumbnail ${index === currentIndex ? "active" : ""}`}
                                                 >
-                                                    <img src={thumbSrc} alt={item.name} className={`thumbnail-img ${isPhotoThumb ? 'is-photo' : 'is-icon'}`} />
+                                                    {isVideo ? (
+                                                        <div className="thumbnail-video-wrapper">
+                                                            {!loadedVideoThumbs.has(item.id) && (
+                                                                <Skeleton
+                                                                    variant="rectangular"
+                                                                    width="100%"
+                                                                    height="100%"
+                                                                    animation="wave"
+                                                                    sx={{ position: 'absolute', inset: 0 }}
+                                                                />
+                                                            )}
+                                                            <video
+                                                                src={`${item.url}#t=0.5`}
+                                                                className="thumbnail-img is-video"
+                                                                preload="metadata"
+                                                                muted
+                                                                onLoadedData={() => handleVideoThumbLoad(item.id)}
+                                                                style={{ opacity: loadedVideoThumbs.has(item.id) ? 1 : 0 }}
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <img
+                                                            src={thumbSrc}
+                                                            alt={item.name}
+                                                            className={`thumbnail-img ${isPhotoThumb ? 'is-photo' : 'is-icon'}`}
+                                                        />
+                                                    )}
                                                     <button
                                                         className="remove-thumbnail"
                                                         onClick={(e) => {
@@ -453,7 +526,7 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                     onChange={handleFileSelect}
                                     multiple
                                     style={{ display: 'none' }}
-                                    accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                                    accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.apk"
                                 />
                             </div>
                         )}

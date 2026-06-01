@@ -63,7 +63,12 @@ const MessageContent = ({
 
     return (
         <div className="message-content" style={{ flexDirection: 'column' }}>
-            <MessageBubble msg={msg} isOutgoing={isOutgoing} selectedCustomer={selectedCustomer}>
+            <MessageBubble
+                msg={msg}
+                isOutgoing={isOutgoing}
+                selectedCustomer={selectedCustomer}
+                onContextMenu={(e) => handleContextMenu(e, msg)}
+            >
                 <MessageActions
                     msg={msg}
                     isOutgoing={isOutgoing}
@@ -90,22 +95,30 @@ const MessageContent = ({
                         sx={{
                             '&&': {
                                 position: 'absolute !important',
-                                top: '3px !important',
-                                right: '3px !important',
-                                left: 'auto !important',
-                                padding: '0px !important',
-                                color: theme.palette.text.secondary + ' !important',
+                                top: '4px !important',
+                                right: '4px !important',
+                                padding: '1px !important',
+                                color: (isOutgoing ? theme.palette.text.secondary : theme.palette.text.primary) + ' !important',
                                 opacity: shouldShowActions ? 1 : 0,
+                                transform: shouldShowActions ? 'translateX(0) scale(1)' : 'translateX(8px) scale(0.8)',
                                 pointerEvents: shouldShowActions ? 'auto' : 'none',
-                                backgroundColor: alpha(theme.palette.primary.main, 0.10),
-                                boxShadow: '0 6px 14px ' + alpha('#000', 0.12),
-                                transition: 'opacity 160ms ease',
-                                zIndex: 3,
+                                background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.95)} 0%, ${alpha(theme.palette.background.paper, 0.6)} 100%) !important`,
+                                backdropFilter: 'blur(4px) !important',
+                                borderRadius: '50% !important',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.18) !important',
+                                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important',
+                                zIndex: 10,
+                                '&:hover': {
+                                    backgroundColor: theme.palette.background.paper + ' !important',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.22) !important',
+                                    transform: 'scale(1.1) !important',
+                                }
                             },
                         }}
                     >
-                        <ChevronDown size={24} />
+                        <ChevronDown size={22} style={{ strokeWidth: 2.5 }} />
                     </IconButton>
+
                 )}
 
                 {/* Forwarded Indicator */}
@@ -266,25 +279,35 @@ const MessageContent = ({
                                         });
 
                                         const uniqueReactions = Array.from(emojiGroups.values());
-                                        const displayReactions = uniqueReactions.slice(0, 2);
-                                        const remainingCount = uniqueReactions.length - 2;
+                                        const displayReactions = uniqueReactions.slice(0, 3);
+                                        const remainingCount = uniqueReactions.length - 3;
 
                                         return (
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                                 {displayReactions.map((r, idx) => {
                                                     const emojiChar = r?.Reaction || r?.Emoji;
                                                     const unified = r?.Unified || charToUnified(emojiChar);
                                                     return (
-                                                        <Box key={idx} className="emoji-item" sx={{ display: 'flex', alignItems: 'center', gap: 0.2 }}>
+                                                        <Box
+                                                            key={idx}
+                                                            className="emoji-item"
+                                                            sx={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: 0.3,
+                                                                px: 0.1 // Prevent horizontal cutting
+                                                            }}
+                                                        >
                                                             {unified ? <Emoji unified={unified} size={18} emojiStyle="apple" /> : emojiChar}
                                                             {r.count > 1 && (
                                                                 <Typography
                                                                     variant="caption"
                                                                     sx={{
-                                                                        fontSize: '10.5px',
+                                                                        fontSize: '10px',
                                                                         fontWeight: 700,
-                                                                        opacity: 0.85,
-                                                                        lineHeight: 1
+                                                                        opacity: 0.9,
+                                                                        lineHeight: 1,
+                                                                        ml: -0.1 // Tighten count to emoji
                                                                     }}
                                                                 >
                                                                     {r.count}
@@ -297,11 +320,11 @@ const MessageContent = ({
                                                     <Typography
                                                         variant="caption"
                                                         sx={{
-                                                            fontSize: '11px',
-                                                            fontWeight: 600,
+                                                            fontSize: '10px',
+                                                            fontWeight: 700,
+                                                            color: theme.palette.text.secondary,
                                                             ml: 0.2,
-                                                            color: 'inherit',
-                                                            opacity: 0.9
+                                                            opacity: 0.8
                                                         }}
                                                     >
                                                         +{remainingCount}

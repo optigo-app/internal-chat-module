@@ -32,9 +32,8 @@ export function useMessageLoader({ selectedCustomer, auth, pageSize, msgState, d
             dispatchMsg({ type: MSG.LOAD, data: parsed, total: parsed.length });
             dispatchMsg({ type: MSG.SET_HAS_MORE, value: false });
             didShowCache = true;
-            const unread = Number(selectedCustomer?.unreadCount ?? selectedCustomer?.UnreadCount ?? 0);
-            if (unread === 0) return;
           }
+
         }
       } catch (e) { /* ignore parse errors */ }
     }

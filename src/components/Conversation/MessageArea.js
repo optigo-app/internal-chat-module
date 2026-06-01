@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { VariableSizeList as List } from 'react-window';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import TypingIndicator from '../chat/messages/TypingIndicator';
@@ -84,7 +84,7 @@ const VirtualRow = React.memo(({ data, index, style }) => {
     const { msg, msgIndex } = row;
     return (
         <div style={style}>
-            <div ref={rowRef} style={{ padding: '0 50px 4px 24px' }}>
+            <div ref={rowRef} style={{ padding: '0 20px 4px 24px' }}>
                 <MessageItem
                     msg={msg} index={msgIndex} auth={auth} handlePaste={handlePaste}
                     selectedCustomer={selectedCustomer} blinkMessageId={blinkMessageId}
@@ -107,18 +107,18 @@ const VirtualRow = React.memo(({ data, index, style }) => {
 });
 
 // ─── MessageArea ──────────────────────────────────────────────────────────────
-const MessageArea = ({
+const MessageArea = forwardRef(({
     auth, showMedia, setShowMedia, loading, loadingOlder,
     mediaFiles, setMediaFiles, handleClosePreview, containerRef,
     showScrollToBottom, scrollToBottomRightOffset, setContextMenu,
     selectedCustomer, scrollToBottom, groupMessagesByDate, formatDateHeader,
     getMessageStatusIcon: getMessageStatusIconProp, parseTemplateData,
     getMediaSrcForMessage, handleMediaClick, handleMessageEmojiClick,
-    handleMenuClick, handleContextMenu, scrollToMessage, blinkMessageId,
+    handleMenuClick, handleContextMenu, scrollToMessage: scrollToMessageProp, blinkMessageId,
     loadedMedia, getMediaKey, markLoaded, handleRemoveReaction,
     replyToMessage, handleForward, processFiles, captureMessageScrollState,
     typingStatus, setDrawerViewState, setDrawerOpen, handleSendMessage,
-}) => {
+}, ref) => {
     const [hoveredMessageId, setHoveredMessageId] = useState(null);
     const [reactionMenuAnchorEl, setReactionMenuAnchorEl] = useState(null);
     const [reactionMenuMessageId, setReactionMenuMessageId] = useState(null);
@@ -135,6 +135,11 @@ const MessageArea = ({
 
     const stableKeyToHeight = useRef({});
     const indexToStableKey = useRef({});
+    const [listWidth, setListWidth] = useState(0);
+
+    // Track minimum index for batched resetAfterIndex
+    const minResetIndexRef = useRef(null);
+    const resetFrameRef = useRef(null);
 
     // Track distance-from-bottom via scroll event so it's always accurate
     // even when react-window's virtual scrollHeight changes mid-render
@@ -164,6 +169,35 @@ const MessageArea = ({
         return list;
     }, [groupMessagesByDate, typingStatus]);
 
+    // Enhanced scroll to message that handles virtualization
+    const scrollToMessage = useCallback(async (messageId, containerRef, attachmentId = null) => {
+        if (!messageId) return;
+        const sid = String(messageId);
+
+        // Find index in rows
+        const rowIndex = rows.findIndex(r =>
+            r.type === 'message' &&
+            String(r.msg?.Id || r.msg?.MessageId) === sid
+        );
+
+        if (rowIndex !== -1) {
+            // Scroll virtual list to item if found
+            listRef.current?.scrollToItem(rowIndex, 'center');
+            // Mini delay for react-window to render the item
+            await new Promise(resolve => requestAnimationFrame(resolve));
+        }
+
+        // Delegate to original scrollToMessage for blink and fallback loading
+        return scrollToMessageProp(messageId, containerRef, attachmentId);
+    }, [rows, scrollToMessageProp]);
+
+    // Expose scroll method to parent
+    useImperativeHandle(ref, () => ({
+        scrollToMessage: (messageId, attachmentId = null) => {
+            return scrollToMessage(messageId, containerRef, attachmentId);
+        }
+    }), [scrollToMessage, containerRef]);
+
     // Rebuild index map on every rows change
     const prevRowsLengthRef = useRef(0);
     useEffect(() => {
@@ -174,7 +208,7 @@ const MessageArea = ({
         indexToStableKey.current = map;
         // Only reset from the first changed index instead of resetting everything
         const resetFrom = rows.length !== prevLen ? Math.max(0, Math.min(prevLen, rows.length) - 1) : 0;
-        listRef.current?.resetAfterIndex(resetFrom, false);
+        listRef.current?.resetAfterIndex(resetFrom, true);
     }, [rows]);
 
     // ── Height helpers ────────────────────────────────────────────────────
@@ -193,15 +227,20 @@ const MessageArea = ({
             if (m?.IsDeletedForEveryone === 1) return 46; // System message estimate
 
             const mt = m?.MessageType;
-            if (mt === 'image' || mt === 'video') return 300;
-            if (mt === 'document' || mt === 'audio') return 120;
+            if (mt === 'image' || mt === 'video') return 340; // Increased to accommodate sender name/status
+            if (mt === 'document' || mt === 'audio') {
+                const mediaItems = Array.isArray(m?.mediaItems) ? m.mediaItems : [];
+                const itemCount = Math.max(1, mediaItems.length);
+                return 70 + (itemCount * 65); // Better document group estimate
+            }
 
             const msgLen = (m?.Message || '').length;
             const isGroup = selectedCustomer?.IsGroup === 1 && m?.Direction === 0;
-            const base = isGroup ? 95 : 72;
+            const hasReply = m?.ContextType === 2;
+            const base = (isGroup ? 95 : 72) + (hasReply ? 60 : 0);
 
-            // Adjust base for multi-line messages
-            if (msgLen > 50) return base + Math.min(100, Math.floor(msgLen / 45) * 20);
+            // Adjust base for multi-line messages - 35 chars is a safer avg line length for bubbles
+            if (msgLen > 35) return base + Math.min(250, Math.floor(msgLen / 35) * 22);
             return base;
         }
         return 80;
@@ -210,13 +249,26 @@ const MessageArea = ({
     const setSize = useCallback((stableKey, index, size) => {
         const prevSize = stableKeyToHeight.current[stableKey];
         // Only trigger update if height has changed significantly (avoiding sub-pixel jitter)
-        if (prevSize != null && Math.abs(prevSize - size) < 1.5) return;
+        if (prevSize != null && Math.abs(prevSize - size) < 1.1) return;
 
         stableKeyToHeight.current[stableKey] = size;
-        listRef.current?.resetAfterIndex(index, false);
+
+        // Batch resetAfterIndex calls to avoid massive overhead during resize or batch updates
+        if (minResetIndexRef.current === null || index < minResetIndexRef.current) {
+            minResetIndexRef.current = index;
+        }
+
+        if (!resetFrameRef.current) {
+            resetFrameRef.current = requestAnimationFrame(() => {
+                if (minResetIndexRef.current !== null) {
+                    listRef.current?.resetAfterIndex(minResetIndexRef.current, true);
+                    minResetIndexRef.current = null;
+                }
+                resetFrameRef.current = null;
+            });
+        }
 
         // Sticky bottom: if user was already at the bottom, stay there.
-        // We check distanceFromBottomRef which is updated in onScroll.
         if (distanceFromBottomRef.current < 40) {
             requestAnimationFrame(() => {
                 listRef.current?.scrollToItem(rows.length - 1, 'end');
@@ -250,6 +302,7 @@ const MessageArea = ({
     useEffect(() => () => {
         clearTimeout(convLoadTimerRef.current);
         clearTimeout(scrollSettleRef.current);
+        if (resetFrameRef.current) cancelAnimationFrame(resetFrameRef.current);
     }, []);
 
     // ── Initial scroll-to-bottom then reveal ─────────────────────────────
@@ -336,18 +389,33 @@ const MessageArea = ({
         if (outerRef.current) containerRef.current = outerRef.current;
     });
 
-    // ── Measure wrapper height ────────────────────────────────────────────
+    // ── Measure wrapper dimensions & handle resize ────────────────────────
     useEffect(() => {
         const el = wrapperRef.current;
         if (!el) return;
         setListHeight(el.clientHeight || el.offsetHeight || 600);
+        setListWidth(el.clientWidth || el.offsetWidth || 0);
+
         const ro = new ResizeObserver(([entry]) => {
             const h = entry.contentRect.height;
+            const w = entry.contentRect.width;
             if (h > 0) setListHeight(h);
+            if (w > 0) setListWidth(w);
         });
         ro.observe(el);
         return () => ro.disconnect();
     }, []);
+
+    // Clear height cache and reset list when width changes significantly
+    const prevWidthRef = useRef(0);
+    useEffect(() => {
+        if (Math.abs(listWidth - prevWidthRef.current) < 2) return;
+        prevWidthRef.current = listWidth;
+
+        // When width changes, all our cached heights are potentially invalid
+        stableKeyToHeight.current = {};
+        listRef.current?.resetAfterIndex(0, true);
+    }, [listWidth]);
 
     useEffect(() => {
         if (mediaFiles?.length > 0) setShowMedia(false);
@@ -552,6 +620,6 @@ const MessageArea = ({
             )}
         </div>
     );
-};
+});
 
 export default React.memo(MessageArea);

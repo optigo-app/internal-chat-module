@@ -9,7 +9,8 @@ import {
     FileSpreadsheet,
     FileArchive,
     FileCode,
-    File
+    File,
+    Smartphone
 } from "lucide-react";
 
 const DocumentMessage = ({
@@ -29,12 +30,12 @@ const DocumentMessage = ({
         FileSpreadsheet,
         FileArchive,
         FileCode,
-        File
+        File,
+        Smartphone
     };
 
     const renderDocumentItem = (itemProps, index) => {
         const { url: href, filename, fileName } = itemProps;
-
         const name = filename || fileName || "Document";
         const meta = getDocumentMeta(name);
 
@@ -134,11 +135,11 @@ const DocumentMessage = ({
 
                 {/* DOWNLOAD BUTTON */}
                 <IconButton
-                    component="a"
-                    href={href}
-                    download={name}
                     size="small"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadFile(href, name);
+                    }}
                     sx={{
                         color: "text.secondary",
                         "&:hover": {

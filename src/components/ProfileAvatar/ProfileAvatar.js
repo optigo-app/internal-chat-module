@@ -22,6 +22,7 @@ import { getWhatsAppAvatarConfig } from '../../utils/globalFunc';
 import ConfirmationDialog from '../ReusableComponent/ConfirmationDialog';
 import { useConfirmModal } from '../../hooks/useConfirmModal';
 import { getConfirmProps } from '../../hooks/confirmConfig';
+import { eraseCookie } from '../../utils/cookieUtils';
 
 const ProfileAvatar = () => {
     const [anchorEl, setAnchorEl] = useState(null);
@@ -56,12 +57,21 @@ const ProfileAvatar = () => {
             await LogoutApi(auth?.id || getId?.id);
             disconnectSocket();
             sessionStorage.clear();
+            
+            // Clear cookies that cause auto-login
+            eraseCookie("userData");
+            eraseCookie("token");
+
             setAuth({ userId: '', username: '', ukey: '', token: '' });
             setToken({ sv: '', yc: '' });
             navigate('/login');
             closeConfirm();
         } catch (error) {
             console.error('Error during logout:', error);
+            
+            eraseCookie("userData");
+            eraseCookie("token");
+
             navigate('/login');
             closeConfirm();
             disconnectSocket();
