@@ -80,8 +80,12 @@ const Customers = ({ selectedStatus, selectedTag }) => {
 
     React.useEffect(() => {
         const handleSelectConversation = (event) => {
-            const { conversationId } = event.detail;
+            const { conversationId, customer: eventCustomer } = event.detail;
             if (!conversationId) return;
+            if (eventCustomer) {
+                handleCustomerSelect(eventCustomer);
+                return;
+            }
             const list = converListRef.current || [];
             const customer = list.find(c => Number(c.ConversationId) === Number(conversationId));
             if (customer) {

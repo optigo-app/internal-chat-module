@@ -412,6 +412,7 @@ const ChatBox = ({
                         <LexicalChatEditor
                             value={tempQuery}
                             syncKey={selectedCustomer?.ConversationId}
+                            hasDraft={Boolean(tempQuery?.trim())}
                             onChange={onLexicalChange}
                             onPaste={handlePaste}
                             onKeyDown={handleInputKeyDown}

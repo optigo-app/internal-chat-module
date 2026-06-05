@@ -47,7 +47,7 @@ export const useConversationList = ({
 
     const fetchControllerRef = useRef(null);
     const searchTimeoutRef = useRef(null);
-    const pendingSelectConversationIdRef = useRef(null);
+    const pendingAutoSelectRef = useRef(null);
 
     const selectedConversationIdRef = useRef(selectedCustomer?.ConversationId);
     const selectedCustomerRef = useRef(selectedCustomer);
@@ -119,7 +119,6 @@ export const useConversationList = ({
         fetchControllerRef.current = controller;
 
         if (reset) {
-            setChatMembers({ data: null, total: 0 });
             setShowEmptyState(false);
         }
         setLoading(true);
@@ -144,10 +143,24 @@ export const useConversationList = ({
 
             const sortedConversations = mergedConversations.sort(conversationComparator);
 
-            setChatMembers(prev => ({
-                data: reset ? sortedConversations : [...(prev.data || []), ...sortedConversations],
-                total: Math.max(response.total, sortedConversations.length)
-            }));
+            setChatMembers(prev => {
+                let finalData = sortedConversations;
+                // When resetting, preserve conversations from previous state that are not yet in API
+                // (e.g., a newly created conversation from an outgoing socket message)
+                if (reset && prev?.data) {
+                    const missing = prev.data.filter(old =>
+                        !sortedConversations.some(n => Number(n.ConversationId) === Number(old.ConversationId))
+                    );
+                    if (missing.length) {
+                        finalData = [...sortedConversations, ...missing];
+                        finalData.sort(conversationComparator);
+                    }
+                }
+                return {
+                    data: finalData,
+                    total: Math.max(response.total, finalData.length)
+                };
+            });
 
             const moreAvailable = response?.hasMore ?? sortedConversations.length > 0;
             setHasMore(moreAvailable);
@@ -288,20 +301,19 @@ export const useConversationList = ({
                 let finalName = resolvedName;
                 const currentSelected = selectedCustomerRef.current;
 
-                if (isOutgoing && currentSelected) {
-                    const receiverId = incoming?.ReceiverId;
-                    const selectedId = currentSelected.UserId || currentSelected.CustomerId || currentSelected.Id;
-                    const isMatch = (Number(conversationId) === Number(currentSelected.ConversationId)) ||
-                        (receiverId && selectedId && Number(receiverId) === Number(selectedId));
+                const receiverId = incoming?.ReceiverId || incoming?.Receiver || incoming?.CustomerId;
+                const selectedId = currentSelected?.UserId || currentSelected?.CustomerId || currentSelected?.Id || currentSelected?.ReceiverId;
+                const isMatch = isOutgoing && currentSelected && (
+                    (Number(conversationId) === Number(currentSelected.ConversationId)) ||
+                    (receiverId && selectedId && Number(receiverId) === Number(selectedId))
+                );
 
-                    if (isMatch) {
-                        finalName = currentSelected.name || getCustomerDisplayName(currentSelected) || resolvedName;
-                        avatarSeed = getCustomerAvatarSeed(currentSelected) || finalName;
-                        pendingSelectConversationIdRef.current = conversationId;
-                    }
+                if (isMatch) {
+                    finalName = currentSelected.name || getCustomerDisplayName(currentSelected) || resolvedName;
+                    avatarSeed = getCustomerAvatarSeed(currentSelected) || finalName;
                 }
 
-                updatedData.push({
+                const newCustomer = {
                     ConversationId: conversationId,
                     name: finalName,
                     lastMessage: messagePreviewNode,
@@ -326,14 +338,30 @@ export const useConversationList = ({
                         : (incoming?.SenderId || incoming?.Sender || incoming?.UserId),
                     avatar: null,
                     avatarConfig: getWhatsAppAvatarConfig(avatarSeed),
-                });
+                };
+
+                // Mark for auto-select after state updates and converListRef is synced
+                if (isMatch) {
+                    pendingAutoSelectRef.current = { conversationId, customer: newCustomer };
+                }
+
+                // If search is active, clear it and reload full list
+                if (isOutgoing && searchTerm) {
+                    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+                    searchTimeoutRef.current = setTimeout(() => {
+                        setSearchTerm('');
+                        loadMembers(1, true, '');
+                    }, 0);
+                }
+
+                updatedData.push(newCustomer);
             }
 
             updatedData.sort(conversationComparator);
             updateChatCache(conversationId, incoming, auth, isStatusChange);
             return { ...prev, data: updatedData };
         });
-    }, [auth, conversationComparator]);
+    }, [auth, conversationComparator, searchTerm, setSearchTerm, loadMembers]);
 
     const handleRemoveItem = useCallback((conversationId) => {
         setChatMembers(prev => {
@@ -386,14 +414,13 @@ export const useConversationList = ({
     useEffect(() => {
         const list = Array.isArray(chatMembers?.data) ? chatMembers.data : [];
         onConversationList(list);
-        const pendingId = pendingSelectConversationIdRef.current;
-        if (pendingId) {
-            pendingSelectConversationIdRef.current = null;
-            setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('SELECT_CONVERSATION', {
-                    detail: { conversationId: pendingId }
-                }));
-            }, 0);
+        const pending = pendingAutoSelectRef.current;
+        if (pending) {
+            pendingAutoSelectRef.current = null;
+            const customer = list.find(c => Number(c.ConversationId) === Number(pending.conversationId)) || pending.customer;
+            window.dispatchEvent(new CustomEvent('SELECT_CONVERSATION', {
+                detail: { conversationId: pending.conversationId, customer }
+            }));
         }
     }, [chatMembers, onConversationList]);
 
@@ -559,6 +586,12 @@ export const useConversationList = ({
     useEffect(() => {
         if (isSyncing === false) loadMembers(1, true);
     }, [isSyncing]);
+
+    useEffect(() => {
+        return () => {
+            if (pendingAutoSelectRef.current) pendingAutoSelectRef.current = null;
+        };
+    }, []);
 
     return {
         chatMembers,

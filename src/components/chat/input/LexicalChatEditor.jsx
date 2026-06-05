@@ -211,8 +211,10 @@ const LexicalChatEditor = ({
     placeholder,
     className,
     editorRef,
-    syncKey
+    syncKey,
+    hasDraft = false
 }) => {
+
     const initialConfig = {
         namespace: 'WhatsAppChatEditor',
         theme,
@@ -233,12 +235,12 @@ const LexicalChatEditor = ({
             <div className={`lexical-editor-container ${className || ''}`} style={{ position: 'relative', width: '100%' }}>
                 <RichTextPlugin
                     contentEditable={
-                        <ContentEditable 
-                            className="lexical-content-editable" 
+                        <ContentEditable
+                            className="lexical-content-editable"
                             onPaste={onPaste}
                         />
                     }
-                    placeholder={<div className="lexical-placeholder">{placeholder}</div>}
+                    placeholder={!hasDraft ? <div className="lexical-placeholder">{placeholder}</div> : null}
                     ErrorBoundary={LexicalErrorBoundary}
                 />
                 <HistoryPlugin />
