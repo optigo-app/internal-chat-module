@@ -14,7 +14,8 @@ const ConfirmationDialog = ({
     icon: Icon,
     variant = "primary", // primary, danger, success
     showCancel = true,
-    actions = [] // Array of { label, onClick, variant, danger }
+    actions = [], // Array of { label, onClick, variant, danger }
+    children
 }) => {
     if (!isOpen) return null;
 
@@ -60,7 +61,9 @@ const ConfirmationDialog = ({
                 </div>
 
                 <h2>{title}</h2>
-                <p>{description}</p>
+                <p>{description?.replace(/\/n/g, '\n')}</p>
+
+                {children}
 
                 <div className={`modal-actions ${actions.length > 2 ? 'vertical' : ''}`}>
                     {renderActions()}

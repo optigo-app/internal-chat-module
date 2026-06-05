@@ -400,8 +400,8 @@ const CustomerLists = ({
                                         isKeyboardSelected={index === selectedIndex}
                                         isMenuOpen={Boolean(anchorEl) && selectMember?.ConversationId === member.ConversationId}
                                         shouldShowUnreadBadge={member.unreadCount > 0 && !(selectedCustomer?.ConversationId === member.ConversationId && (isConversationRead || viewConversationRead))}
-                                        typingStates={typingStates}
-                                        drafts={drafts}
+                                        typingState={typingStates[member.ConversationId]}
+                                        draftText={drafts[member.ConversationId]}
                                         hoveredId={hoveredId}
                                         searchTerm={searchTerm}
                                         handleCustomerClick={handleCustomerClick}
@@ -410,7 +410,7 @@ const CustomerLists = ({
                                         setSelectMember={setSelectMember}
                                         onConversationList={onConversationList}
                                         chatMembersData={chatMembers?.data}
-                                        favoriteState={favoriteState}
+                                        isFavorite={(favoriteState[member.ConversationId]?.isStar ?? member?.IsStar) === 1}
                                     />
                                 ))}
 

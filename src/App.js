@@ -18,7 +18,6 @@ import { LoginContext } from './context/LoginData';
 import { registerSocketId } from './utils/socketHelper';
 import { notify } from './utils/notificationTemplates';
 import { unlockAudio } from './utils/sound';
-import LoginExists from './components/LoginExists/LoginExists';
 import Lottie from 'lottie-react';
 import loader from './assets/lotties/loader.json';
 import NotificationPermissionModal from './components/_ui/NotificationPermissionModal';

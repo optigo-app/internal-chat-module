@@ -113,7 +113,8 @@ const ProfileAvatarUpload = ({
 
     const handleViewPhoto = () => {
         handleMenuClose();
-        const imageUrl = previewImage || currentImageUrl;
+        // Prefer server URL (currentImageUrl) over local preview for best quality
+        const imageUrl = currentImageUrl || previewImage;
         if (imageUrl) {
             setViewDialog({ open: true, imageUrl });
         }
@@ -127,15 +128,10 @@ const ProfileAvatarUpload = ({
     const handleConfirmRemove = async () => {
         setRemoveDialog({ open: false });
         setIsUploading(true);
-
         try {
-            // Remove from storage
             if (currentImageUrl) markImageAsDead(currentImageUrl);
             await removeExistingImage();
-
-            // Clear preview and notify parent
             setPreviewImage(null);
-
             if (onRemoveComplete) {
                 onRemoveComplete();
             } else {
@@ -153,17 +149,14 @@ const ProfileAvatarUpload = ({
         }
     };
 
-    const removeExistingImage = async () => {
-        const imageUrl = currentImageUrl || previewImage;
+    const removeExistingImage = async (imageUrl) => {
         if (!imageUrl) return;
-
         try {
             const response = await removeFileApi({ attachments: imageUrl });
             console.log('Existing image removed from storage:', response?.status);
             return response;
         } catch (error) {
             console.error('Error removing existing image:', error);
-            throw error; // Re-throw to handle in calling function
         }
     };
 
@@ -210,13 +203,9 @@ const ProfileAvatarUpload = ({
 
     const uploadPhotoWithRemoval = async (file) => {
         setIsUploading(true);
+        const previousImageUrl = currentImageUrl || previewImage;
         try {
-            // Step 1: Remove existing image if it exists
-            if (hasExistingImage) {
-                await removeExistingImage();
-            }
-
-            // Step 2: Upload new image
+            // Step 1: Upload new image FIRST
             const uploadedFiles = await uploadMediaAPi({
                 folderName,
                 files: [file],
@@ -233,17 +222,23 @@ const ProfileAvatarUpload = ({
                     throw new Error('Failed to get image URL from upload');
                 }
 
+                // Step 2: Notify parent with new URL (parent updates state)
                 if (onUploadComplete) {
-                    onUploadComplete(imageUrl, file);
+                    await onUploadComplete(imageUrl, file);
                 } else {
                     toast.success('Photo uploaded successfully');
+                }
+
+                // Step 3: Only remove old image AFTER successful upload
+                if (previousImageUrl && previousImageUrl !== imageUrl) {
+                    await removeExistingImage(previousImageUrl);
                 }
             } else {
                 throw new Error('Upload failed - no files returned');
             }
         } catch (error) {
             console.error('Error in upload process:', error);
-            setPreviewImage(currentImageUrl);
+            // Keep existing preview on error — don't wipe it
             if (onUploadError) {
                 onUploadError(error);
             } else {
@@ -265,11 +260,7 @@ const ProfileAvatarUpload = ({
             <div
                 className={`avatar-container ${className}`}
                 onClick={handleAvatarClick}
-                style={{
-                    cursor: disabled ? 'default' : 'pointer',
-                    position: 'relative',
-                    display: 'inline-block'
-                }}
+                style={{ cursor: disabled ? 'default' : 'pointer' }}
             >
                 <Avatar
                     {...getWhatsAppAvatarConfig(avatarSeed, size)}
@@ -284,27 +275,7 @@ const ProfileAvatarUpload = ({
                 />
 
                 {showOverlay && !disabled && (
-                    <div className="avatar-overlay" style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white',
-                        fontSize: '12px',
-                        textAlign: 'center',
-                        opacity: 0,
-                        transition: 'opacity 0.2s',
-                        '&:hover': {
-                            opacity: 1
-                        }
-                    }}>
+                    <div className="avatar-overlay">
                         {isUploading ? (
                             <CircularProgress size={24} sx={{ color: 'white' }} />
                         ) : (

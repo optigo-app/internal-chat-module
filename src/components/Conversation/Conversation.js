@@ -79,7 +79,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
 
     // Use the conversation hook (depends on drawerOpen)
     const {
-        inputValue, setInputValue,
+        inputValue, setInputValue, updateLatestInput,
         messages, setMessages,
         mediaFiles, setMediaFiles,
         showMedia, setLoadedMedia, setShowMedia,
@@ -749,6 +749,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                 handleFileChange={handleFileChange}
                                 inputValue={inputValue}
                                 setInputValue={setInputValue}
+                                updateLatestInput={updateLatestInput}
                                 handleKeyPress={handleKeyPress}
                                 handleSendMessage={handleSendMessageCallback}
                                 mediaFiles={mediaFiles}

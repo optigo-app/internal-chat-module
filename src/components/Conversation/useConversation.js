@@ -38,8 +38,6 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
       return saved ? JSON.parse(saved) : {};
     } catch { return {}; }
   })());
-  const isInternalInputUpdate = useRef(false);
-
   const saveDraft = useCallback((convoId, text) => {
     if (!convoId) return;
     const cleanText = text?.trim();
@@ -72,25 +70,37 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     latestInputValueRef.current = uiState.inputValue;
   }, [uiState.inputValue]);
 
-  // Load draft when switching conversations
+  const updateLatestInput = useCallback((val) => {
+    latestInputValueRef.current = val;
+  }, []);
+
+  // Load draft when switching conversations — always read fresh from localStorage
   useEffect(() => {
     if (!selectedCustomer?.ConversationId) return;
-    const draft = draftsRef.current[selectedCustomer.ConversationId] || '';
-    if (draft !== uiState.inputValue) {
-      isInternalInputUpdate.current = true;
-      dispatchUI({ type: UI.SET_INPUT, value: draft });
+    try {
+      const storageKey = auth?.id ? `chat_drafts_${auth.id}` : 'chat_drafts';
+      const saved = localStorage.getItem(storageKey);
+      const drafts = saved ? JSON.parse(saved) : {};
+      const draft = drafts[selectedCustomer.ConversationId] || '';
+      if (draft !== uiState.inputValue) {
+        dispatchUI({ type: UI.SET_INPUT, value: draft });
+      }
+    } catch {
+      dispatchUI({ type: UI.SET_INPUT, value: '' });
     }
   }, [selectedCustomer?.ConversationId]);
 
-  // Load draft when switching conversations
+  // Keep draftsRef in sync with other tabs
   useEffect(() => {
-    if (!selectedCustomer?.ConversationId) return;
-    const draft = draftsRef.current[selectedCustomer.ConversationId] || '';
-    if (draft !== uiState.inputValue) {
-      isInternalInputUpdate.current = true;
-      dispatchUI({ type: UI.SET_INPUT, value: draft });
-    }
-  }, [selectedCustomer?.ConversationId]);
+    const storageKey = auth?.id ? `chat_drafts_${auth.id}` : 'chat_drafts';
+    const handleStorage = (e) => {
+      if (e.key === storageKey && e.newValue) {
+        try { draftsRef.current = JSON.parse(e.newValue); } catch { /* ignore */ }
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [auth?.id]);
 
   // ── Group members ──────────────────────────────────────────────────────────
   const fetchAndCacheGroupMembers = useCallback(async (conversationId, force = false) => {
@@ -121,7 +131,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
 
   // ── Sub-hooks ──────────────────────────────────────────────────────────────
   const { loadConversation, loadOlderMessages, abortControllerRef } = useMessageLoader({
-    selectedCustomer, auth, pageSize: 1000, msgState, dispatchMsg, normalizeServerMessages, msgDataRef: messagesRef,
+    selectedCustomer, auth, pageSize: 50, msgState, dispatchMsg, normalizeServerMessages, msgDataRef: messagesRef,
   });
 
   const { handleReadMessage } = useReadReceipt({
@@ -294,6 +304,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
   return {
     // State (flattened for drop-in compatibility)
     inputValue: uiState.inputValue,
+    updateLatestInput,
     setInputValue: (v) => dispatchUI({ type: UI.SET_INPUT, value: v }),
     messages: { data: msgState.data, total: msgState.total },
     setMessages: (updater) => {

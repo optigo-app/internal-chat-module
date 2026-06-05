@@ -3,6 +3,8 @@ import { Dialog, DialogContent, IconButton, Box, Typography, Button, Tooltip } f
 import { X, RotateCw, ZoomIn, ZoomOut, Info } from 'lucide-react';
 import './ImageAdjustmentModal.scss';
 
+const CROP_SIZE = 300;
+
 const ImageAdjustmentModal = ({
     open,
     onClose,
@@ -20,6 +22,17 @@ const ImageAdjustmentModal = ({
 
     const containerRef = useRef(null);
     const imageRef = useRef(null);
+
+    // Calculate base dimensions so image covers the crop circle at scale=1
+    const getBaseDimensions = () => {
+        if (!imageRef.current) return { w: CROP_SIZE, h: CROP_SIZE };
+        const img = imageRef.current;
+        const aspect = img.naturalWidth / img.naturalHeight;
+        if (aspect > 1) {
+            return { w: CROP_SIZE * aspect, h: CROP_SIZE };
+        }
+        return { w: CROP_SIZE, h: CROP_SIZE / aspect };
+    };
 
     // Create image URL when file changes
     useEffect(() => {
@@ -46,48 +59,18 @@ const ImageAdjustmentModal = ({
 
     const handleImageLoad = () => {
         setImageLoaded(true);
-        // Auto-fit image to circle on load
-        if (imageRef.current) {
-            const img = imageRef.current;
-            const containerSize = 300; // Circle size
-            const imgAspect = img.naturalWidth / img.naturalHeight;
-
-            // Calculate initial scale to fit image in circle
-            let initialScale;
-            if (imgAspect > 1) {
-                // Landscape - fit height
-                initialScale = containerSize / img.naturalHeight;
-            } else {
-                // Portrait or square - fit width
-                initialScale = containerSize / img.naturalWidth;
-            }
-
-            // Ensure minimum coverage of the circle
-            initialScale = Math.max(initialScale, 1);
-            setScale(initialScale);
-        }
+        // Reset to cover-fit defaults (scale=1 means image covers the circle)
+        setScale(1);
+        setPosition({ x: 0, y: 0 });
     };
 
     const getMaxOffset = (currentScale) => {
-        if (!imageRef.current) return { maxX: 0, maxY: 0 };
-        const img = imageRef.current;
-        const cropSize = 300;
-        const imgAspect = img.naturalWidth / img.naturalHeight;
+        const base = getBaseDimensions();
+        const scaledWidth = base.w * currentScale;
+        const scaledHeight = base.h * currentScale;
 
-        let drawWidth, drawHeight;
-        if (imgAspect > 1) {
-            drawHeight = cropSize;
-            drawWidth = cropSize * imgAspect;
-        } else {
-            drawWidth = cropSize;
-            drawHeight = cropSize / imgAspect;
-        }
-
-        const scaledWidth = drawWidth * currentScale;
-        const scaledHeight = drawHeight * currentScale;
-
-        const maxX = Math.max(0, (scaledWidth - cropSize) / 2);
-        const maxY = Math.max(0, (scaledHeight - cropSize) / 2);
+        const maxX = Math.max(0, (scaledWidth - CROP_SIZE) / 2);
+        const maxY = Math.max(0, (scaledHeight - CROP_SIZE) / 2);
 
         return { maxX, maxY };
     };
@@ -236,7 +219,7 @@ const ImageAdjustmentModal = ({
 
             img.onload = () => {
 
-                const size = 320;
+                const size = 640; // Higher resolution output for crisp profile photos
                 canvas.width = size;
                 canvas.height = size;
 
@@ -475,49 +458,37 @@ const ImageAdjustmentModal = ({
                             width: 300,
                             height: 300,
                             borderRadius: '50%',
-                            border: '3px solid #7367f0',
-                            boxShadow: '0 0 0 9999px rgba(0,0,0,0.3)',
+                            border: '2px solid rgba(255,255,255,0.9)',
+                            boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
                             pointerEvents: 'none',
                             zIndex: 2
                         }}
                     />
-
-                    {/* Square crop indicator */}
-                    <Box
-                        sx={{
-                            position: 'absolute',
-                            top: '50%',
-                            left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            width: 300,
-                            height: 300,
-                            border: '2px dashed rgba(115, 103, 240, 0.5)',
-                            pointerEvents: 'none',
-                            zIndex: 1
-                        }}
-                    />
                     {/* Image */}
-                    {imageUrl && (
-                        <img
-                            ref={imageRef}
-                            src={imageUrl}
-                            alt="Adjust"
-                            onLoad={handleImageLoad}
-                            style={{
-                                maxWidth: 'none',
-                                maxHeight: 'none',
-                                width: 'auto',
-                                height: 'auto',
-                                minWidth: 300,
-                                minHeight: 300,
-                                transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)`,
-                                transition: isDragging ? 'none' : 'transform 0.1s ease',
-                                userSelect: 'none',
-                                pointerEvents: 'none',
-                                opacity: imageLoaded ? 1 : 0
-                            }}
-                        />
-                    )}
+                    {imageUrl && (() => {
+                        const base = getBaseDimensions();
+                        return (
+                            <img
+                                ref={imageRef}
+                                src={imageUrl}
+                                alt="Adjust"
+                                onLoad={handleImageLoad}
+                                style={{
+                                    position: 'absolute',
+                                    top: '50%',
+                                    left: '50%',
+                                    width: base.w,
+                                    height: base.h,
+                                    transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px)) scale(${scale}) rotate(${rotation}deg)`,
+                                    transformOrigin: 'center center',
+                                    transition: isDragging ? 'none' : 'transform 0.1s ease',
+                                    userSelect: 'none',
+                                    pointerEvents: 'none',
+                                    opacity: imageLoaded ? 1 : 0
+                                }}
+                            />
+                        );
+                    })()}
 
                     {/* Loading indicator */}
                     {!imageLoaded && imageUrl && (

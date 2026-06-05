@@ -1,0 +1,71 @@
+.lexical-editor-container {
+    border: none;
+    min-height: 40px;
+    max-height: 120px;
+    overflow-y: auto;
+    position: relative;
+    display: flex;
+    align-items: center;
+    font-family: inherit;
+    .lexical-content-editable {
+        outline: none;
+        width: 100%;
+        min-height: 20px;
+        font-size: 1rem;
+        line-height: 1.5;
+        tab-size: 1;
+        white-space: pre-wrap;
+        word-break: break-word;
+
+        p {
+            margin: 0;
+        }
+
+        .editor-text-bold {
+            font-weight: bold;
+        }
+        .editor-text-italic {
+            font-style: italic;
+        }
+        .editor-text-strikethrough {
+            text-decoration: line-through;
+        }
+        .editor-text-code {
+            font-family: monospace;
+            background-color: #eee;
+            padding: 1px 3px;
+            border-radius: 3px;
+        }
+        .editor-quote {
+            border-left: 4px solid #ccc;
+            padding-left: 8px;
+            margin-left: 0;
+            color: #666;
+        }
+        .editor-list-ol {
+            padding: 0;
+            margin: 0 0 0 24px;
+        }
+        .editor-list-ul {
+            padding: 0;
+            margin: 0 0 0 24px;
+        }
+        .editor-listitem {
+            margin: 0;
+        }
+    }
+
+    .lexical-placeholder {
+        color: #9e9e9e;
+        overflow: hidden;
+        position: absolute;
+        text-overflow: ellipsis;
+        top: 8.5px;
+        left: 14px;
+        font-size: 1rem;
+        user-select: none;
+        display: inline-block;
+        pointer-events: none;
+        line-height: 1.5;
+    }
+}

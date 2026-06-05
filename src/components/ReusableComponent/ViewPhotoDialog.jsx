@@ -96,7 +96,7 @@ const ViewPhotoDialog = ({ open, onClose, imageUrl, title = "View Photo" }) => {
                 </Box>
             </Box>
 
-            <DialogContent sx={{ p: 3, bgcolor: '#f8f9fa', height: '100%', overflow: 'hidden' }}>
+            <DialogContent sx={{ p: 0, bgcolor: '#0b0b0b', height: '100%', overflow: 'hidden' }}>
                 <Box
                     sx={{
                         display: 'flex',
@@ -113,10 +113,12 @@ const ViewPhotoDialog = ({ open, onClose, imageUrl, title = "View Photo" }) => {
                         src={imageUrl}
                         alt="Profile Photo"
                         style={{
-                            maxWidth: '100%',
-                            maxHeight: '100%',
+                            maxWidth: '80%',
+                            maxHeight: '80%',
                             display: 'block',
-                            borderRadius: '12px',
+                            borderRadius: '50%',
+                            aspectRatio: '1 / 1',
+                            objectFit: 'cover',
                             transform: `scale(${zoom})`,
                             transition: 'transform 0.3s ease',
                             cursor: zoom > 1 ? 'zoom-out' : 'zoom-in'

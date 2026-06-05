@@ -52,7 +52,7 @@ export function useMessageLoader({ selectedCustomer, auth, pageSize, msgState, d
 
       const merged = mergeMessages(serverMessages, msgState.data, selectedId);
       dispatchMsg({ type: MSG.LOAD, data: merged, total: response.total });
-      dispatchMsg({ type: MSG.SET_HAS_MORE, value: false });
+      dispatchMsg({ type: MSG.SET_HAS_MORE, value: serverMessages.length === pageSize });
       dispatchMsg({ type: MSG.SET_PAGE, value: page });
     } catch (err) {
       if (err.name !== 'AbortError') console.error('loadConversation error:', err);

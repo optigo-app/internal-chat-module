@@ -4,6 +4,17 @@ import { CheckCheck, Image, Video, FileText, Pin, Star, ChevronDown } from 'luci
 import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
 import { renderEmojiText } from '../../utils/EmojiRenderer';
 import { highlightText } from '../../utils/globalFunc';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+const withEmoji16 = (children) => {
+    return React.Children.map(children, (child) => {
+        if (typeof child === 'string') {
+            return renderEmojiText(child, { size: 16 });
+        }
+        return child;
+    });
+};
 
 const ConversationItem = React.memo(({ 
     member, 
@@ -12,8 +23,8 @@ const ConversationItem = React.memo(({
     isKeyboardSelected, 
     isMenuOpen, 
     shouldShowUnreadBadge,
-    typingStates,
-    drafts,
+    typingState,
+    draftText,
     hoveredId,
     searchTerm,
     handleCustomerClick,
@@ -22,7 +33,7 @@ const ConversationItem = React.memo(({
     setSelectMember,
     onConversationList,
     chatMembersData,
-    favoriteState
+    isFavorite
 }) => {
     const getMessageStatusIcon = (member) => {
         const direction = Number(member?.LastMessageDirection ?? member?.lastMessageDirection);
@@ -79,7 +90,7 @@ const ConversationItem = React.memo(({
                             className={shouldShowUnreadBadge ? 'last-message-unread' : 'last-message'}
                             style={{ display: 'flex', alignItems: 'center' }}
                         >
-                            {typingStates[member.ConversationId] ? (
+                            {typingState ? (
                                 <span className='typing_indecator'>
                                     <div className="typing-dots-container sidebar-dots">
                                         <div className="typing-dot"></div>
@@ -87,14 +98,14 @@ const ConversationItem = React.memo(({
                                         <div className="typing-dot"></div>
                                     </div>
                                     {member.IsGroup === 1
-                                        ? `${typingStates[member.ConversationId].userName} is typing...`
+                                        ? `${typingState.userName} is typing...`
                                         : 'typing...'}
                                 </span>
-                            ) : (drafts[member.ConversationId] && !isSelected) ? (
+                            ) : (draftText && !isSelected) ? (
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <span style={{ color: '#7367f0', fontWeight: 600 }}>Draft: </span>
                                     <span style={{ color: '#4b4b4b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {renderEmojiText(drafts[member.ConversationId], { size: 16 })}
+                                        {renderEmojiText(draftText, { size: 16 })}
                                     </span>
                                 </span>
                             ) : (
@@ -103,7 +114,30 @@ const ConversationItem = React.memo(({
 
                                     {/* TEXT MESSAGE */}
                                     {member.LastMessageType === 1 && (
-                                        renderEmojiText(member.LastMessage || 'Text', { size: 16 })
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                                p: ({node, children, ...props}) => <span {...props}>{withEmoji16(children)} </span>,
+                                                a: ({node, children, ...props}) => <span {...props}>{withEmoji16(children)}</span>,
+                                                strong: ({node, children, ...props}) => <strong {...props}>{withEmoji16(children)}</strong>,
+                                                em: ({node, children, ...props}) => <em {...props}>{withEmoji16(children)}</em>,
+                                                del: ({node, children, ...props}) => <del {...props}>{withEmoji16(children)}</del>,
+                                                code: ({node, children, ...props}) => <span style={{ fontFamily: 'monospace' }} {...props}>{withEmoji16(children)}</span>,
+                                                pre: ({node, children, ...props}) => <span {...props}>{children}</span>,
+                                                blockquote: ({node, children, ...props}) => <span style={{ fontStyle: 'italic', opacity: 0.8 }} {...props}>"{withEmoji16(children)}" </span>,
+                                                ul: ({node, children, ...props}) => <span {...props}>{children}</span>,
+                                                ol: ({node, children, ...props}) => <span {...props}>{children}</span>,
+                                                li: ({node, children, ...props}) => <span {...props}>• {withEmoji16(children)} </span>,
+                                                h1: ({node, children, ...props}) => <strong {...props}>{withEmoji16(children)} </strong>,
+                                                h2: ({node, children, ...props}) => <strong {...props}>{withEmoji16(children)} </strong>,
+                                                h3: ({node, children, ...props}) => <strong {...props}>{withEmoji16(children)} </strong>,
+                                                h4: ({node, children, ...props}) => <strong {...props}>{withEmoji16(children)} </strong>,
+                                                h5: ({node, children, ...props}) => <strong {...props}>{withEmoji16(children)} </strong>,
+                                                h6: ({node, children, ...props}) => <strong {...props}>{withEmoji16(children)} </strong>,
+                                            }}
+                                        >
+                                            {member.LastMessage || 'Text'}
+                                        </ReactMarkdown>
                                     )}
 
                                     {/* IMAGE */}
@@ -157,7 +191,7 @@ const ConversationItem = React.memo(({
                                         </IconButton>
                                     </Tooltip>
                                 }
-                                {((favoriteState[member.ConversationId]?.isStar ?? member?.IsStar) === 1) &&
+                                {isFavorite &&
                                     <Tooltip title="Unfavorite" arrow>
                                         <IconButton
                                             size="small"

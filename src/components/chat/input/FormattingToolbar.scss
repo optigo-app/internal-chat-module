@@ -1,0 +1,85 @@
+.formatting-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: #ffffff;
+    border-radius: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 4px 16px rgba(0, 0, 0, 0.08);
+    position: relative;
+    z-index: 10;
+    margin-bottom: 8px;
+    width: fit-content;
+
+    .formatting-item {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        cursor: pointer;
+        color: #4a4a4a;
+        transition: all 0.2s ease-in-out;
+
+        &:hover {
+            background: #f5f5f5;
+            color: #1a1a1a;
+        }
+
+        &:active {
+            transform: scale(0.95);
+        }
+
+        .formatting-tooltip {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1a1a1a;
+            color: #ffffff;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            min-width: 120px;
+            will-change: opacity, visibility;
+
+            &::after {
+                content: '';
+                position: absolute;
+                top: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                border: 5px solid transparent;
+                border-top-color: #1a1a1a;
+            }
+
+            .tooltip-label {
+                font-weight: 500;
+                font-size: 12px;
+            }
+
+            .tooltip-shortcut {
+                font-size: 10px;
+                opacity: 0.8;
+                font-weight: 400;
+            }
+        }
+
+        &:hover .formatting-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+    }
+}

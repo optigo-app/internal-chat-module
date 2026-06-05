@@ -7,6 +7,7 @@ import JSZip from 'jszip';
 import { toast } from 'react-hot-toast';
 import { renderEmojiText } from './EmojiRenderer';
 import { getHeaders } from '../API/InitialApi/Config';
+import { downloadFileApi } from '../API/FileUpload/fileDownloadApi';
 
 // Global cache for images that return 404/error to prevent flickering from stale API data
 const deadImageCache = new Set();
@@ -244,7 +245,6 @@ export function passwordToSha1(password) {
 
 
 export const handleDownloadFile = async (fileUrlOrMessage, filename = null, options = {}) => {
-    console.log("filename",filename)
     if (typeof fileUrlOrMessage === 'object' && fileUrlOrMessage !== null && !options?.isRecursive) {
         const msg = fileUrlOrMessage;
         const mediaItems = Array.isArray(msg?.mediaItems) ? msg.mediaItems : [];
@@ -310,6 +310,8 @@ export const handleDownloadFile = async (fileUrlOrMessage, filename = null, opti
 
     if (!fileUrl) return { success: false, error: "No URL provided" };
 
+    let resolvedFileUrl = fileUrl;
+
     // Generate filename with timestamp
     const timestamp = new Date().getTime();
     if (!filename) {
@@ -328,9 +330,31 @@ export const handleDownloadFile = async (fileUrlOrMessage, filename = null, opti
         }
     }
 
+    // Try download API first (can return a resolved file URL or direct payload)
+    try {
+        const apiResponse = await downloadFileApi({ fileUrl, fileName: filename });
+        const apiData = apiResponse?.data;
+
+        const apiResolvedUrl =
+            apiData?.Data?.rd?.[0]?.FileUrl ||
+            apiData?.Data?.rd?.[0]?.fileUrl ||
+            apiData?.Data?.rd?.[0]?.Url ||
+            apiData?.Data?.rd?.[0]?.url ||
+            apiData?.FileUrl ||
+            apiData?.fileUrl ||
+            apiData?.Url ||
+            apiData?.url;
+
+        if (apiResolvedUrl) {
+            resolvedFileUrl = apiResolvedUrl;
+        }
+    } catch (apiError) {
+        console.warn('downloadFileApi failed, falling back to direct URL download:', apiError);
+    }
+
     // Try fetch blob first
     try {
-        const response = await fetch(fileUrl);
+        const response = await fetch(resolvedFileUrl);
         const blob = await response.blob();
         const objectUrl = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
@@ -345,7 +369,7 @@ export const handleDownloadFile = async (fileUrlOrMessage, filename = null, opti
         // Fallback to direct anchor download
         try {
             const anchor = document.createElement('a');
-            anchor.href = fileUrl;
+            anchor.href = resolvedFileUrl;
             anchor.download = filename;
             anchor.target = '_blank';
             anchor.rel = 'noopener noreferrer';
