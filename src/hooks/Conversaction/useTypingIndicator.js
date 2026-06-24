@@ -5,12 +5,22 @@ export const useTypingIndicator = (conversationId, currentUserId) => {
     const [typingStatus, setTypingStatus] = useState(null);
     const typingTimeoutRef = useRef(null);
 
+    // Clear typing status whenever conversation changes
+    useEffect(() => {
+        setTypingStatus(null);
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = null;
+        }
+    }, [conversationId]);
+
     useEffect(() => {
         const cleanup = addInternalTypingHandler((data) => {
             if (Number(data.ConversationId) !== Number(conversationId)) return;
             if (Number(data.SenderId) === Number(currentUserId)) return;
 
-            if (data.isTyping === false) {
+            const isStopped = data.isTyping === false || data.isTyping === 0 || data.isTyping === 'false';
+            if (isStopped) {
                 setTypingStatus(null);
                 if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
             } else {

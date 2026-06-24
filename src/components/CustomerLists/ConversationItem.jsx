@@ -136,7 +136,7 @@ const ConversationItem = React.memo(({
                                                 h6: ({node, children, ...props}) => <strong {...props}>{withEmoji16(children)} </strong>,
                                             }}
                                         >
-                                            {member.LastMessage || 'Text'}
+                                            {(member.LastMessage || 'Text').replace(/\\n/g, ' ')}
                                         </ReactMarkdown>
                                     )}
 

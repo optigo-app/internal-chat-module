@@ -44,7 +44,6 @@ const ChatBox = ({
     fetchAndCacheGroupMembers,
     updateLatestInput
 }) => {
-    const inputRef = useRef(null);
     const lexicalEditorRef = useRef(null);
     const attachButtonRef = useRef(null);
     const emojiButtonRef = useRef(null);
@@ -66,7 +65,9 @@ const ChatBox = ({
 
     const [tempQuery, setTempQuery] = useState(inputValue || '')
     const activeConversationIdRef = useRef(selectedCustomer?.ConversationId)
-    const typingTimeoutRef = useRef(null)
+    const typingTimeoutsMapRef = useRef({})
+    const lastTypingEmitRef = useRef(0);
+    const prevSelectedCustomerRef = useRef(selectedCustomer);
     const { auth } = useContext(LoginContext)
 
     const [showFileConfirm, setShowFileConfirm] = useState(false);
@@ -81,27 +82,24 @@ const ChatBox = ({
     const isNearLimit = charCount >= WARNING_THRESHOLD;
     const isAtLimit = charCount >= MAX_CHARS;
 
-    const lastTypingEmitRef = useRef(0);
-
-    const handleTyping = useCallback(async (isTyping) => {
-        if (!selectedCustomer?.ConversationId || !auth) return;
+    const handleTypingFor = useCallback(async (isTyping, customer) => {
+        if (!customer?.ConversationId || !auth) return;
         const senderId = auth?.id || auth?.userId;
-        const isGroup = selectedCustomer?.IsGroup == 1;
+        const isGroup = customer?.IsGroup == 1;
         let receiverIdValue;
         if (isGroup) {
             try {
-                const groupData = await fetchAndCacheGroupMembers(selectedCustomer.ConversationId);
+                const groupData = await fetchAndCacheGroupMembers(customer.ConversationId);
                 const memberIds = (groupData?.members || []).map(m => Number(m.UserId || m.userId || m.id)).filter(Boolean);
                 receiverIdValue = memberIds.length > 0 ? memberIds : [];
             } catch (error) {
-                console.error('Error fetching group members for typing status:', error);
                 receiverIdValue = [];
             }
         } else {
-            receiverIdValue = selectedCustomer.ReceiverId || selectedCustomer.UserId || selectedCustomer.CustomerId;
+            receiverIdValue = customer.ReceiverId || customer.UserId || customer.CustomerId;
         }
         emitInternalTyping({
-            ConversationId: selectedCustomer.ConversationId,
+            ConversationId: customer.ConversationId,
             SenderId: senderId,
             ReceiverId: receiverIdValue,
             IsGroup: isGroup ? 1 : 0,
@@ -111,7 +109,11 @@ const ChatBox = ({
             ufcc: auth?.ufcc,
             isTyping: isTyping
         });
-    }, [selectedCustomer, auth, fetchAndCacheGroupMembers]);
+    }, [auth, fetchAndCacheGroupMembers]);
+
+    const handleTyping = useCallback((isTyping) => {
+        handleTypingFor(isTyping, selectedCustomer);
+    }, [handleTypingFor, selectedCustomer]);
 
     const onLexicalChange = useCallback((markdown) => {
         let val = markdown;
@@ -124,18 +126,46 @@ const ChatBox = ({
         setTempQuery(val);
         if (updateLatestInput) updateLatestInput(val);
         setInputValue(val);
-        
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        const now = Date.now();
-        if (now - lastTypingEmitRef.current > 1000) {
-            handleTyping(true);
-            lastTypingEmitRef.current = now;
+
+        const convId = selectedCustomer?.ConversationId;
+        if (!convId) return;
+
+        // If conversation changed since last call, emit stop-typing for old conversation
+        const prevCustomer = prevSelectedCustomerRef.current;
+        if (prevCustomer?.ConversationId && prevCustomer.ConversationId !== convId) {
+            if (typingTimeoutsMapRef.current[prevCustomer.ConversationId]) {
+                clearTimeout(typingTimeoutsMapRef.current[prevCustomer.ConversationId]);
+                delete typingTimeoutsMapRef.current[prevCustomer.ConversationId];
+            }
+            handleTypingFor(false, prevCustomer);
         }
-        typingTimeoutRef.current = setTimeout(() => {
+        prevSelectedCustomerRef.current = selectedCustomer;
+
+        // Clear any pending timeout for this conversation
+        if (typingTimeoutsMapRef.current[convId]) {
+            clearTimeout(typingTimeoutsMapRef.current[convId]);
+            delete typingTimeoutsMapRef.current[convId];
+        }
+
+        const hasContent = val.trim().length > 0;
+        const now = Date.now();
+
+        if (hasContent) {
+            if (now - lastTypingEmitRef.current > 1000) {
+                handleTyping(true);
+                lastTypingEmitRef.current = now;
+            }
+            const customerAtSetTime = selectedCustomer;
+            typingTimeoutsMapRef.current[convId] = setTimeout(() => {
+                handleTypingFor(false, customerAtSetTime);
+                delete typingTimeoutsMapRef.current[convId];
+            }, 1000);
+        } else {
+            // Content cleared — stop typing immediately
             handleTyping(false);
             lastTypingEmitRef.current = 0;
-        }, 1000);
-    }, [handleTyping, setInputValue, updateLatestInput]);
+        }
+    }, [handleTyping, handleTypingFor, setInputValue, updateLatestInput, selectedCustomer]);
 
     useEffect(() => {
         if (!inputValue && lexicalEditorRef.current) {
@@ -295,9 +325,8 @@ const ChatBox = ({
 
     const onEmojiClick = (emojiData) => {
         const emoji = emojiData?.emoji || '';
-        
+
         if (lexicalEditorRef.current) {
-            // Let the text change plugin sync it naturally by inserting text
             lexicalEditorRef.current.update(() => {
                 const selection = $getSelection();
                 if ($isRangeSelection(selection)) {
@@ -321,11 +350,21 @@ const ChatBox = ({
                 return next;
             });
         }
-        
+
+        const convId = selectedCustomer?.ConversationId;
+        if (!convId) return;
+
+        if (typingTimeoutsMapRef.current[convId]) {
+            clearTimeout(typingTimeoutsMapRef.current[convId]);
+            delete typingTimeoutsMapRef.current[convId];
+        }
+
         handleTyping(true);
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = setTimeout(() => {
-            handleTyping(false);
+        lastTypingEmitRef.current = Date.now();
+        const customerAtSetTime = selectedCustomer;
+        typingTimeoutsMapRef.current[convId] = setTimeout(() => {
+            handleTypingFor(false, customerAtSetTime);
+            delete typingTimeoutsMapRef.current[convId];
         }, 1000);
     };
 
@@ -472,7 +511,7 @@ const ChatBox = ({
                 }}
                 onConfirm={handleConfirmFileConversion}
                 title="Convert to File"
-                description="Your message is too long for chat display./nIt will be sent as a text file attachment."
+                description="Your message is too long for chat display.\nIt will be sent as a text file attachment."
                 confirmText="Convert to File"
                 cancelText="Cancel"
                 variant="primary"

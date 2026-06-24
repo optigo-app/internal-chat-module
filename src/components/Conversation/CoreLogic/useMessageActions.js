@@ -88,6 +88,17 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
           message: caption,
         });
 
+      const stat = resp?.Data?.rd?.[0]?.stat;
+      const statMsg = resp?.Data?.rd?.[0]?.stat_msg;
+
+      if (stat === 0) {
+        const errorMsg = statMsg ? statMsg.replace(/^"|"$/g, '') : 'Failed to send message';
+        toast.error(errorMsg);
+        dispatchMsg({ type: MSG.UPSERT, id: tempId, msg: { Status: 4 } });
+        if (typeof scrollToBottom === 'function') scrollToBottom();
+        return;
+      }
+
       const sentId = resp?.Data?.rd?.[0]?.MessageId;
       const convId = resp?.Data?.rd?.[0]?.ConversationId || selectedCustomer?.ConversationId;
       const isNewConv = resp?.Data?.rd?.[0]?.IsNewConversation === true;
@@ -124,6 +135,9 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
           },
         });
         dispatchMsg({ type: MSG.UPSERT, id: tempId, msg: { Id: sentId, MessageId: sentId, Status: 1, SenderId: auth?.id, Direction: 1 } });
+      } else {
+        toast.error('Failed to send message');
+        dispatchMsg({ type: MSG.UPSERT, id: tempId, msg: { Status: 4 } });
       }
 
       if (isNewConv && convId && onCustomerSelect) {

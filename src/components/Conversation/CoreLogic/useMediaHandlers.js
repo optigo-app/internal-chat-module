@@ -75,6 +75,16 @@ export function useMediaHandlers({ auth, selectedCustomer, uiState, dispatchUI, 
       const sendFn = type === 'image' ? sendImageMessage : type === 'video' ? sendVideoMessage : sendDocumentMessage;
       const res = await sendFn(auth, { senderId: auth?.id, receiverId, conversationId: convId, caption, attachments });
 
+      const stat = res?.Data?.rd?.[0]?.stat;
+      const statMsg = res?.Data?.rd?.[0]?.stat_msg;
+
+      if (stat === 0) {
+        const errorMsg = statMsg ? statMsg.replace(/^"|"$/g, '') : 'Failed to send media';
+        toast.error(errorMsg);
+        dispatchMsg({ type: MSG.UPSERT, id: tempId, msg: { Status: 4, isUploading: false } });
+        return;
+      }
+
       const sentId = res?.Data?.rd?.[0]?.MessageId;
       const sentConvId = res?.Data?.rd?.[0]?.ConversationId;
       const serverAttachments = (() => {
@@ -83,10 +93,15 @@ export function useMediaHandlers({ auth, selectedCustomer, uiState, dispatchUI, 
       })();
       const enrichedItems = mediaItems.map((item, i) => ({ ...item, attachmentId: serverAttachments[i]?.Id || null }));
 
-      const payload = buildMediaPayload({ auth, selectedCustomer, sentId, tempId, type, uploadedUrls, mediaItems: enrichedItems, caption, time, date, dateTime, isGroup, memberIds });
-      emitMediaMessage(payload);
+      if (sentId) {
+        const payload = buildMediaPayload({ auth, selectedCustomer, sentId, tempId, type, uploadedUrls, mediaItems: enrichedItems, caption, time, date, dateTime, isGroup, memberIds });
+        emitMediaMessage(payload);
 
-      dispatchMsg({ type: MSG.UPSERT, id: tempId, msg: { Id: sentId, MessageId: sentId, previewUrl: uploadedUrls[0], mediaItems: enrichedItems, isUploading: false, percent: 100, Status: 1 } });
+        dispatchMsg({ type: MSG.UPSERT, id: tempId, msg: { Id: sentId, MessageId: sentId, previewUrl: uploadedUrls[0], mediaItems: enrichedItems, isUploading: false, percent: 100, Status: 1 } });
+      } else {
+        toast.error('Failed to send media');
+        dispatchMsg({ type: MSG.UPSERT, id: tempId, msg: { Status: 4, isUploading: false } });
+      }
 
       if (res?.Data?.rd?.[0]?.IsNewConversation && sentConvId && onCustomerSelect) {
         onCustomerSelect({ ...selectedCustomerRef.current, ConversationId: sentConvId });

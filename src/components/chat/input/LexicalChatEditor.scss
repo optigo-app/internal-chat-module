@@ -4,8 +4,8 @@
     max-height: 120px;
     overflow-y: auto;
     position: relative;
-    display: flex;
-    align-items: center;
+    padding: 8.5px 14px;
+    box-sizing: border-box;
     font-family: inherit;
     .lexical-content-editable {
         outline: none;

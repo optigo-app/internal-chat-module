@@ -74,12 +74,20 @@ const MessageContent = ({
     const parsedReactions = React.useMemo(() => parseReactions(msg?.ReactionEmojis), [msg?.ReactionEmojis]);
 
     const MESSAGE_CHAR_LIMIT = 2000;
-    const DISPLAY_CHAR_LIMIT = 1000;
-    const messageText = msg.Message || '';
-    const shouldTruncate = messageText.length > DISPLAY_CHAR_LIMIT;
-    const displayText = shouldTruncate && !isExpanded
-        ? messageText.slice(0, DISPLAY_CHAR_LIMIT) + '...'
-        : messageText;
+    const DISPLAY_CHAR_LIMIT = 1500;
+    const DISPLAY_LINE_LIMIT = 20;
+    const messageText = (msg.Message || '').replace(/\\n/g, '\n');
+    const lines = messageText.split('\n');
+    const shouldTruncate = messageText.length > DISPLAY_CHAR_LIMIT || lines.length > DISPLAY_LINE_LIMIT;
+    
+    let displayText = messageText;
+    if (shouldTruncate && !isExpanded) {
+        if (messageText.length > DISPLAY_CHAR_LIMIT) {
+            displayText = messageText.slice(0, DISPLAY_CHAR_LIMIT) + '...';
+        } else {
+            displayText = lines.slice(0, DISPLAY_LINE_LIMIT).join('\n') + '\n...';
+        }
+    }
 
 
 
@@ -226,15 +234,16 @@ const MessageContent = ({
                             <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{
-                                    p: ({node, children, ...props}) => <Typography variant="body2" sx={{margin: 0, padding: 0, fontSize: 'inherit', lineHeight: 'inherit'}} {...props}>{withEmoji(children)}</Typography>,
+                                    p: ({node, children, ...props}) => <Typography variant="body2" sx={{margin: 0, padding: 0, fontSize: 'inherit', lineHeight: 'inherit', whiteSpace: 'pre-wrap', '&:not(:last-child)': { mb: 1 }}} {...props}>{withEmoji(children)}</Typography>,
                                     a: ({node, children, ...props}) => <a style={{color: theme.palette.primary.main, textDecoration: 'underline'}} target="_blank" rel="noopener noreferrer" {...props}>{withEmoji(children)}</a>,
                                     strong: ({node, children, ...props}) => <strong {...props}>{withEmoji(children)}</strong>,
                                     em: ({node, children, ...props}) => <em {...props}>{withEmoji(children)}</em>,
                                     del: ({node, children, ...props}) => <del {...props}>{withEmoji(children)}</del>,
+                                    pre: ({node, children, ...props}) => <pre style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.05)', padding: '8px', borderRadius: '4px', overflowX: 'auto', margin: '4px 0', maxWidth: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} {...props}>{children}</pre>,
                                     code: ({node, inline, children, ...props}) => 
                                         inline 
                                         ? <code style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: '4px', wordBreak: 'break-word' }} {...props}>{withEmoji(children)}</code>
-                                        : <pre style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.05)', padding: '8px', borderRadius: '4px', overflowX: 'auto', margin: '4px 0', maxWidth: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}><code {...props}>{withEmoji(children)}</code></pre>,
+                                        : <code {...props}>{withEmoji(children)}</code>,
                                     blockquote: ({node, children, ...props}) => <blockquote style={{ borderLeft: '4px solid #ccc', paddingLeft: '8px', margin: '4px 0 4px 0', color: '#666' }} {...props}>{withEmoji(children)}</blockquote>,
                                     ul: ({node, children, ...props}) => <ul style={{ padding: 0, margin: '4px 0 4px 24px' }} {...props}>{withEmoji(children)}</ul>,
                                     ol: ({node, children, ...props}) => <ol style={{ padding: 0, margin: '4px 0 4px 24px' }} {...props}>{withEmoji(children)}</ol>,
@@ -309,15 +318,16 @@ const MessageContent = ({
                                     <ReactMarkdown
                                         remarkPlugins={[remarkGfm]}
                                         components={{
-                                            p: ({node, children, ...props}) => <Typography variant="body2" sx={{margin: 0, padding: 0, fontSize: 'inherit', lineHeight: 'inherit'}} {...props}>{withEmoji(children)}</Typography>,
+                                            p: ({node, children, ...props}) => <Typography variant="body2" sx={{margin: 0, padding: 0, fontSize: 'inherit', lineHeight: 'inherit', whiteSpace: 'pre-wrap', '&:not(:last-child)': { mb: 1 }}} {...props}>{withEmoji(children)}</Typography>,
                                             a: ({node, children, ...props}) => <a style={{color: theme.palette.primary.main, textDecoration: 'underline'}} target="_blank" rel="noopener noreferrer" {...props}>{withEmoji(children)}</a>,
                                             strong: ({node, children, ...props}) => <strong {...props}>{withEmoji(children)}</strong>,
                                             em: ({node, children, ...props}) => <em {...props}>{withEmoji(children)}</em>,
                                             del: ({node, children, ...props}) => <del {...props}>{withEmoji(children)}</del>,
+                                            pre: ({node, children, ...props}) => <pre style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.05)', padding: '8px', borderRadius: '4px', overflowX: 'auto', margin: '4px 0', maxWidth: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} {...props}>{children}</pre>,
                                             code: ({node, inline, children, ...props}) => 
                                                 inline 
                                                 ? <code style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: '4px', wordBreak: 'break-word' }} {...props}>{withEmoji(children)}</code>
-                                                : <pre style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.05)', padding: '8px', borderRadius: '4px', overflowX: 'auto', margin: '4px 0', maxWidth: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}><code {...props}>{withEmoji(children)}</code></pre>,
+                                                : <code {...props}>{withEmoji(children)}</code>,
                                             blockquote: ({node, children, ...props}) => <blockquote style={{ borderLeft: '4px solid #ccc', paddingLeft: '8px', margin: '4px 0 4px 0', color: '#666' }} {...props}>{withEmoji(children)}</blockquote>,
                                             ul: ({node, children, ...props}) => <ul style={{ padding: 0, margin: '4px 0 4px 24px' }} {...props}>{withEmoji(children)}</ul>,
                                             ol: ({node, children, ...props}) => <ol style={{ padding: 0, margin: '4px 0 4px 24px' }} {...props}>{withEmoji(children)}</ol>,

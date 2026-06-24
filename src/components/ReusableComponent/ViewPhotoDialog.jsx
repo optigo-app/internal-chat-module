@@ -1,9 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, IconButton, Box, Typography } from '@mui/material';
 import { X, ZoomIn, ZoomOut } from 'lucide-react';
 
 const ViewPhotoDialog = ({ open, onClose, imageUrl, title = "View Photo" }) => {
     const [zoom, setZoom] = useState(1);
+    const [displayImageUrl, setDisplayImageUrl] = useState(imageUrl);
+
+    // Keep last valid imageUrl so the photo stays visible during close transition
+    useEffect(() => {
+        if (imageUrl) setDisplayImageUrl(imageUrl);
+    }, [imageUrl]);
+
+    // Reset zoom when dialog closes
+    useEffect(() => {
+        if (!open) setZoom(1);
+    }, [open]);
 
     const handleDoubleClick = () => {
         setZoom(prev => prev === 1 ? 2 : 1);
@@ -110,7 +121,7 @@ const ViewPhotoDialog = ({ open, onClose, imageUrl, title = "View Photo" }) => {
                     onDoubleClick={handleDoubleClick}
                 >
                     <img
-                        src={imageUrl}
+                        src={displayImageUrl}
                         alt="Profile Photo"
                         style={{
                             maxWidth: '80%',

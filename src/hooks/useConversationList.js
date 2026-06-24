@@ -38,6 +38,7 @@ export const useConversationList = ({
     const { auth, isSyncing } = useContext(LoginContext);
     const [chatMembers, setChatMembers] = useState({ data: null, total: 0 });
     const [loading, setLoading] = useState(false);
+    const [searchLoading, setSearchLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
     const [typingStates, setTypingStates] = useState({});
@@ -121,10 +122,13 @@ export const useConversationList = ({
         if (reset) {
             setShowEmptyState(false);
         }
-        setLoading(true);
+
+        const searchToUse = search !== null ? search : searchTerm;
+        const isSearchRequest = Boolean(searchToUse) && reset;
+        if (isSearchRequest) setSearchLoading(true);
+        else setLoading(true);
 
         try {
-            const searchToUse = search !== null ? search : searchTerm;
             const response = await fetchConversationLists(page, pageSize, auth, searchToUse, controller.signal);
             const currentConversations = processApiResponse(response.data?.rd || []);
             const searchResults = mapSearchResults(response.data?.rd1);
@@ -169,7 +173,8 @@ export const useConversationList = ({
             if (error.name === 'AbortError') return;
             console.error('Error loading members:', error);
         } finally {
-            setLoading(false);
+            if (isSearchRequest) setSearchLoading(false);
+            else setLoading(false);
         }
     }, [loading, hasMore, auth, pageSize, searchTerm]);
 
@@ -575,8 +580,12 @@ export const useConversationList = ({
         setSearchTerm(value);
         if (value === '') {
             if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+            setSearchLoading(false);
             loadMembers(1, true, '');
-        } else debouncedSearch(value);
+        } else {
+            setSearchLoading(true);
+            debouncedSearch(value);
+        }
     };
 
     useEffect(() => {
@@ -604,6 +613,7 @@ export const useConversationList = ({
         loadMembers,
         handleSearchChange,
         setChatMembers,
-        setShowEmptyState
+        setShowEmptyState,
+        searchLoading
     };
 };

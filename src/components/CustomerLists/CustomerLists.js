@@ -57,6 +57,7 @@ const CustomerLists = ({
     const {
         chatMembers,
         loading,
+        searchLoading,
         hasMore,
         currentPage,
         typingStates,
@@ -373,7 +374,7 @@ const CustomerLists = ({
                         </li>
                     )}
 
-                    {((loading || chatMembers.data === null) || (filteredMembers.length === 0 && !showEmptyState)) ? (
+                    {(chatMembers.data === null || (loading && !searchLoading) || (filteredMembers.length === 0 && !showEmptyState && !searchLoading)) ? (
                         <>
                             {[...Array(12)].map((_, i) => (
                                 <li key={i} className="member-item" style={{ pointerEvents: 'none' }}>
@@ -389,6 +390,13 @@ const CustomerLists = ({
                         </>
                     ) : filteredMembers?.length > 0 ? (
                         <>
+                            {searchLoading && (
+                                <li style={{ textAlign: 'center', padding: '6px 0', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                                    <Typography variant="caption" color="textSecondary" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, fontSize: '12px' }}>
+                                        <CircularProgress size={12} thickness={5} /> Searching...
+                                    </Typography>
+                                </li>
+                            )}
                             {filteredMembers
                                 .filter(member => !member.isSearchResult)
                                 .map((member, index) => (

@@ -43,22 +43,26 @@ const VirtualRow = React.memo(({ data, index, style }) => {
     useEffect(() => {
         if (!rowRef.current || !row) return;
         const stableKey = getRowStableKey(row);
-        const observer = new ResizeObserver(([entry]) => {
-            const h = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
-            if (h > 0) setSize(stableKey, index, Math.ceil(h));
+        const observer = new ResizeObserver(() => {
+            if (!rowRef.current) return;
+            const h = rowRef.current.offsetHeight;
+            if (h > 0) setSize(stableKey, index, h);
         });
         observer.observe(rowRef.current);
-        const initialH = rowRef.current.getBoundingClientRect().height;
-        if (initialH > 0) setSize(stableKey, index, Math.ceil(initialH));
+        const initialH = rowRef.current.offsetHeight;
+        if (initialH > 0) setSize(stableKey, index, initialH);
         return () => observer.disconnect();
     }, [index, row, setSize]);
 
     if (!row) return <div style={style} />;
 
+    const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+    const msgPadding = isMobile ? '0 12px 4px 12px' : '0 20px 4px 24px';
+
     if (row.type === 'typing') {
         return (
             <div style={style}>
-                <div ref={rowRef} style={{ padding: '0 50px 4px 24px' }}>
+                <div ref={rowRef} style={{ padding: isMobile ? '0 12px 4px 12px' : '0 50px 4px 24px' }}>
                     <TypingIndicator typingStatus={typingStatus} isGroup={selectedCustomer?.IsGroup === 1} />
                 </div>
             </div>
@@ -84,7 +88,7 @@ const VirtualRow = React.memo(({ data, index, style }) => {
     const { msg, msgIndex } = row;
     return (
         <div style={style}>
-            <div ref={rowRef} style={{ padding: '0 20px 4px 24px' }}>
+            <div ref={rowRef} style={{ padding: msgPadding }}>
                 <MessageItem
                     msg={msg} index={msgIndex} auth={auth} handlePaste={handlePaste}
                     selectedCustomer={selectedCustomer} blinkMessageId={blinkMessageId}
@@ -204,10 +208,26 @@ const MessageArea = forwardRef(({
         const prevLen = prevRowsLengthRef.current;
         prevRowsLengthRef.current = rows.length;
         const map = {};
-        rows.forEach((row, i) => { map[i] = getRowStableKey(row); });
+        
+        let firstChangedIndex = rows.length;
+        rows.forEach((row, i) => { 
+            const key = getRowStableKey(row);
+            map[i] = key; 
+            if (indexToStableKey.current[i] !== key && i < firstChangedIndex) {
+                firstChangedIndex = i;
+            }
+        });
         indexToStableKey.current = map;
-        // Only reset from the first changed index instead of resetting everything
-        const resetFrom = rows.length !== prevLen ? Math.max(0, Math.min(prevLen, rows.length) - 1) : 0;
+        
+        let resetFrom = 0;
+        if (rows.length === prevLen && firstChangedIndex === rows.length) {
+            return;
+        } else if (firstChangedIndex < rows.length) {
+            resetFrom = firstChangedIndex;
+        } else {
+            resetFrom = prevLen > 0 ? prevLen - 1 : 0;
+        }
+        
         listRef.current?.resetAfterIndex(resetFrom, true);
     }, [rows]);
 
@@ -239,12 +259,14 @@ const MessageArea = forwardRef(({
             const hasReply = m?.ContextType === 2;
             const base = (isGroup ? 95 : 72) + (hasReply ? 60 : 0);
 
-            // Adjust base for multi-line messages - 35 chars is a safer avg line length for bubbles
-            if (msgLen > 35) return base + Math.min(250, Math.floor(msgLen / 35) * 22);
+            // Responsive chars-per-line: narrower bubbles on mobile wrap sooner
+            const bubbleWidth = Math.max(280, listWidth - 44);
+            const charsPerLine = Math.max(20, Math.floor(bubbleWidth / 12));
+            if (msgLen > charsPerLine) return base + Math.min(250, Math.floor(msgLen / charsPerLine) * 22);
             return base;
         }
         return 80;
-    }, [rows, selectedCustomer?.IsGroup]);
+    }, [rows, selectedCustomer?.IsGroup, listWidth]);
 
     const setSize = useCallback((stableKey, index, size) => {
         const prevSize = stableKeyToHeight.current[stableKey];
@@ -412,8 +434,10 @@ const MessageArea = forwardRef(({
         if (Math.abs(listWidth - prevWidthRef.current) < 2) return;
         prevWidthRef.current = listWidth;
 
-        // When width changes, all our cached heights are potentially invalid
-        stableKeyToHeight.current = {};
+        // We explicitly DO NOT wipe stableKeyToHeight here.
+        // Doing so causes a race condition: VirtualRow's ResizeObserver measures the new
+        // height in the same event loop, updates the cache, and then this effect wipes it,
+        // causing visible rows to fall back to the heuristic height and permanently overlap.
         listRef.current?.resetAfterIndex(0, true);
     }, [listWidth]);
 

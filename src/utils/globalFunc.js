@@ -46,16 +46,24 @@ const getInitials = (name) => {
 
 const formatWhatsAppText = (text) => {
     if (!text || typeof text !== 'string') return text;
-    const regex = /(```[\s\S]*?```|\*\S(?:.*?\S)?\*|_\S(?:.*?\S)?_|~\S(?:.*?\S)?~)/g;
+    // Support both Markdown and WhatsApp-style formatting
+    // Order matters: longer markers first (** before *, __ before _, ~~ before ~)
+    const regex = /(```[\s\S]*?```|\*\*\S(?:.*?\S)?\*\*|\*\S(?:.*?\S)?\*|__\S(?:.*?\S)?__|_\S(?:.*?\S)?_|~~\S(?:.*?\S)?~~|~\S(?:.*?\S)?~)/g;
     const parts = text.split(regex);
-    
+
     return parts.map((part, index) => {
         if (part.startsWith('```') && part.endsWith('```')) {
             return <code key={index} style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: '4px' }}>{renderEmojiText(part.slice(3, -3))}</code>;
+        } else if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={index}>{renderEmojiText(part.slice(2, -2))}</strong>;
         } else if (part.startsWith('*') && part.endsWith('*')) {
-            return <strong key={index}>{renderEmojiText(part.slice(1, -1))}</strong>;
+            return <em key={index}>{renderEmojiText(part.slice(1, -1))}</em>;
+        } else if (part.startsWith('__') && part.endsWith('__')) {
+            return <strong key={index}>{renderEmojiText(part.slice(2, -2))}</strong>;
         } else if (part.startsWith('_') && part.endsWith('_')) {
             return <em key={index}>{renderEmojiText(part.slice(1, -1))}</em>;
+        } else if (part.startsWith('~~') && part.endsWith('~~')) {
+            return <s key={index}>{renderEmojiText(part.slice(2, -2))}</s>;
         } else if (part.startsWith('~') && part.endsWith('~')) {
             return <s key={index}>{renderEmojiText(part.slice(1, -1))}</s>;
         }
