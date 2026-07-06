@@ -442,6 +442,12 @@ const FILE_TYPES = {
         iconName: 'FileType',
         iconUrl: '/icons/doc.png'
     },
+    rtf: {
+        label: 'DOCS',
+        tone: 'doc',
+        iconName: 'FileType',
+        iconUrl: '/icons/doc.png'
+    },
     xls: {
         label: 'EXCEL',
         tone: 'sheet',
@@ -476,25 +482,25 @@ const FILE_TYPES = {
         label: 'ZIP',
         tone: 'archive',
         iconName: 'FileArchive',
-        iconUrl: '/icons/doc.png'
+        iconUrl: '/icons/zip.png'
     },
     rar: {
-        label: 'ZIP',
+        label: 'RAR',
         tone: 'archive',
         iconName: 'FileArchive',
-        iconUrl: '/icons/doc.png'
+        iconUrl: '/icons/rar.png'
     },
     '7z': {
-        label: 'ZIP',
+        label: '7Z',
         tone: 'archive',
         iconName: 'FileArchive',
-        iconUrl: '/icons/doc.png'
+        iconUrl: '/icons/7z.png'
     },
     psd: {
         label: 'PSD',
         tone: 'psd',
         iconName: 'FileType',
-        iconUrl: '/icons/doc.png'
+        iconUrl: '/icons/psd-file.png'
     },
     apk: {
         label: 'APK',
@@ -508,41 +514,185 @@ const FILE_TYPES = {
         iconName: 'FileText',
         iconUrl: '/icons/txt.png'
     },
+    log: {
+        label: 'TEXT',
+        tone: 'default',
+        iconName: 'FileText',
+        iconUrl: '/icons/txt.png'
+    },
+    md: {
+        label: 'TEXT',
+        tone: 'default',
+        iconName: 'FileText',
+        iconUrl: '/icons/txt.png'
+    },
     json: {
         label: 'CODE',
         tone: 'code',
         iconName: 'FileCode',
-        iconUrl: '/icons/doc.png'
+        iconUrl: '/icons/json-file.png'
     },
     xml: {
         label: 'CODE',
         tone: 'code',
         iconName: 'FileCode',
-        iconUrl: '/icons/doc.png'
+        iconUrl: '/icons/xml.png'
     },
     html: {
-        label: 'CODE',
+        label: 'HTML',
         tone: 'code',
         iconName: 'FileCode',
-        iconUrl: '/icons/doc.png'
+        iconUrl: '/icons/html.png'
+    },
+    htm: {
+        label: 'HTML',
+        tone: 'code',
+        iconName: 'FileCode',
+        iconUrl: '/icons/html.png'
     },
     js: {
         label: 'CODE',
         tone: 'code',
         iconName: 'FileCode',
-        iconUrl: '/icons/doc.png'
+        iconUrl: '/icons/java-script.png'
     },
     ts: {
         label: 'CODE',
         tone: 'code',
         iconName: 'FileCode',
-        iconUrl: '/icons/doc.png'
+        iconUrl: '/icons/java-script.png'
+    },
+    jsx: {
+        label: 'CODE',
+        tone: 'code',
+        iconName: 'FileCode',
+        iconUrl: '/icons/java-script.png'
+    },
+    tsx: {
+        label: 'CODE',
+        tone: 'code',
+        iconName: 'FileCode',
+        iconUrl: '/icons/java-script.png'
     },
     css: {
         label: 'CODE',
         tone: 'code',
         iconName: 'FileCode',
-        iconUrl: '/icons/doc.png'
+        iconUrl: '/icons/css-3.png'
+    },
+    py: {
+        label: 'PYTHON',
+        tone: 'code',
+        iconName: 'FileCode',
+        iconUrl: '/icons/python.png'
+    },
+    sql: {
+        label: 'DATABASE',
+        tone: 'code',
+        iconName: 'FileCode',
+        iconUrl: '/icons/database.png'
+    },
+    svg: {
+        label: 'SVG',
+        tone: 'image',
+        iconName: 'FileImage',
+        iconUrl: '/icons/svg.png'
+    },
+    eps: {
+        label: 'SVG',
+        tone: 'image',
+        iconName: 'FileImage',
+        iconUrl: '/icons/svg.png'
+    },
+    mp3: {
+        label: 'AUDIO',
+        tone: 'audio',
+        iconName: 'FileAudio',
+        iconUrl: '/icons/audio.png'
+    },
+    wav: {
+        label: 'AUDIO',
+        tone: 'audio',
+        iconName: 'FileAudio',
+        iconUrl: '/icons/audio.png'
+    },
+    ogg: {
+        label: 'AUDIO',
+        tone: 'audio',
+        iconName: 'FileAudio',
+        iconUrl: '/icons/audio.png'
+    },
+    m4a: {
+        label: 'AUDIO',
+        tone: 'audio',
+        iconName: 'FileAudio',
+        iconUrl: '/icons/audio.png'
+    },
+    flac: {
+        label: 'AUDIO',
+        tone: 'audio',
+        iconName: 'FileAudio',
+        iconUrl: '/icons/audio.png'
+    },
+    aac: {
+        label: 'AUDIO',
+        tone: 'audio',
+        iconName: 'FileAudio',
+        iconUrl: '/icons/audio.png'
+    },
+    wma: {
+        label: 'AUDIO',
+        tone: 'audio',
+        iconName: 'FileAudio',
+        iconUrl: '/icons/audio.png'
+    },
+    mp4: {
+        label: 'VIDEO',
+        tone: 'video',
+        iconName: 'FileVideo',
+        iconUrl: '/icons/video.png'
+    },
+    mov: {
+        label: 'VIDEO',
+        tone: 'video',
+        iconName: 'FileVideo',
+        iconUrl: '/icons/video.png'
+    },
+    avi: {
+        label: 'VIDEO',
+        tone: 'video',
+        iconName: 'FileVideo',
+        iconUrl: '/icons/video.png'
+    },
+    mkv: {
+        label: 'VIDEO',
+        tone: 'video',
+        iconName: 'FileVideo',
+        iconUrl: '/icons/video.png'
+    },
+    flv: {
+        label: 'VIDEO',
+        tone: 'video',
+        iconName: 'FileVideo',
+        iconUrl: '/icons/video.png'
+    },
+    wmv: {
+        label: 'VIDEO',
+        tone: 'video',
+        iconName: 'FileVideo',
+        iconUrl: '/icons/video.png'
+    },
+    m4v: {
+        label: 'VIDEO',
+        tone: 'video',
+        iconName: 'FileVideo',
+        iconUrl: '/icons/video.png'
+    },
+    webm: {
+        label: 'VIDEO',
+        tone: 'video',
+        iconName: 'FileVideo',
+        iconUrl: '/icons/video.png'
     }
 };
 

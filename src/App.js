@@ -308,6 +308,18 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const preventDefaultDrop = (e) => {
+      e.preventDefault();
+    };
+    window.addEventListener('dragover', preventDefaultDrop);
+    window.addEventListener('drop', preventDefaultDrop);
+    return () => {
+      window.removeEventListener('dragover', preventDefaultDrop);
+      window.removeEventListener('drop', preventDefaultDrop);
+    };
+  }, []);
+
+  useEffect(() => {
     const handleKeyDown = (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
         const target = event.target;

@@ -210,6 +210,13 @@
                     background-color: rgba(0, 0, 0, 0.03);
                 }
 
+                &.drag-over {
+                    background: rgba($primary-main, 0.12) !important;
+                    box-shadow: inset 0 0 0 2px rgba($primary-main, 0.5);
+                    transform: scale(1.01);
+                    transition: all 0.2s ease;
+                }
+
                 &.active, &.keyboard-selected {
                     background: $primary-light;
                     // box-shadow: inset 3px 0 0 0 $primary-main;

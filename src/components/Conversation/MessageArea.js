@@ -122,6 +122,7 @@ const MessageArea = forwardRef(({
     loadedMedia, getMediaKey, markLoaded, handleRemoveReaction,
     replyToMessage, handleForward, processFiles, captureMessageScrollState,
     typingStatus, setDrawerViewState, setDrawerOpen, handleSendMessage,
+    inputValue, setInputValue,
 }, ref) => {
     const [hoveredMessageId, setHoveredMessageId] = useState(null);
     const [reactionMenuAnchorEl, setReactionMenuAnchorEl] = useState(null);
@@ -468,23 +469,30 @@ const MessageArea = forwardRef(({
     );
 
     // ── Drag-and-drop ─────────────────────────────────────────────────────
+    // Distinguish external OS file drops from internal element drags (e.g. dragging an <img> inside a message).
+    // Internal drags include browser-added types like text/uri-list and text/html alongside Files.
+    const isExternalFileDrag = useCallback((e) => {
+        const types = e.dataTransfer.types;
+        if (!types?.includes('Files')) return false;
+        // Internal element drags also carry text/uri-list or text/html
+        if (types.includes('text/uri-list') || types.includes('text/html')) return false;
+        return true;
+    }, []);
+
     const handleDragEnter = useCallback((e) => {
         e.preventDefault(); e.stopPropagation();
-        // Only trigger overlay for actual external files
-        const isFile = e.dataTransfer.types?.includes('Files');
-        if (!isFile) return;
+        if (!isExternalFileDrag(e)) return;
 
         dragCounter.current++;
         if (e.dataTransfer.items?.length > 0) setIsDragging(true);
-    }, []);
+    }, [isExternalFileDrag]);
 
     const handleDragLeave = useCallback((e) => {
         e.preventDefault(); e.stopPropagation();
-        const isFile = e.dataTransfer.types?.includes('Files');
-        if (!isFile) return;
+        if (!isExternalFileDrag(e)) return;
 
         if (--dragCounter.current === 0) setIsDragging(false);
-    }, []);
+    }, [isExternalFileDrag]);
 
     const handleDragOver = useCallback((e) => {
         e.preventDefault(); e.stopPropagation();
@@ -492,18 +500,16 @@ const MessageArea = forwardRef(({
 
     const handleDrop = useCallback((e) => {
         e.preventDefault(); e.stopPropagation();
-        const isFile = e.dataTransfer.types?.includes('Files');
+        if (!isExternalFileDrag(e)) return;
 
-        if (isFile) {
-            setIsDragging(false);
-            dragCounter.current = 0;
-            if (e.dataTransfer.files?.length > 0) {
-                captureMessageScrollState?.();
-                processFiles?.(Array.from(e.dataTransfer.files));
-                e.dataTransfer.clearData();
-            }
+        setIsDragging(false);
+        dragCounter.current = 0;
+        if (e.dataTransfer.files?.length > 0) {
+            captureMessageScrollState?.();
+            processFiles?.(Array.from(e.dataTransfer.files));
+            e.dataTransfer.clearData();
         }
-    }, [processFiles, captureMessageScrollState]);
+    }, [processFiles, captureMessageScrollState, isExternalFileDrag]);
 
     const handlePaste = useCallback((e) => {
         if (e.clipboardData?.files?.length > 0) {
@@ -640,6 +646,8 @@ const MessageArea = forwardRef(({
                     setMediaFiles={setMediaFiles}
                     handleClosePreview={handleClosePreview}
                     handleSendMessage={handleSendMessage}
+                    inputValue={inputValue}
+                    setInputValue={setInputValue}
                 />
             )}
         </div>

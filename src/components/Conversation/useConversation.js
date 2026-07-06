@@ -6,6 +6,7 @@ import { normalizeServerMessages as normalizeServerMessagesHelper, groupMessages
 import { conversationView } from '../../API/ConversationView/ConversationView';
 import { fetchGroupDetails } from '../../API/Groups/FetchGroupDetails';
 import { formatDateHeader } from '../../utils/DateFnc';
+import { getAndClearDroppedFiles } from '../../utils/dropFileQueue';
 import imageNotFound from '../../assets/image-not-found.jpg';
 
 import { useMessageLoader } from './CoreLogic/useMessageLoader';
@@ -146,6 +147,14 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
     auth, selectedCustomer, uiState, dispatchUI, dispatchMsg, fetchAndCacheGroupMembers,
     onCustomerSelect, selectedCustomerRef, tempConversationId: msgState.tempConversationId,
   });
+
+  // Process files dropped on the conversation item in the sidebar
+  useEffect(() => {
+    const pendingFiles = getAndClearDroppedFiles(selectedCustomer?.ConversationId);
+    if (pendingFiles && pendingFiles.length > 0 && processFiles) {
+      processFiles(pendingFiles);
+    }
+  }, [selectedCustomer?.ConversationId, processFiles]);
 
   const { handleSendMessage, handleEditMessage, handleDeleteMessage, handleReply, handleCancelReply } = useMessageActions({
     auth, selectedCustomer, uiState: { ...uiState, storeMessData: msgState.storeMessData }, dispatchUI, dispatchMsg,

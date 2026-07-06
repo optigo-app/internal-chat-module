@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { X, Trash2, Plus } from 'lucide-react';
+import { X, Trash2, Plus, SendHorizontal } from 'lucide-react';
 import { Skeleton } from '@mui/material';
 import './MediaPreview.scss';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, FreeMode, Thumbs } from 'swiper/modules';
-import { validateMediaFiles } from '../../utils/globalFunc';
+import { validateMediaFiles, getDocumentMeta } from '../../utils/globalFunc';
 import { showToast } from '../../utils/toastHelper';
 
 // Swiper styles
@@ -13,8 +13,9 @@ import 'swiper/css/navigation';
 import 'swiper/css/thumbs';
 import 'swiper/css/free-mode';
 
-const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, handleClosePreview, handleSendMessage }) => {
+const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, handleClosePreview, handleSendMessage, inputValue = '', setInputValue = () => { } }) => {
     const fileInputRef = useRef(null);
+    const captionRef = useRef(null);
     const mainSwiperRef = useRef(null);
     const [thumbsSwiper, setThumbsSwiper] = useState(null);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -132,6 +133,14 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
         };
     }, [isImageLike, isVideoLike, mediaFiles, safeCreateObjectUrl]);
 
+    // Auto-resize caption textarea
+    useEffect(() => {
+        const el = captionRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+    }, [inputValue]);
+
     const currentMedia = mediaItems[currentIndex];
 
     const currentMediaUrl = useMemo(() => {
@@ -223,16 +232,19 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
             }
 
             if (e.key === 'Enter') {
-                e.preventDefault();
-                if (typeof handleSendMessage === 'function') {
-                    handleSendMessage();
+                const isCaptionFocused = document.activeElement === captionRef.current;
+                if (!isCaptionFocused) {
+                    e.preventDefault();
+                    if (typeof handleSendMessage === 'function') {
+                        handleSendMessage(inputValue);
+                    }
                 }
             }
         };
 
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [currentIndex, handleClose, mediaItems.length, handleSendMessage]);
+    }, [currentIndex, handleClose, mediaItems.length, handleSendMessage, inputValue]);
 
 
     const removeMedia = (id) => {
@@ -359,69 +371,16 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                         )}
 
                                         {item.type === 'file' && (
-                                            <>
-                                                {((item.name || item.file?.name || '').toLowerCase()).endsWith('.pdf') ? (
-                                                    <div className="no-preview-container">
-                                                        <div className="file-icon">
-                                                            <img src="./icons/pdf.png" alt="Pdf" style={{ height: "100px", width: "100%" }} />
-                                                        </div>
-                                                        <div className="file-name">{item.name || item.file?.name}</div>
-                                                        <div className="file-meta">
-                                                            {currentFileMeta.sizeText} · {currentFileMeta.extText}
-                                                        </div>
-                                                        <div className="no-preview-text">No preview available</div>
-                                                    </div>
-                                                ) : ((item.name || item.file?.name || '').toLowerCase()).endsWith('.doc') || ((item.name || item.file?.name || '').toLowerCase()).endsWith('.docx') ? (
-                                                    <div className="no-preview-container">
-                                                        <div className="file-icon">
-                                                            <img src="./icons/doc.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
-                                                        </div>
-                                                        <div className="file-name">{item.name || item.file?.name}</div>
-                                                        <div className="file-meta">
-                                                            {currentFileMeta.sizeText} · {currentFileMeta.extText}
-                                                        </div>
-                                                        <div className="no-preview-text">No preview available</div>
-                                                    </div>
-                                                ) : ((item.name || item.file?.name || '').toLowerCase()).endsWith('.xls') || ((item.name || item.file?.name || '').toLowerCase()).endsWith('.xlsx') || ((item.name || item.file?.name || '').toLowerCase()).endsWith('.csv') ? (
-                                                    <div className="no-preview-container">
-                                                        <div className="file-icon">
-                                                            <img src="./icons/xls.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
-                                                        </div>
-                                                        <div className="file-name">{item.name || item.file?.name}</div>
-                                                        <div className="file-meta">
-                                                            {currentFileMeta.sizeText} · {currentFileMeta.extText}
-                                                        </div>
-                                                        <div className="no-preview-text">No preview available</div>
-                                                    </div>
-                                                ) : ((item.name || item.file?.name || '').toLowerCase()).endsWith('.txt') ? (
-                                                    <div className="no-preview-container">
-                                                        <div className="file-icon">
-                                                            <img src="./icons/txt.png" alt="Excel" style={{ height: "100px", width: "100%" }} />
-                                                        </div>
-                                                        <div className="file-name">{item.name || item.file?.name}</div>
-                                                        <div className="file-meta">
-                                                            {currentFileMeta.sizeText} · {currentFileMeta.extText}
-                                                        </div>
-                                                        <div className="no-preview-text">No preview available</div>
-                                                    </div>
-                                                ) :
-                                                    ((item.name || item.file?.name || '').toLowerCase()).endsWith('.apk') ? (
-                                                        <div className="no-preview-container">
-                                                            <div className="file-icon">
-                                                                <img src="./icons/apk.png" alt="Apk" style={{ height: "100px", width: "100%" }} />
-                                                            </div>
-                                                            <div className="file-name">{item.name || item.file?.name}</div>
-                                                            <div className="file-meta">
-                                                                {currentFileMeta.sizeText} · {currentFileMeta.extText}
-                                                            </div>
-                                                            <div className="no-preview-text">No preview available</div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="file-placeholder">
-                                                            <span>Preview not available for {item.name || item.file?.name}</span>
-                                                        </div>
-                                                    )}
-                                            </>
+                                            <div className="no-preview-container">
+                                                <div className="file-icon">
+                                                    <img src={getDocumentMeta(item.name || item.file?.name).iconUrl} alt="File" style={{ height: "100px", width: "100%" }} />
+                                                </div>
+                                                <div className="file-name">{item.name || item.file?.name}</div>
+                                                <div className="file-meta">
+                                                    {currentFileMeta.sizeText} · {currentFileMeta.extText}
+                                                </div>
+                                                <div className="no-preview-text">No preview available</div>
+                                            </div>
                                         )}
                                     </div>
                                 </SwiperSlide>
@@ -452,19 +411,9 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                         const isPhotoThumb = mime.startsWith('image') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'tif', 'tiff', 'ico'].includes(ext);
                                         const isVideo = item.type === 'video';
 
-                                        let thumbSrc = "./txt.png";
+                                        let thumbSrc = getDocumentMeta(item.name || getAnyName(item.file)).iconUrl;
                                         if (isPhotoThumb) {
                                             thumbSrc = item.url || item.file.preview;
-                                        } else if (name.endsWith('.pdf')) {
-                                            thumbSrc = "./icons/pdf.png";
-                                        } else if (name.endsWith('.doc') || name.endsWith('.docx')) {
-                                            thumbSrc = "./icons/doc.png";
-                                        } else if (name.endsWith('.xls') || name.endsWith('.xlsx') || name.endsWith('.csv')) {
-                                            thumbSrc = "./icons/xls.png";
-                                        } else if (name.endsWith('.txt')) {
-                                            thumbSrc = "./icons/txt.png";
-                                        } else if (name.endsWith('.apk') || name.endsWith('.ipa')) {
-                                            thumbSrc = "./icons/apk.png";
                                         }
 
                                         return (
@@ -526,12 +475,45 @@ const MediaPreview = ({ mediaFiles, scrollToBottom, setMediaFiles = () => { }, h
                                     onChange={handleFileSelect}
                                     multiple
                                     style={{ display: 'none' }}
-                                    accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.apk"
+                                    accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.apk,.html,.htm,.py,.js,.jsx,.ts,.tsx,.css,.json,.xml,.zip,.rar,.7z,.sql,.log,.md,.rtf,.psd,.ai,.svg,.eps,.mp3,.wav,.ogg,.m4a,.flac,.aac,.wma,.mp4,.mov,.avi,.mkv,.flv,.wmv,.m4v,.webm"
                                 />
                             </div>
                         )}
                     </div>
                 )}
+
+                {/* Caption & Send */}
+                <div className="media-preview-caption-bar">
+                    <div className="caption-input-wrapper">
+                        <textarea
+                            ref={captionRef}
+                            className="caption-textarea"
+                            placeholder="Add a caption..."
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    if (typeof handleSendMessage === 'function') {
+                                        handleSendMessage(inputValue);
+                                    }
+                                }
+                            }}
+                            rows={1}
+                        />
+                    </div>
+                    <button
+                        className="caption-send-btn"
+                        onClick={() => {
+                            if (typeof handleSendMessage === 'function') {
+                                handleSendMessage(inputValue);
+                            }
+                        }}
+                        aria-label="Send"
+                    >
+                        <SendHorizontal size={22} />
+                    </button>
+                </div>
             </div>
         </div>
     );

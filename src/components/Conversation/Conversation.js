@@ -265,7 +265,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         messagesRef.current = messages;
     }, [messages]);
 
-    const docsParams = ".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.csv,.apk";
+    const docsParams = ".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.csv,.apk,.html,.htm,.py,.js,.jsx,.ts,.tsx,.css,.json,.xml,.zip,.rar,.7z,.sql,.log,.md,.rtf,.psd,.ai,.svg,.eps,.mp3,.wav,.ogg,.m4a,.flac,.aac,.wma,.mp4,.mov,.avi,.mkv,.flv,.wmv,.m4v,.webm";
     const videoParams = "video/*";
     const imageParams = "image/*";
 
@@ -731,37 +731,41 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
                                 setDrawerViewState={setDrawerViewState}
                                 setDrawerOpen={setDrawerOpen}
                                 handleSendMessage={handleSendMessageCallback}
-                            />
-
-                            <ChatBox
-                                replyToMessage={replyToMessage}
-                                handleCancelReply={handleCancelReply}
-                                handleAttachClick={handleAttachClick}
-                                toggleEmojiPicker={toggleEmojiPicker}
-                                showPicker={showPicker}
-                                emojiPickerRef={emojiPickerRef}
-                                showMedia={showMedia}
-                                fileInputRef={fileInputRef}
-                                openFilePicker={openFilePicker}
-                                imageParams={imageParams}
-                                videoParams={videoParams}
-                                docsParams={docsParams}
-                                handleFileChange={handleFileChange}
                                 inputValue={inputValue}
                                 setInputValue={setInputValue}
-                                updateLatestInput={updateLatestInput}
-                                handleKeyPress={handleKeyPress}
-                                handleSendMessage={handleSendMessageCallback}
-                                mediaFiles={mediaFiles}
-                                isRemovedFromGroup={isRemovedFromCurrentGroup}
-                                isOnlyAdminSend={isOnlyAdminSend}
-                                isCurrentUserAdmin={isCurrentUserAdmin}
-                                selectedCustomer={selectedCustomer}
-                                processFiles={processFiles}
-                                captureMessageScrollState={captureMessageScrollState}
-                                groupMembers={groupMembers}
-                                fetchAndCacheGroupMembers={fetchAndCacheGroupMembers}
                             />
+
+                            {(mediaFiles?.length === 0) && (
+                                <ChatBox
+                                    replyToMessage={replyToMessage}
+                                    handleCancelReply={handleCancelReply}
+                                    handleAttachClick={handleAttachClick}
+                                    toggleEmojiPicker={toggleEmojiPicker}
+                                    showPicker={showPicker}
+                                    emojiPickerRef={emojiPickerRef}
+                                    showMedia={showMedia}
+                                    fileInputRef={fileInputRef}
+                                    openFilePicker={openFilePicker}
+                                    imageParams={imageParams}
+                                    videoParams={videoParams}
+                                    docsParams={docsParams}
+                                    handleFileChange={handleFileChange}
+                                    inputValue={inputValue}
+                                    setInputValue={setInputValue}
+                                    updateLatestInput={updateLatestInput}
+                                    handleKeyPress={handleKeyPress}
+                                    handleSendMessage={handleSendMessageCallback}
+                                    mediaFiles={mediaFiles}
+                                    isRemovedFromGroup={isRemovedFromCurrentGroup}
+                                    isOnlyAdminSend={isOnlyAdminSend}
+                                    isCurrentUserAdmin={isCurrentUserAdmin}
+                                    selectedCustomer={selectedCustomer}
+                                    processFiles={processFiles}
+                                    captureMessageScrollState={captureMessageScrollState}
+                                    groupMembers={groupMembers}
+                                    fetchAndCacheGroupMembers={fetchAndCacheGroupMembers}
+                                />
+                            )}
                         </>
                     )}
                 </div>

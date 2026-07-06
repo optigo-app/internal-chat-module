@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Typography, Badge, IconButton, Tooltip } from '@mui/material';
 import { CheckCheck, Image, Video, FileText, Pin, Star, ChevronDown } from 'lucide-react';
 import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
 import { renderEmojiText } from '../../utils/EmojiRenderer';
 import { highlightText } from '../../utils/globalFunc';
+import { queueDroppedFiles } from '../../utils/dropFileQueue';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -35,6 +36,49 @@ const ConversationItem = React.memo(({
     chatMembersData,
     isFavorite
 }) => {
+    const [isDragOver, setIsDragOver] = useState(false);
+    const dragCounter = useRef(0);
+
+    const isExternalFileDrag = useCallback((e) => {
+        const types = e.dataTransfer.types;
+        if (!types?.includes('Files')) return false;
+        if (types.includes('text/uri-list') || types.includes('text/html')) return false;
+        return true;
+    }, []);
+
+    const handleDragEnter = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isExternalFileDrag(e)) return;
+        dragCounter.current++;
+        if (e.dataTransfer.items?.length > 0) setIsDragOver(true);
+    }, [isExternalFileDrag]);
+
+    const handleDragLeave = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isExternalFileDrag(e)) return;
+        if (--dragCounter.current === 0) setIsDragOver(false);
+    }, [isExternalFileDrag]);
+
+    const handleDragOver = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    }, []);
+
+    const handleDrop = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragCounter.current = 0;
+        setIsDragOver(false);
+        if (!isExternalFileDrag(e)) return;
+        if (e.dataTransfer.files?.length > 0) {
+            const files = Array.from(e.dataTransfer.files);
+            queueDroppedFiles(member.ConversationId, files);
+            handleCustomerClick(member);
+        }
+    }, [member, handleCustomerClick, isExternalFileDrag]);
+
     const getMessageStatusIcon = (member) => {
         const direction = Number(member?.LastMessageDirection ?? member?.lastMessageDirection);
         if (direction !== 1) return null;
@@ -60,10 +104,14 @@ const ConversationItem = React.memo(({
 
     return (
         <li
-            className={`member-item ${isSelected ? 'active' : ''} ${isSelectedAndReading ? 'reading' : ''} ${isMenuOpen ? 'menu-open' : ''} ${isKeyboardSelected ? 'keyboard-selected' : ''}`}
+            className={`member-item ${isSelected ? 'active' : ''} ${isSelectedAndReading ? 'reading' : ''} ${isMenuOpen ? 'menu-open' : ''} ${isKeyboardSelected ? 'keyboard-selected' : ''} ${isDragOver ? 'drag-over' : ''}`}
             onClick={() => handleCustomerClick(member)}
             onMouseEnter={() => setHoveredId(member.ConversationId)}
             onMouseLeave={() => setHoveredId(null)}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
         >
             <div className={`member-item ${isSelected ? 'active' : ''} ${isSelectedAndReading ? 'reading' : ''}`}>
                 <div className="member-avatar">

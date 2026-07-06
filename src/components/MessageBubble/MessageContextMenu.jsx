@@ -16,7 +16,7 @@ import {
   Info,
   User,
   Edit2,
-  Download,
+  Download,                                                                               
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { handleDownloadFile, isMessageEditable } from "../../utils/globalFunc";
@@ -48,7 +48,12 @@ const MessageContextMenu = ({
 
   const handleCopy = () => {
     if (message?.Message) {
-      navigator.clipboard.writeText(message.Message);
+      let text = message.Message;
+      // Replace literal \n sequences with actual newlines (matches display logic)
+      text = text.replace(/\\n/g, '\n');
+      // Unescape markdown sequences: \_ -> _, \* -> *, \\ -> \, trailing \ before newline, etc.
+      text = text.replace(/\\([\\*_[\]()~`>#+\-=|.!\n])/g, '$1');
+      navigator.clipboard.writeText(text);
       toast.success("Text Copied");
     }
   };
