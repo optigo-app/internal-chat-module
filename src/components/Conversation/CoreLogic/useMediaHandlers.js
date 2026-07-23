@@ -54,11 +54,14 @@ export function useMediaHandlers({ auth, selectedCustomer, uiState, dispatchUI, 
     const safeFiles = files.filter(f => f instanceof File);
     if (!safeFiles.length) return;
 
+    // Read the latest selected conversation so media goes to the right chat
+    const customer = selectedCustomerRef?.current || selectedCustomer;
+
     try {
-      const isGroup = selectedCustomer?.IsGroup === 1;
-      const groupData = isGroup ? await fetchAndCacheGroupMembers(selectedCustomer.ConversationId) : null;
+      const isGroup = customer?.IsGroup === 1;
+      const groupData = isGroup ? await fetchAndCacheGroupMembers(customer.ConversationId) : null;
       const memberIds = (groupData?.members || []).map(m => Number(m.UserId || m.userId || m.id)).filter(Boolean);
-      const convId = selectedCustomer?.ConversationId || tempConversationId;
+      const convId = customer?.ConversationId || tempConversationId;
 
       const uploadedUrls = await uploadFiles({
         files: safeFiles, conversationId: convId, type,
@@ -71,7 +74,7 @@ export function useMediaHandlers({ auth, selectedCustomer, uiState, dispatchUI, 
       const attachments = safeFiles.map((f, i) => ({ FileUrl: uploadedUrls[i], FileName: f.name, MimeType: f.type }));
       const mediaItems = safeFiles.map((f, i) => ({ url: uploadedUrls[i], filename: f.name, mimeType: f.type }));
 
-      const receiverId = selectedCustomer?.CustomerId || selectedCustomer?.UserId;
+      const receiverId = customer?.CustomerId || customer?.UserId;
       const sendFn = type === 'image' ? sendImageMessage : type === 'video' ? sendVideoMessage : sendDocumentMessage;
       const res = await sendFn(auth, { senderId: auth?.id, receiverId, conversationId: convId, caption, attachments });
 
@@ -94,7 +97,7 @@ export function useMediaHandlers({ auth, selectedCustomer, uiState, dispatchUI, 
       const enrichedItems = mediaItems.map((item, i) => ({ ...item, attachmentId: serverAttachments[i]?.Id || null }));
 
       if (sentId) {
-        const payload = buildMediaPayload({ auth, selectedCustomer, sentId, tempId, type, uploadedUrls, mediaItems: enrichedItems, caption, time, date, dateTime, isGroup, memberIds });
+        const payload = buildMediaPayload({ auth, selectedCustomer: customer, sentId, tempId, type, uploadedUrls, mediaItems: enrichedItems, caption, time, date, dateTime, isGroup, memberIds });
         emitMediaMessage(payload);
 
         dispatchMsg({ type: MSG.UPSERT, id: tempId, msg: { Id: sentId, MessageId: sentId, previewUrl: uploadedUrls[0], mediaItems: enrichedItems, isUploading: false, percent: 100, Status: 1 } });
@@ -104,15 +107,15 @@ export function useMediaHandlers({ auth, selectedCustomer, uiState, dispatchUI, 
       }
 
       if (res?.Data?.rd?.[0]?.IsNewConversation && sentConvId && onCustomerSelect) {
-        onCustomerSelect({ ...selectedCustomerRef.current, ConversationId: sentConvId });
-        window.dispatchEvent(new CustomEvent('UPDATE_CONVERSATION_ITEM', { detail: { ...selectedCustomerRef.current, ConversationId: sentConvId, Message: caption, MessageType: type, DateTime: dateTime } }));
+        onCustomerSelect({ ...customer, ConversationId: sentConvId });
+        window.dispatchEvent(new CustomEvent('UPDATE_CONVERSATION_ITEM', { detail: { ...customer, ConversationId: sentConvId, Message: caption, MessageType: type, DateTime: dateTime } }));
       }
     } catch (err) {
       console.error('uploadAndSendMedia error:', err);
       toast.error('Failed to send media');
       dispatchMsg({ type: MSG.UPSERT, id: tempId, msg: { Status: 3, isUploading: false } });
     }
-  }, [auth, selectedCustomer, tempConversationId, fetchAndCacheGroupMembers, onCustomerSelect]);
+  }, [auth, selectedCustomerRef, selectedCustomer, tempConversationId, fetchAndCacheGroupMembers, onCustomerSelect]);
 
   return { handleAttachClick, processFiles, handleFileChange, handleMediaClick, handleClosePreview, uploadAndSendMedia };
 }

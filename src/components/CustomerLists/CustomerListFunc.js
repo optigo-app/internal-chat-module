@@ -6,7 +6,7 @@ import { Archive, ArchiveRestore, File, FileText, Image, Pin, PinOff, Star, Star
 export const getMessagePreview = (msg) => {
   const isDeleted = msg?.IsDeletedForEveryone === 1;
   const type = msg?.MessageType;
-  const text = isDeleted ? (msg?.Message || 'This message was deleted.')
+  const rawText = isDeleted ? (msg?.Message || 'This message was deleted.')
     : type === 'text' ? (msg?.Message || '')
       : type === 'image' ? 'Photo'
         : type === 'video' ? 'Video'
@@ -14,6 +14,8 @@ export const getMessagePreview = (msg) => {
             : type === 'file' ? 'File'
               : msg?.SystemMsg === 1 ? (msg?.Message || '')
                 : 'New message';
+
+  const text = typeof rawText === 'string' ? rawText.replace(/\\n|\n|\r/g, ' ').trim() : rawText;
 
   const showIcon = !isDeleted && (type === 'image' || type === 'video' || type === 'document' || type === 'file');
   const Icon = type === 'image' ? Image
@@ -186,9 +188,13 @@ export const mapSearchResults = (rd1) => {
 };
 
 export const resolveConversationName = (incoming, getCustomerDisplayName) => {
+  // SenderName is the actual message sender's display name. SenderInfo is repurposed on reply messages
+  // to hold the original message author's name, so we always prefer SenderName first.
+  const messageSenderName = incoming?.SenderName || incoming?.senderName || incoming?.SenderInfo || '';
+
   const senderInfo = (incoming?.FirstName || incoming?.LastName)
     ? ((incoming?.FirstName || '') + ' ' + (incoming?.LastName || '')).trim()
-    : (incoming?.SenderInfo || incoming?.SenderName || incoming?.senderName || '');
+    : messageSenderName;
 
   const candidate = String(
     senderInfo ||
@@ -202,4 +208,4 @@ export const resolveConversationName = (incoming, getCustomerDisplayName) => {
   ).trim();
 
   return candidate || getCustomerDisplayName(incoming);
-};
+};

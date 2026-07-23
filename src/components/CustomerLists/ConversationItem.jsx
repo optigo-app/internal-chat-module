@@ -157,7 +157,7 @@ const ConversationItem = React.memo(({
                                     </span>
                                 </span>
                             ) : (
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
                                     {getMessageStatusIcon(member)}
 
                                     {/* TEXT MESSAGE */}
@@ -184,7 +184,7 @@ const ConversationItem = React.memo(({
                                                 h6: ({node, children, ...props}) => <strong {...props}>{withEmoji16(children)} </strong>,
                                             }}
                                         >
-                                            {(member.LastMessage || 'Text').replace(/\\n/g, ' ')}
+                                            {(member.LastMessage || 'Text').replace(/\\n|\n|\r/g, ' ')}
                                         </ReactMarkdown>
                                     )}
 

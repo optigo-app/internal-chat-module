@@ -310,14 +310,18 @@ const CustomerLists = ({
                             const newConvId = rd?.ConversationId || result?.response?.Data?.rd?.ConversationId;
                             if (newConvId) {
                                 const now = new Date().toISOString();
+                                const newGroupCustomer = {
+                                    ConversationId: newConvId, ConversationName: result.name || "New Group",
+                                    name: result.name || "New Group", IsGroup: 1, LastMessage: "Group created",
+                                    LastMessageType: 1, LastMessageDate: now, LastUpdatedDate: now,
+                                    DateTime: now, UnreadCount: 0, unreadCount: 0, IsAdmin: 1,
+                                    GroupMembers: result.members || [], isStatusChange: false
+                                };
                                 window.dispatchEvent(new CustomEvent('UPDATE_CONVERSATION_ITEM', {
-                                    detail: {
-                                        ConversationId: newConvId, ConversationName: result.name || "New Group",
-                                        name: result.name || "New Group", IsGroup: 1, LastMessage: "Group created",
-                                        LastMessageType: 1, LastMessageDate: now, LastUpdatedDate: now,
-                                        DateTime: now, UnreadCount: 0, unreadCount: 0, IsAdmin: 1,
-                                        GroupMembers: result.members || [], isStatusChange: false
-                                    }
+                                    detail: newGroupCustomer
+                                }));
+                                window.dispatchEvent(new CustomEvent('SELECT_NEW_CONVERSATION', {
+                                    detail: { customer: newGroupCustomer }
                                 }));
                             }
                         }}

@@ -12,8 +12,15 @@ const capitalizeWords = (str) =>
 export const NOTIFICATION_TEMPLATES = {
     // New Message Notification
     NEW_MESSAGE: (data) => {
+        const sender = capitalizeWords(data?.senderName || data?.CustomerName || "New Message");
+        const conversationName = data?.conversationName || data?.ConversationName || '';
+        const isGroup = data?.isGroup === 1 || data?.IsGroup === 1;
+        const title = isGroup && conversationName && conversationName !== sender
+            ? `${capitalizeWords(conversationName)} • ${sender}`
+            : sender;
+
         return {
-            title: `${capitalizeWords(data?.senderName || data?.CustomerName || "New Message")}`,
+            title,
             body: data?.message || data?.Message || "You have a new message.",
             icon: LOGO_ICON,
             badge: LOGO_ICON,
@@ -146,9 +153,30 @@ export const NOTIFICATION_TEMPLATES = {
     // }),
 };
 
+// Deduplicate notifications that fire from multiple handlers for the same event
+const recentNotifications = new Map();
+const NOTIFICATION_DEDUPE_MS = 3000;
+
+const getNotificationKey = (templateId, data) => {
+    const conversationId = data?.conversationId ?? data?.ConversationId ?? '';
+    const messageId = data?.MessageId ?? data?.messageId ?? data?.Id ?? data?.id ?? '';
+    const eventType = data?.eventType ?? '';
+    const memberId = data?.memberId ?? data?.removedMemberId ?? data?.newMemberId ?? '';
+    const changedPermissionName = data?.changedPermission?.name ?? '';
+    return `${templateId}|${conversationId}|${messageId}|${eventType}|${memberId}|${changedPermissionName}`;
+};
+
 export const notify = (data, templateId, user) => {
     const templateFn = NOTIFICATION_TEMPLATES[templateId];
     if (!templateFn) return console.warn(`Notification template "${templateId}" not found`);
+
+    const key = getNotificationKey(templateId, data);
+    const now = Date.now();
+    const lastShown = recentNotifications.get(key);
+    if (lastShown && now - lastShown < NOTIFICATION_DEDUPE_MS) {
+        return;
+    }
+    recentNotifications.set(key, now);
 
     const notificationOptions = templateFn(data, user);
 

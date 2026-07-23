@@ -230,6 +230,8 @@ export const useConversationList = ({
                     senderName: resolvedName,
                     message: messagePreviewText,
                     conversationId: conversationId,
+                    conversationName: existingChat?.name || incoming?.ConversationName,
+                    isGroup: existingChat?.IsGroup ?? incoming?.IsGroup,
                     tag: `msg-${conversationId}`,
                     ...incoming
                 }, "NEW_MESSAGE");

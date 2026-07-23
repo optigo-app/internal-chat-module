@@ -157,7 +157,7 @@ export const useConversation = (selectedCustomer, onConversationRead, onViewConv
   }, [selectedCustomer?.ConversationId, processFiles]);
 
   const { handleSendMessage, handleEditMessage, handleDeleteMessage, handleReply, handleCancelReply } = useMessageActions({
-    auth, selectedCustomer, uiState: { ...uiState, storeMessData: msgState.storeMessData }, dispatchUI, dispatchMsg,
+    auth, selectedCustomer, selectedCustomerRef, uiState: { ...uiState, storeMessData: msgState.storeMessData }, dispatchUI, dispatchMsg,
     fetchAndCacheGroupMembers, onCustomerSelect, tempConversationId: msgState.tempConversationId, uploadAndSendMedia,
   });
 

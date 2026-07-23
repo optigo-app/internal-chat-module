@@ -8,7 +8,7 @@ export const NotificationProvider = ({ children }) => {
     const [enabledOpen, setEnabledOpen] = useState(false);
     const [showGuide, setShowGuide] = useState(false);
     const [permissionStatus, setPermissionStatus] = useState(
-        typeof window !== "undefined" ? Notification.permission : "default"
+        (typeof window !== "undefined" && window.Notification?.permission) || "default"
     );
 
     useEffect(() => {
@@ -31,10 +31,16 @@ export const NotificationProvider = ({ children }) => {
                         setEnabledOpen(true);
                         setShowGuide(false); // Close modal if open
                         showToast("Notifications enabled!", "success");
-                        new Notification("Notifications enabled!", {
-                            body: "You'll receive real-time updates.",
-                            icon: LOGO_ICON
-                        });
+                        try {
+                            if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+                                new Notification("Notifications enabled!", {
+                                    body: "You'll receive real-time updates.",
+                                    icon: LOGO_ICON
+                                });
+                            }
+                        } catch (e) {
+                            console.warn("Browser does not support desktop notifications:", e);
+                        }
                     } else if (permissionStatus.state === 'denied') {
                         setShowGuide(false); // Optionally close modal or keep basic blocked UI
                     }
@@ -69,10 +75,16 @@ export const NotificationProvider = ({ children }) => {
                 setShowGuide(false);
                 showToast("Notifications enabled!", "success");
 
-                new Notification("Notifications enabled!", {
-                    body: "You'll receive real-time updates.",
-                    icon: LOGO_ICON
-                });
+                try {
+                    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+                        new Notification("Notifications enabled!", {
+                            body: "You'll receive real-time updates.",
+                            icon: LOGO_ICON
+                        });
+                    }
+                } catch (e) {
+                    console.warn("Browser does not support desktop notifications:", e);
+                }
             } else if (status === "denied") {
                 // Only show toast if NOT from the modal (because modal already explains it's blocked)
                 if (!fromModal) {

@@ -511,6 +511,12 @@ const MessageArea = forwardRef(({
         }
     }, [processFiles, captureMessageScrollState, isExternalFileDrag]);
 
+    // Reset drag state when replyToMessage changes (prevents stuck overlay after clicking Reply)
+    useEffect(() => {
+        setIsDragging(false);
+        dragCounter.current = 0;
+    }, [replyToMessage]);
+
     const handlePaste = useCallback((e) => {
         if (e.clipboardData?.files?.length > 0) {
             captureMessageScrollState?.();
@@ -557,7 +563,7 @@ const MessageArea = forwardRef(({
             }}
             style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}
         >
-            <DragDropOverlay isDragging={isDragging} />
+            {isDragging && <DragDropOverlay isDragging={isDragging} />}
 
             {/* Smooth loader — fades out once list is ready at exact bottom */}
             <Box sx={{

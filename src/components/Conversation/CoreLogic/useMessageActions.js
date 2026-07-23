@@ -10,8 +10,11 @@ import { getLocalTime } from './messageHelpers';
 import { emitTextMessage } from './socketHelpers';
 import { emitInternalMessageDelete } from '../../../socket';
 
-export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI, dispatchMsg, fetchAndCacheGroupMembers, onCustomerSelect, tempConversationId, uploadAndSendMedia }) {
+export function useMessageActions({ auth, selectedCustomer, selectedCustomerRef, uiState, dispatchUI, dispatchMsg, fetchAndCacheGroupMembers, onCustomerSelect, tempConversationId, uploadAndSendMedia }) {
   const handleSendMessage = useCallback(async (containerRef, scrollToBottom, messageOverride = null) => {
+    // Always read the latest selected customer to avoid emitting to a stale conversation
+    const customer = selectedCustomerRef?.current || selectedCustomer;
+
     const caption = (messageOverride !== null ? messageOverride : uiState.inputValue).trim();
     if (!caption && !uiState.mediaFiles?.length) return;
     const { time, date, dateTime } = getLocalTime();
@@ -40,7 +43,7 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
             previewUrl: URL.createObjectURL(files[0]), Message: caption,
             isUploading: true, percent: 0, Time: time, Date: date, DateTime: dateTime,
             mediaItems: files.map(f => ({ url: URL.createObjectURL(f), filename: f.name, mimeType: f.type, size: f.size })),
-            ConversationId: selectedCustomer?.ConversationId || tempConversationId,
+            ConversationId: customer?.ConversationId || tempConversationId,
           },
         });
         if (typeof scrollToBottom === 'function') scrollToBottom();
@@ -59,7 +62,7 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
       msg: {
         Id: tempId, Message: caption, Time: time, Date: date, DateTime: dateTime,
         Direction: 1, Status: 'pending', MessageType: 'text',
-        ConversationId: selectedCustomer?.ConversationId || tempConversationId,
+        ConversationId: customer?.ConversationId || tempConversationId,
         SenderId: auth?.id,
         ...(replySnapshot && replyToMessageId ? {
           ContextType: 2, ContextId: replyToMessageId,
@@ -76,15 +79,15 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
       const isReply = !!(replySnapshot && replyToMessageId);
       const resp = isReply
         ? await replyToMessageApi(auth, {
-          conversationId: replySnapshot.ConversationId || selectedCustomer?.ConversationId,
+          conversationId: replySnapshot.ConversationId || customer?.ConversationId,
           replyToMessageId: replySnapshot.Id,
           ReplyToAttachmentId: replySnapshot.ReplyToAttachmentId,
           message: caption, messageType: 1,
         })
         : await sendTextMessage(auth, {
           senderId: auth?.id,
-          receiverId: selectedCustomer?.CustomerId || selectedCustomer?.UserId,
-          conversationId: selectedCustomer?.ConversationId ?? null,
+          receiverId: customer?.CustomerId || customer?.UserId,
+          conversationId: customer?.ConversationId ?? null,
           message: caption,
         });
 
@@ -100,32 +103,37 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
       }
 
       const sentId = resp?.Data?.rd?.[0]?.MessageId;
-      const convId = resp?.Data?.rd?.[0]?.ConversationId || selectedCustomer?.ConversationId;
+      const convId = resp?.Data?.rd?.[0]?.ConversationId || customer?.ConversationId;
       const isNewConv = resp?.Data?.rd?.[0]?.IsNewConversation === true;
 
       if (sentId) {
-        const isGroup = selectedCustomer?.IsGroup === 1;
-        let receiverIds = selectedCustomer?.ReceiverId || selectedCustomer?.UserId || selectedCustomer?.SenderId;
+        const isGroup = customer?.IsGroup === 1;
+        let receiverIds = customer?.ReceiverId || customer?.UserId || customer?.SenderId;
         if (isGroup) {
           try {
-            const groupData = await fetchAndCacheGroupMembers(selectedCustomer.ConversationId);
+            const groupData = await fetchAndCacheGroupMembers(customer.ConversationId);
             const memberIds = (groupData?.members || []).map(m => Number(m.UserId || m.userId || m.id)).filter(Boolean);
             if (memberIds.length > 0) receiverIds = memberIds;
           } catch { /* fallback to single ReceiverId */ }
         }
 
         // Build reply context fields so receiver can render the reply preview
+        // Use the actual original-sender name instead of the local "You" placeholder
+        const replyOriginalSenderName = replySnapshot?.sender === 'You'
+          ? (auth?.username || auth?.userId || 'You')
+          : (replySnapshot?.sender || customer?.name || 'Customer');
+
         const replyExtra = (isReply && replySnapshot) ? {
           ContextType: 2,
           ContextId: replySnapshot.Id,
           ReplyContextMsg: replySnapshot.text || 'Media',
-          SenderInfo: replySnapshot.sender || '',
-          Sender: replySnapshot.sender || '',
+          SenderInfo: replyOriginalSenderName,
+          Sender: replyOriginalSenderName,
           ReplyToAttachmentId: replySnapshot.ReplyToAttachmentId || null,
         } : {};
 
         emitTextMessage({
-          auth, selectedCustomer, messageId: sentId, message: caption, isEdited: 0, receiverIds,
+          auth, selectedCustomer: customer, messageId: sentId, message: caption, isEdited: 0, receiverIds,
           extra: {
             Id: auth.SocketId, Status: 1, MessageStatus: 1, MessageType: 'text',
             Time: time, Date: date, DateTime: dateTime,
@@ -141,8 +149,10 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
       }
 
       if (isNewConv && convId && onCustomerSelect) {
-        onCustomerSelect({ ...selectedCustomer, ConversationId: convId });
-        window.dispatchEvent(new CustomEvent('UPDATE_CONVERSATION_ITEM', { detail: { ...selectedCustomer, ConversationId: convId, Message: caption, DateTime: dateTime } }));
+        onCustomerSelect({ ...customer, ConversationId: convId });
+        window.dispatchEvent(new CustomEvent('UPDATE_CONVERSATION_ITEM', {
+          detail: { ...customer, ConversationId: convId, Message: caption, DateTime: dateTime, SenderId: auth?.id }
+        }));
       }
     } catch (err) {
       console.error('sendTextMessage error:', err);
@@ -151,7 +161,7 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
     }
 
     if (typeof scrollToBottom === 'function') scrollToBottom();
-  }, [auth, selectedCustomer, uiState.inputValue, uiState.replyToMessage, uiState.storeMessData, uiState.mediaFiles, tempConversationId, onCustomerSelect, uploadAndSendMedia, fetchAndCacheGroupMembers]);
+  }, [auth, selectedCustomerRef, selectedCustomer, uiState.inputValue, uiState.replyToMessage, uiState.storeMessData, uiState.mediaFiles, tempConversationId, onCustomerSelect, uploadAndSendMedia, fetchAndCacheGroupMembers]);
 
   const handleEditMessage = useCallback(async (messageId, newMessage) => {
     if (!messageId || !newMessage?.trim()) return;
@@ -172,19 +182,21 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
 
   const handleDeleteMessage = useCallback(async (messageId, mode) => {
     if (!messageId) return;
+    // Read the latest selected conversation so deletions go to the right chat
+    const customer = selectedCustomerRef?.current || selectedCustomer;
     try {
-      const response = await deleteMessageApi(auth, messageId, mode, selectedCustomer?.ConversationId);
+      const response = await deleteMessageApi(auth, messageId, mode, customer?.ConversationId);
       const deletedInfo = response?.Data?.rd?.[0] || response?.rd?.[0];
       if (deletedInfo?.stat != 0) {
         if (Number(mode) === 2) {
           dispatchMsg({ type: MSG.DELETE_ALL, messageId, deletedInfo });
-          const isGroup = selectedCustomer?.IsGroup === 1;
-          const groupData = isGroup ? await fetchAndCacheGroupMembers(selectedCustomer.ConversationId) : null;
+          const isGroup = customer?.IsGroup === 1;
+          const groupData = isGroup ? await fetchAndCacheGroupMembers(customer.ConversationId) : null;
           const memberIds = (groupData?.members || []).map(m => Number(m.UserId || m.userId || m.id)).filter(Boolean);
           emitInternalMessageDelete({
             ufcc: auth?.ufcc, UserId: auth?.id, SenderId: auth?.id,
-            ReceiverId: isGroup ? (memberIds.length ? memberIds : [selectedCustomer?.ReceiverId]) : selectedCustomer?.ReceiverId,
-            ConversationId: selectedCustomer?.ConversationId, MessageId: messageId,
+            ReceiverId: isGroup ? (memberIds.length ? memberIds : [customer?.ReceiverId]) : customer?.ReceiverId,
+            ConversationId: customer?.ConversationId, MessageId: messageId,
             Message: deletedInfo.Message || 'This message was deleted.',
             Message1: deletedInfo.Message1 || 'You deleted this message.',
             IsDeletedForEveryone: 1,
@@ -201,7 +213,7 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
       console.error('handleDeleteMessage error:', err);
       toast.error('Error deleting message');
     }
-  }, [auth, selectedCustomer, fetchAndCacheGroupMembers]);
+  }, [auth, selectedCustomerRef, selectedCustomer, fetchAndCacheGroupMembers]);
 
   const handleReply = useCallback(async (message, attachmentId = null) => {
     dispatchMsg({ type: MSG.SET_STORE_MESS, value: { messageId: message?.MessageId } });
@@ -218,16 +230,26 @@ export function useMessageActions({ auth, selectedCustomer, uiState, dispatchUI,
       finalAttachmentId = message.mediaItems.map(i => i.attachmentId || i.Id).filter(Boolean).join(',');
     }
 
+    // Prefer the actual message author over the conversation/group name
+    const currentCustomer = selectedCustomerRef?.current || selectedCustomer;
+    const originalSenderName = (() => {
+      if (message?.Direction === 1) return 'You';
+      if (message?.FirstName || message?.LastName) {
+        return `${message.FirstName || ''} ${message.LastName || ''}`.trim();
+      }
+      return message?.SenderInfo || message?.SenderName || message?.Sender || currentCustomer?.name || 'Customer';
+    })();
+
     dispatchUI({
       type: UI.SET_REPLY,
       value: {
         Id: message?.Id,
-        sender: message?.Direction === 1 ? 'You' : selectedCustomer?.name || 'Customer',
+        sender: originalSenderName,
         text: replyText, MessageType: message?.MessageType,
         ReplyToAttachmentId: finalAttachmentId || null,
       },
     });
-  }, [selectedCustomer?.name]);
+  }, [selectedCustomerRef, selectedCustomer]);
 
   const handleCancelReply = useCallback(() => {
     dispatchUI({ type: UI.SET_REPLY, value: null });

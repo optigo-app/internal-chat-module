@@ -17,6 +17,7 @@ const Customers = ({ selectedStatus, selectedTag }) => {
     const { auth } = useContext(LoginContext);
 
     useEffect(() => {
+        let cancelled = false;
         const resolveConversationId = async () => {
             // Only resolve if we have a selected customer/member but no ConversationId
             if (selectedCustomer && !selectedCustomer.ConversationId && selectedCustomer.IsGroup !== 1) {
@@ -24,6 +25,7 @@ const Customers = ({ selectedStatus, selectedTag }) => {
                 if (receiverId && auth?.token) {
                     try {
                         const response = await contactInfoApi(auth, { contactUserId: receiverId });
+                        if (cancelled) return;
                         if (response?.Status === "200") {
                             const data = response?.Data?.rd?.[0] || response?.Data;
                             if (data?.ConversationId) {
@@ -47,15 +49,38 @@ const Customers = ({ selectedStatus, selectedTag }) => {
             }
         };
         resolveConversationId();
+        return () => { cancelled = true; };
     }, [selectedCustomer?.UserId, selectedCustomer?.ReceiverId, selectedCustomer?.id, selectedCustomer?.SenderId, auth?.token]);
 
     const handleCustomerSelect = useCallback((customer) => {
+        if (!customer) {
+            setSelectedCustomer(null);
+            setIsConversationRead(false);
+            return;
+        }
+
         const list = converListRef.current || [];
+        const isGroup = customer?.IsGroup === 1;
+        const targetConvId = Number(customer?.ConversationId);
+        const targetUserId = Number(customer?.ReceiverId || customer?.CustomerId || customer?.UserId || customer?.id || customer?.SenderId);
+
         const existing = list?.find(c => {
-            const cId = Number(c?.ReceiverId || c?.CustomerId || c?.UserId);
-            const targetId = Number(customer?.ReceiverId || customer?.CustomerId || customer?.UserId);
-            return cId === targetId;
+            const cIsGroup = c?.IsGroup === 1;
+            // Never mix group and individual conversations when matching
+            if (isGroup !== cIsGroup) return false;
+
+            // For groups, match only by conversation id
+            if (isGroup && targetConvId && Number(c?.ConversationId) === targetConvId) return true;
+
+            // For individuals, prefer conversation id match, then user id match
+            if (!isGroup && targetConvId && Number(c?.ConversationId) === targetConvId) return true;
+            if (!isGroup && targetUserId) {
+                const cUserId = Number(c?.ReceiverId || c?.CustomerId || c?.UserId || c?.id || c?.SenderId);
+                return cUserId === targetUserId;
+            }
+            return false;
         });
+
         if (existing) {
             setSelectedCustomer(existing);
         } else {

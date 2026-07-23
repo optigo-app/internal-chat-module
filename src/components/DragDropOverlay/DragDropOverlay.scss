@@ -10,19 +10,19 @@
     align-items: center;
     justify-content: center;
     pointer-events: none;
-    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     opacity: 0;
     transform: translateY(100%);
     visibility: hidden;
     border: 2px dashed #7367f0; // Project Primary
     margin: 16px;
     border-radius: 16px;
-    backdrop-filter: blur(8px);
 
     &.visible {
         opacity: 1;
         transform: translateY(0);
         visibility: visible;
+        backdrop-filter: blur(8px);
     }
 
     .overlay-content {
