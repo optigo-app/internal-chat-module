@@ -1,4 +1,5 @@
 import { io } from 'socket.io-client';
+import { getAppVersion } from './utils/versionManager';
 
 const isLocal = ["localhost", "nzen", 'tecochat.web', 'web', '5svsmvp4-4000.inc1.devtunnels.ms'].includes(window.location.hostname);
 
@@ -22,8 +23,20 @@ let groupEventHandlers = new Set();
 let groupMemberHandlers = new Set();
 let groupPermissionHandlers = new Set();
 let internalMessageDeletionHandlers = new Set();
+let appVersionUpdateHandlers = new Set();
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
+
+const dispatchAppVersionUpdate = (data) => {
+    console.log('received internal:app_version_update', data);
+    appVersionUpdateHandlers.forEach(handler => {
+        try {
+            handler(data);
+        } catch (error) {
+            console.error('❌ Error in app version update handler:', error);
+        }
+    });
+};
 
 // Restore connection state if available
 const restoreConnection = () => {
@@ -153,6 +166,8 @@ export function initializeSocket(token) {
         });
     });
 
+    socketInstance.on('internal:app_version_update', dispatchAppVersionUpdate);
+
     // Group event handlers
     const dispatchGroupEvent = (data) => {
         groupEventHandlers.forEach((handler) => {
@@ -265,6 +280,13 @@ export const addInternalMessageDeletionHandler = (handler) => {
     return () => {
         internalMessageDeletionHandlers.delete(handler);
     };
+};
+
+export const addAppVersionUpdateHandler = (handler) => {
+    if (typeof handler === 'function') {
+        appVersionUpdateHandlers.add(handler);
+        return () => appVersionUpdateHandlers.delete(handler);
+    }
 };
 
 export const addGroupEventHandler = (handler) => {
@@ -417,6 +439,21 @@ export const emitInternalMessageDelete = (payload) => {
     return true;
 };
 
+export const emitAppVersionUpdate = (payload = {}) => {
+    if (!socketInstance) return false;
+
+    const versionData = {
+        version: getAppVersion(),
+        receiveEvent: 'internal:app_version_update',
+        ...payload,
+    };
+    console.log("versionData--->>>>",versionData)
+
+    socketInstance.emit('internal:app_version_update', versionData);
+    dispatchAppVersionUpdate(versionData);
+    return true;
+};
+
 export const emitGroupInfoRequest = (payload) => {
     if (!socketInstance) return false;
     socketInstance.emit('internal:group_info_request', {
@@ -437,6 +474,7 @@ export const disconnectSocket = (permanent = false) => {
         internalStatusHandlers.clear();
         internalTypingHandlers.clear();
         internalMessageDeletionHandlers.clear();
+        appVersionUpdateHandlers.clear();
         groupEventHandlers.clear();
         groupMemberHandlers.clear();
         groupPermissionHandlers.clear();

@@ -19,7 +19,7 @@ import {
   Download,                                                                               
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { handleDownloadFile, isMessageEditable } from "../../utils/globalFunc";
+import { handleDownloadFile, isMessageEditable, normalizeMessageText } from "../../utils/globalFunc";
 
 const MessageContextMenu = ({
   open,

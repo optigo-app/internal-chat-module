@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { VariableSizeList as List } from 'react-window';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import TypingIndicator from '../chat/messages/TypingIndicator';
@@ -34,7 +34,7 @@ const VirtualRow = React.memo(({ data, index, style }) => {
         getMediaKey, getMediaSrcForMessage, loadedMedia, markLoaded,
         handleMediaClick, getMessageStatusIcon, handleRemoveReaction,
         messageById, handleForward, setDrawerViewState, setDrawerOpen,
-        formatDateHeader, typingStatus,
+        formatDateHeader, typingStatus, expandedMessageIds, toggleMessageExpand,
     } = data;
 
     const rowRef = useRef(null);
@@ -104,6 +104,8 @@ const VirtualRow = React.memo(({ data, index, style }) => {
                     getMessageStatusIcon={getMessageStatusIcon} handleRemoveReaction={handleRemoveReaction}
                     messageById={messageById} handleForward={handleForward}
                     setDrawerViewState={setDrawerViewState} setDrawerOpen={setDrawerOpen}
+                    isExpanded={expandedMessageIds.has(msg?.Id)}
+                    onToggleExpand={() => toggleMessageExpand?.(msg?.Id)}
                 />
             </div>
         </div>
@@ -132,6 +134,17 @@ const MessageArea = forwardRef(({
     // Hidden until we've scrolled to exact bottom — then fades in smoothly
     const [listVisible, setListVisible] = useState(false);
     const [showScrollBtn, setShowScrollBtn] = useState(false);
+    const [expandedMessageIds, setExpandedMessageIds] = useState(new Set());
+
+    const toggleMessageExpand = useCallback((id) => {
+        if (!id) return;
+        setExpandedMessageIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
 
     const dragCounter = useRef(0);
     const listRef = useRef(null);
@@ -145,6 +158,12 @@ const MessageArea = forwardRef(({
     // Track minimum index for batched resetAfterIndex
     const minResetIndexRef = useRef(null);
     const resetFrameRef = useRef(null);
+
+    // Track loading-older so we don't auto-scroll to bottom when older messages are prepended
+    const loadingOlderRef = useRef(false);
+    const wasLoadingOlderRef = useRef(false);
+    const prevLoadingOlderRef = useRef(false);
+    const anchorForOlderLoadRef = useRef(null);
 
     // Track distance-from-bottom via scroll event so it's always accurate
     // even when react-window's virtual scrollHeight changes mid-render
@@ -160,6 +179,54 @@ const MessageArea = forwardRef(({
 
     const isMediaPreviewOpen = (mediaFiles?.length || 0) > 0;
     const scrollToBottomBotOffset = replyToMessage ? 170 : 110;
+
+    // Keep loading-older ref in sync without recreating callbacks
+    useEffect(() => {
+        loadingOlderRef.current = loadingOlder;
+    }, [loadingOlder]);
+
+    // Viewport anchor when loading older messages: preserve the exact scroll position
+    // of the first visible message before prepend, then restore it after the new rows
+    // are rendered so the user perceives no movement.
+    useLayoutEffect(() => {
+        const outer = outerRef.current;
+        if (!outer) {
+            prevLoadingOlderRef.current = loadingOlder;
+            return;
+        }
+
+        if (!prevLoadingOlderRef.current && loadingOlder) {
+            const containerRect = outer.getBoundingClientRect();
+            const nodes = outer.querySelectorAll('[data-message-id]');
+            let bestNode = null;
+            let bestTop = Infinity;
+            nodes.forEach(node => {
+                const rect = node.getBoundingClientRect();
+                const top = rect.top - containerRect.top;
+                if (top >= -20 && top < bestTop) {
+                    bestTop = top;
+                    bestNode = node;
+                }
+            });
+            if (bestNode) {
+                anchorForOlderLoadRef.current = {
+                    id: bestNode.getAttribute('data-message-id'),
+                    relativeTop: bestTop,
+                };
+            }
+        } else if (prevLoadingOlderRef.current && !loadingOlder && anchorForOlderLoadRef.current) {
+            const anchor = anchorForOlderLoadRef.current;
+            const el = outer.querySelector(`[data-message-id="${anchor.id}"]`);
+            if (el) {
+                const containerRect = outer.getBoundingClientRect();
+                const currentTop = el.getBoundingClientRect().top - containerRect.top;
+                outer.scrollTop += (currentTop - anchor.relativeTop);
+            }
+            anchorForOlderLoadRef.current = null;
+        }
+
+        prevLoadingOlderRef.current = loadingOlder;
+    }, [loadingOlder]);
 
     // ── Rows ──────────────────────────────────────────────────────────────
     const rows = useMemo(() => {
@@ -247,8 +314,23 @@ const MessageArea = forwardRef(({
             const m = row.msg;
             if (m?.IsDeletedForEveryone === 1) return 46; // System message estimate
 
+            const isExpanded = expandedMessageIds.has(m?.Id);
+
             const mt = m?.MessageType;
-            if (mt === 'image' || mt === 'video') return 340; // Increased to accommodate sender name/status
+            if (mt === 'image' || mt === 'video') {
+                const mdw = m?.mediaWidth;
+                const mdh = m?.mediaHeight;
+                const captionLen = (m?.Message || '').length;
+                const captionExtra = isExpanded
+                    ? Math.min(600, Math.max(260, Math.ceil(captionLen / 20) * 22 + 40))
+                    : 0;
+                if (mdw && mdh) {
+                    const mediaWidth = 250;
+                    const mediaHeight = Math.max(100, Math.min(250, Math.round(mediaWidth * (mdh / mdw))));
+                    return mediaHeight + 40 + captionExtra;
+                }
+                return 340 + captionExtra; // Increased to accommodate sender name/status
+            }
             if (mt === 'document' || mt === 'audio') {
                 const mediaItems = Array.isArray(m?.mediaItems) ? m.mediaItems : [];
                 const itemCount = Math.max(1, mediaItems.length);
@@ -263,11 +345,14 @@ const MessageArea = forwardRef(({
             // Responsive chars-per-line: narrower bubbles on mobile wrap sooner
             const bubbleWidth = Math.max(280, listWidth - 44);
             const charsPerLine = Math.max(20, Math.floor(bubbleWidth / 12));
-            if (msgLen > charsPerLine) return base + Math.min(250, Math.floor(msgLen / charsPerLine) * 22);
-            return base;
+            const fullTextExtra = isExpanded
+                ? Math.min(600, Math.max(0, Math.ceil(msgLen / charsPerLine) - 5) * 22 + 40)
+                : 0;
+            if (msgLen > charsPerLine) return base + Math.min(250, Math.floor(msgLen / charsPerLine) * 22) + fullTextExtra;
+            return base + fullTextExtra;
         }
         return 80;
-    }, [rows, selectedCustomer?.IsGroup, listWidth]);
+    }, [rows, selectedCustomer?.IsGroup, listWidth, expandedMessageIds]);
 
     const setSize = useCallback((stableKey, index, size) => {
         const prevSize = stableKeyToHeight.current[stableKey];
@@ -291,8 +376,9 @@ const MessageArea = forwardRef(({
             });
         }
 
-        // Sticky bottom: if user was already at the bottom, stay there.
-        if (distanceFromBottomRef.current < 40) {
+        // Sticky bottom: if user was already near the bottom, stay there —
+        // but don't jump to bottom when older messages are being prepended.
+        if (!loadingOlderRef.current && distanceFromBottomRef.current <= 100) {
             requestAnimationFrame(() => {
                 listRef.current?.scrollToItem(rows.length - 1, 'end');
                 const o = outerRef.current;
@@ -305,9 +391,10 @@ const MessageArea = forwardRef(({
     const prevConvIdRef = useRef(null);
     const didInitialScroll = useRef(false);
     const convLoadTimerRef = useRef(null);
-    const scrollSettleRef = useRef(null);
 
-    useEffect(() => {
+    // Reset scroll state before paint when conversation changes; keep list hidden
+    // until the initial bottom scroll is applied so the user never sees the top.
+    useLayoutEffect(() => {
         const id = selectedCustomer?.ConversationId;
         if (id === prevConvIdRef.current) return;
         prevConvIdRef.current = id;
@@ -317,6 +404,7 @@ const MessageArea = forwardRef(({
         distanceFromBottomRef.current = 0;
         setShowScrollBtn(false);
         setListVisible(false);
+        setExpandedMessageIds(new Set());
         clearTimeout(convLoadTimerRef.current);
         // Absolute safety net — never stuck forever
         convLoadTimerRef.current = setTimeout(() => setListVisible(true), 5000);
@@ -324,47 +412,42 @@ const MessageArea = forwardRef(({
 
     useEffect(() => () => {
         clearTimeout(convLoadTimerRef.current);
-        clearTimeout(scrollSettleRef.current);
         if (resetFrameRef.current) cancelAnimationFrame(resetFrameRef.current);
     }, []);
 
     // ── Initial scroll-to-bottom then reveal ─────────────────────────────
-    // Phase 1 (immediate): scrollToItem so react-window renders bottom rows.
-    // Phase 2 (after 150ms): heights are measured by ResizeObserver → force
-    //   scrollTop = scrollHeight for pixel-perfect bottom → fade list in.
-    useEffect(() => {
+    // Runs synchronously after the message rows are rendered so the chat is
+    // already at the latest message before the browser paints.
+    useLayoutEffect(() => {
+        if (didInitialScroll.current) return;
+
         if (!rows || rows.length <= 2) {
-            // Empty conversation — just reveal
-            didInitialScroll.current = false;
+            // Empty conversation — nothing to scroll, reveal immediately
             clearTimeout(convLoadTimerRef.current);
             convLoadTimerRef.current = setTimeout(() => setListVisible(true), 200);
             return;
         }
-        if (didInitialScroll.current) return;
-        didInitialScroll.current = true;
 
-        clearTimeout(convLoadTimerRef.current);
-        clearTimeout(scrollSettleRef.current);
-
-        // Phase 1 — jump react-window to last item right away
+        // Tell react-window to target the last item, then force the DOM to the
+        // true bottom before the first paint.
         listRef.current?.resetAfterIndex(0, false);
         listRef.current?.scrollToItem(rows.length - 1, 'end');
 
-        // Phase 2 — wait for ResizeObserver measurements to settle, then pin to true bottom
-        scrollSettleRef.current = setTimeout(() => {
-            listRef.current?.resetAfterIndex(0, false);
-            listRef.current?.scrollToItem(rows.length - 1, 'end');
-            requestAnimationFrame(() => {
-                const outer = outerRef.current;
-                if (outer) outer.scrollTop = outer.scrollHeight;
-                distanceFromBottomRef.current = 0;
-                // Extra frame to catch any late-measuring rows (images etc.)
-                requestAnimationFrame(() => {
-                    if (outer) outer.scrollTop = outer.scrollHeight;
-                    setListVisible(true);
-                });
-            });
-        }, 250);
+        const outer = outerRef.current;
+        if (outer) {
+            outer.scrollTop = outer.scrollHeight;
+        }
+
+        distanceFromBottomRef.current = 0;
+        didInitialScroll.current = true;
+        clearTimeout(convLoadTimerRef.current);
+        setListVisible(true);
+
+        // One extra frame to catch late row-height measurements (images etc.)
+        requestAnimationFrame(() => {
+            const o = outerRef.current;
+            if (o) o.scrollTop = o.scrollHeight;
+        });
     }, [rows.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── Auto-scroll on new incoming/outgoing message ──────────────────────
@@ -375,12 +458,24 @@ const MessageArea = forwardRef(({
         [rows]
     );
 
-    useEffect(() => {
+    useLayoutEffect(() => {
+        // If older messages are loading, mark and skip auto-scroll.
+        if (loadingOlder) {
+            wasLoadingOlderRef.current = true;
+            return;
+        }
+
         const prev = prevMsgCountRef.current;
         const curr = msgRowCount;
         prevMsgCountRef.current = curr;
 
         if (!didInitialScroll.current || curr <= prev || curr === 0) return;
+
+        // If the count increased because we just finished loading older messages, don't jump to bottom.
+        if (wasLoadingOlderRef.current) {
+            wasLoadingOlderRef.current = false;
+            return;
+        }
 
         const outer = outerRef.current;
         if (!outer) return;
@@ -389,23 +484,19 @@ const MessageArea = forwardRef(({
         const lastMsgRow = [...rows].reverse().find(r => r.type === 'message');
         const isOutgoing = lastMsgRow?.msg?.Direction === 1;
 
-        // Calculate distance from bottom; be more forgiving when pinned
-        const isNearBottom = distanceFromBottomRef.current < 250;
+        // WhatsApp-style near-bottom threshold: auto-scroll only if within ~100px of bottom
+        const isNearBottom = distanceFromBottomRef.current <= 100;
 
         if (isOutgoing || isNearBottom) {
-            // Use smooth behavior for new messages to feel "premium"
-            requestAnimationFrame(() => {
-                const o = outerRef.current;
-                if (o) {
-                    o.scrollTo({
-                        top: o.scrollHeight,
-                        behavior: 'smooth'
-                    });
-                }
-            });
+            // Instant positioning before paint — no smooth scrolling for automatic operations
+            const o = outerRef.current;
+            if (o) {
+                listRef.current?.scrollToItem(rows.length - 1, 'end');
+                o.scrollTop = o.scrollHeight;
+            }
             setShowScrollBtn(false);
         }
-    }, [msgRowCount, rows]);
+    }, [msgRowCount, rows, loadingOlder]);
 
     // ── Expose scroll container ───────────────────────────────────────────
     useEffect(() => {
@@ -533,7 +624,7 @@ const MessageArea = forwardRef(({
         getMediaKey, getMediaSrcForMessage, loadedMedia, markLoaded,
         handleMediaClick, getMessageStatusIcon, handleRemoveReaction,
         messageById, handleForward, setDrawerViewState, setDrawerOpen,
-        formatDateHeader, typingStatus,
+        formatDateHeader, typingStatus, expandedMessageIds, toggleMessageExpand,
     }), [
         rows, setSize, auth, handlePaste, selectedCustomer, blinkMessageId,
         hoveredMessageId, reactionMenuMessageId, reactionMenuAnchorEl,
@@ -542,7 +633,7 @@ const MessageArea = forwardRef(({
         getMediaKey, getMediaSrcForMessage, loadedMedia, markLoaded,
         handleMediaClick, getMessageStatusIcon, handleRemoveReaction,
         messageById, handleForward, setDrawerViewState, setDrawerOpen,
-        formatDateHeader, typingStatus,
+        formatDateHeader, typingStatus, expandedMessageIds, toggleMessageExpand,
     ]);
 
     const isEmpty = !groupMessagesByDate || Object.keys(groupMessagesByDate).length === 0;

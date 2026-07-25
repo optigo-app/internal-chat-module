@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Box, Skeleton, alpha } from "@mui/material";
 import VideoMessage from "./VideoMessage";
 import DocumentMessage from "./DocumentMessage";
@@ -175,6 +175,24 @@ const MediaMessage = ({
     const mediaKey = getMediaKey(msg, 0);
     const rawSrc = getMediaSrcForMessage(msg);
 
+    const parseDim = (val) => {
+        const n = Number(val);
+        return Number.isFinite(n) && n > 0 ? n : null;
+    };
+
+    const initialDims = useMemo(() => {
+        const w = parseDim(msg?.mediaWidth);
+        const h = parseDim(msg?.mediaHeight);
+        if (w && h) return { w, h };
+
+        const first = Array.isArray(msg?.mediaItems) ? msg.mediaItems[0] : null;
+        const fw = parseDim(first?.width);
+        const fh = parseDim(first?.height);
+        if (fw && fh) return { w: fw, h: fh };
+
+        return null;
+    }, [msg?.mediaWidth, msg?.mediaHeight, msg?.mediaItems]);
+
     if (msg.MessageType === "image") {
         const mediaItems = Array.isArray(msg?.mediaItems) ? msg.mediaItems : [];
         const hasGrid = mediaItems.length > 1;
@@ -182,7 +200,7 @@ const MediaMessage = ({
         const gridHeight = mediaItems.length <= 2 ? 160 : 250;
 
         const cachedDims = rawSrc ? imageDimsCache.get(rawSrc) : null;
-        const dimsForCalc = imageDims || cachedDims;
+        const dimsForCalc = initialDims || imageDims || cachedDims;
         const mediaWidth = 250;
         const computedHeight = dimsForCalc?.w && dimsForCalc?.h
             ? Math.max(100, Math.min(250, Math.round(mediaWidth * (dimsForCalc.h / dimsForCalc.w))))

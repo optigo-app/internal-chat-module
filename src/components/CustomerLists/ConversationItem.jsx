@@ -3,7 +3,7 @@ import { Typography, Badge, IconButton, Tooltip } from '@mui/material';
 import { CheckCheck, Image, Video, FileText, Pin, Star, ChevronDown } from 'lucide-react';
 import ConversationAvatar from '../ReusableComponent/ConversationAvatar';
 import { renderEmojiText } from '../../utils/EmojiRenderer';
-import { highlightText } from '../../utils/globalFunc';
+import { highlightText, normalizeMessageText } from '../../utils/globalFunc';
 import { queueDroppedFiles } from '../../utils/dropFileQueue';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -184,7 +184,7 @@ const ConversationItem = React.memo(({
                                                 h6: ({node, children, ...props}) => <strong {...props}>{withEmoji16(children)} </strong>,
                                             }}
                                         >
-                                            {(member.LastMessage || 'Text').replace(/\\n|\n|\r/g, ' ')}
+                                            {normalizeMessageText(member.LastMessage || 'Text').replace(/\n|\r/g, ' ')}
                                         </ReactMarkdown>
                                     )}
 

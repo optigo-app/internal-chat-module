@@ -1,6 +1,6 @@
 {
   "name": "whatsapp-chat-module",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "private": true,
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -51,7 +51,8 @@
   },
   "scripts": {
     "start": "npx fix-react2shell-next && cross-env PORT=4000 react-scripts start",
-    "build": "npx fix-react2shell-next && react-scripts build",
+    "prebuild": "node scripts/generate-version.js",
+    "build": "node scripts/generate-version.js && npx fix-react2shell-next && react-scripts build",
     "test": "npx fix-react2shell-next && react-scripts test",
     "eject": "npx fix-react2shell-next && react-scripts eject"
   },

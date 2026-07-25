@@ -173,70 +173,16 @@ const ChatBox = ({
         }
     }, [inputValue]);
 
-    // Capture-phase paste interceptor to catch large text before Lexical processes it
-    useEffect(() => {
-        if (!editorWrapperEl) return;
-        const handler = (e) => {
-            const text = e.clipboardData?.getData('text') || '';
-            if (text.length > MAX_CHARS) {
-                e.preventDefault();
-                e.stopPropagation();
-                setPendingPastedText(text);
-                setPendingFileName(`pasted-content-${Date.now()}.txt`);
-                setShowFileConfirm(true);
-            }
-        };
-        editorWrapperEl.addEventListener('paste', handler, true);
-        return () => editorWrapperEl.removeEventListener('paste', handler, true);
-    }, [editorWrapperEl]);
+    const handlePasteTextOverflow = useCallback((text) => {
+        setPendingPastedText(text);
+        setPendingFileName(`pasted-content-${Date.now()}.txt`);
+        setShowFileConfirm(true);
+    }, []);
 
-    const handlePaste = useCallback((e) => {
-        // Handle files pasting
-        if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
-            const files = Array.from(e.clipboardData.files);
-            if (captureMessageScrollState) captureMessageScrollState();
-            if (processFiles) processFiles(files);
-            // We don't preventDefault here to allow text that might be pasted alongside files
-        }
-
-        // Handle text pasting
-        const pastedText = e.clipboardData.getData('text');
-        if (pastedText) {
-            // Check if pasted text exceeds max character limit
-            if (pastedText.length > MAX_CHARS) {
-                e.preventDefault();
-                e.nativeEvent.stopImmediatePropagation();
-                setPendingPastedText(pastedText);
-                setPendingFileName(`pasted-content-${Date.now()}.txt`);
-                setShowFileConfirm(true);
-                return;
-            }
-
-            // Handle text pasting with trimming (including newlines)
-            if (pastedText !== pastedText.trim()) {
-                e.preventDefault();
-                const trimmedText = pastedText.trim();
-
-                const input = e.target;
-                const start = input.selectionStart || 0;
-                const end = input.selectionEnd || 0;
-                const textBefore = tempQuery.substring(0, start);
-                const textAfter = tempQuery.substring(end);
-
-                const newValue = textBefore + trimmedText + textAfter;
-                setTempQuery(newValue);
-                setInputValue(newValue);
-                if (updateLatestInput) updateLatestInput(newValue);
-
-                // Set cursor position after the pasted trimmed text
-                setTimeout(() => {
-                    if (input) {
-                        input.selectionStart = input.selectionEnd = start + trimmedText.length;
-                    }
-                }, 0);
-            }
-        }
-    }, [processFiles, captureMessageScrollState, tempQuery, setInputValue, updateLatestInput]);
+    const handlePasteFiles = useCallback((files) => {
+        if (captureMessageScrollState) captureMessageScrollState();
+        if (processFiles) processFiles(files);
+    }, [captureMessageScrollState, processFiles]);
 
     const handleConfirmFileConversion = useCallback(() => {
         if (!pendingPastedText) return;
@@ -244,9 +190,12 @@ const ChatBox = ({
         const safeFileName = pendingFileName?.trim() || `pasted-content-${Date.now()}.txt`;
         const fileNameWithExt = safeFileName.endsWith('.txt') ? safeFileName : `${safeFileName}.txt`;
 
+        // Trim leading/trailing (top/bottom) whitespace while preserving inner spaces
+        const fileContent = pendingPastedText.trim();
+
         // Create a TXT file with the pasted content
         const file = new File(
-            [pendingPastedText],
+            [fileContent],
             fileNameWithExt,
             { type: "text/plain" }
         );
@@ -258,7 +207,7 @@ const ChatBox = ({
         }
 
         // Show notification to user
-        toast.success(`Text converted to file (${pendingPastedText.length} characters exceeded ${MAX_CHARS} limit)`);
+        toast.success(`Text converted to file (${fileContent.length} characters exceeded ${MAX_CHARS} limit)`);
 
         // Clear any leaked text from editor
         setTempQuery('');
@@ -453,8 +402,11 @@ const ChatBox = ({
                             syncKey={selectedCustomer?.ConversationId}
                             hasDraft={Boolean(tempQuery?.trim())}
                             onChange={onLexicalChange}
-                            onPaste={handlePaste}
                             onKeyDown={handleInputKeyDown}
+                            maxChars={MAX_CHARS}
+                            onPasteTextOverflow={handlePasteTextOverflow}
+                            onPasteFiles={handlePasteFiles}
+                            captureMessageScrollState={captureMessageScrollState}
                             placeholder={
                                 mediaFiles?.length > 0
                                     ? 'Type a caption...'

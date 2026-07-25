@@ -72,10 +72,6 @@ export function useMessageLoader({ selectedCustomer, auth, pageSize, msgState, d
     const nextPage = msgState.currentPage + 1;
     dispatchMsg({ type: MSG.SET_LOADING_OLDER, value: true });
 
-    const container = containerRef?.current;
-    const prevScrollHeight = container?.scrollHeight || 0;
-    const prevScrollTop = container?.scrollTop || 0;
-
     const selectedId = selectedCustomer.ConversationId;
     try {
       const response = await conversationView(
@@ -105,12 +101,6 @@ export function useMessageLoader({ selectedCustomer, auth, pageSize, msgState, d
       dispatchMsg({ type: MSG.LOAD, data: sorted, total: response.total });
       dispatchMsg({ type: MSG.SET_HAS_MORE, value: serverMessages.length === pageSize });
       dispatchMsg({ type: MSG.SET_PAGE, value: nextPage });
-
-      requestAnimationFrame(() => {
-        if (container && prevScrollHeight > 0) {
-          container.scrollTop = prevScrollTop + (container.scrollHeight - prevScrollHeight);
-        }
-      });
     } catch (err) {
       if (err.name !== 'AbortError') console.error('loadOlderMessages error:', err);
     } finally {

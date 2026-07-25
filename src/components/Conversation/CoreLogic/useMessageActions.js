@@ -31,18 +31,26 @@ export function useMessageActions({ auth, selectedCustomer, selectedCustomerRef,
         const file = media.file || media;
         if (!(file instanceof File)) continue;
         const t = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'document';
-        byType[t].push(file);
+        byType[t].push({ file, media });
       }
 
-      for (const [type, files] of Object.entries(byType).filter(([, list]) => list.length > 0)) {
+      for (const [type, list] of Object.entries(byType).filter(([, list]) => list.length > 0)) {
         const tempId = `${Date.now()}-${type}-batch`;
+        const files = list.map(({ file }) => file);
+        const tempMediaItems = list.map(({ file, media }) => ({
+          url: URL.createObjectURL(file),
+          filename: file.name,
+          mimeType: file.type,
+          size: file.size,
+          ...(media?.width && media?.height ? { width: media.width, height: media.height } : {}),
+        }));
         dispatchMsg({
           type: MSG.UPSERT, id: tempId,
           msg: {
             Id: tempId, Direction: 1, Status: 'pending', MessageType: type,
             previewUrl: URL.createObjectURL(files[0]), Message: caption,
             isUploading: true, percent: 0, Time: time, Date: date, DateTime: dateTime,
-            mediaItems: files.map(f => ({ url: URL.createObjectURL(f), filename: f.name, mimeType: f.type, size: f.size })),
+            mediaItems: tempMediaItems,
             ConversationId: customer?.ConversationId || tempConversationId,
           },
         });

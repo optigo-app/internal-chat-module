@@ -5,7 +5,7 @@ import { ChevronDown, Forward, CheckCheck, CircleMinus } from 'lucide-react';
 import { Emoji } from 'emoji-picker-react';
 import { FormatDateIST } from '../../utils/DateFnc';
 import ReactionDetailsMenu from './ReactionMenu';
-import { handleDownloadFile, getDocumentMeta, renderTextWithLinks } from '../../utils/globalFunc';
+import { handleDownloadFile, getDocumentMeta, renderTextWithLinks, normalizeMessageText } from '../../utils/globalFunc';
 import { charToUnified, parseReactions } from '../../utils/EmojiUtils';
 import imageNotFound from '../../assets/image-not-found.jpg';
 import MessageBubble from '../chat/messages/MessageBubble';
@@ -15,6 +15,7 @@ import MediaMessage from '../chat/messages/MediaMessage';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { renderEmojiText } from '../../utils/EmojiRenderer';
+import { ReadMoreText } from './ReadMoreText';
 
 // Helper to recursively apply emoji rendering to text nodes
 const withEmoji = (children) => {
@@ -58,6 +59,8 @@ const MessageContent = ({
     selectedCustomer,
     setDrawerViewState,
     setDrawerOpen,
+    isExpanded,
+    onToggleExpand,
 }) => {
 
     const theme = useTheme();
@@ -69,28 +72,34 @@ const MessageContent = ({
 
     const [anchorEl, setAnchorEl] = React.useState(null);
     const [videoLoadError, setVideoLoadError] = useState(false);
-    const [isExpanded, setIsExpanded] = useState(false);
 
     const parsedReactions = React.useMemo(() => parseReactions(msg?.ReactionEmojis), [msg?.ReactionEmojis]);
 
-    const MESSAGE_CHAR_LIMIT = 2000;
-    const DISPLAY_CHAR_LIMIT = 1500;
-    const DISPLAY_LINE_LIMIT = 20;
-    const messageText = (msg.Message || '').replace(/\\n/g, '\n');
-    const lines = messageText.split('\n');
-    const shouldTruncate = messageText.length > DISPLAY_CHAR_LIMIT || lines.length > DISPLAY_LINE_LIMIT;
-    
-    let displayText = messageText;
-    if (shouldTruncate && !isExpanded) {
-        if (messageText.length > DISPLAY_CHAR_LIMIT) {
-            displayText = messageText.slice(0, DISPLAY_CHAR_LIMIT) + '...';
-        } else {
-            displayText = lines.slice(0, DISPLAY_LINE_LIMIT).join('\n') + '\n...';
-        }
-    }
+    const remarkPlugins = React.useMemo(() => [remarkGfm], []);
+    const markdownComponents = React.useMemo(() => ({
+        p: ({node, children, ...props}) => <Typography variant="body2" sx={{margin: 0, padding: 0, fontSize: 'inherit', lineHeight: 'inherit', whiteSpace: 'pre-wrap', '&:not(:last-child)': { mb: 1 }}} {...props}>{withEmoji(children)}</Typography>,
+        a: ({node, children, ...props}) => <a style={{color: theme.palette.primary.main, textDecoration: 'underline'}} target="_blank" rel="noopener noreferrer" {...props}>{withEmoji(children)}</a>,
+        strong: ({node, children, ...props}) => <strong {...props}>{withEmoji(children)}</strong>,
+        em: ({node, children, ...props}) => <em {...props}>{withEmoji(children)}</em>,
+        del: ({node, children, ...props}) => <del {...props}>{withEmoji(children)}</del>,
+        pre: ({node, children, ...props}) => <pre style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.05)', padding: '8px', borderRadius: '4px', overflowX: 'auto', margin: '4px 0', maxWidth: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} {...props}>{children}</pre>,
+        code: ({node, inline, children, ...props}) =>
+            inline
+            ? <code style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: '4px', wordBreak: 'break-word' }} {...props}>{withEmoji(children)}</code>
+            : <code {...props}>{withEmoji(children)}</code>,
+        blockquote: ({node, children, ...props}) => <blockquote style={{ borderLeft: '4px solid #ccc', paddingLeft: '8px', margin: '4px 0 4px 0', color: '#666' }} {...props}>{withEmoji(children)}</blockquote>,
+        ul: ({node, children, ...props}) => <ul style={{ padding: 0, margin: '4px 0 4px 24px' }} {...props}>{withEmoji(children)}</ul>,
+        ol: ({node, children, ...props}) => <ol style={{ padding: 0, margin: '4px 0 4px 24px' }} {...props}>{withEmoji(children)}</ol>,
+        li: ({node, children, ...props}) => <li style={{ margin: 0, padding: 0 }} {...props}>{withEmoji(children)}</li>,
+        h1: ({node, children, ...props}) => <strong style={{ fontSize: '1.2em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
+        h2: ({node, children, ...props}) => <strong style={{ fontSize: '1.1em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
+        h3: ({node, children, ...props}) => <strong style={{ fontSize: '1.05em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
+        h4: ({node, children, ...props}) => <strong style={{ fontSize: '1em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
+        h5: ({node, children, ...props}) => <strong style={{ fontSize: '0.9em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
+        h6: ({node, children, ...props}) => <strong style={{ fontSize: '0.8em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
+    }), [theme]);
 
-
-
+    const messageText = normalizeMessageText(msg.Message || '').trim();
 
     return (
         <div className="message-content" style={{ flexDirection: 'column' }}>
@@ -215,71 +224,16 @@ const MessageContent = ({
                         </Typography>
                     </Box>
                 ) : msg.MessageType === 'text' ? (
-                    <>
-                        <Box
-                            className="message-text"
-                            sx={{
-                                color: theme.palette.text.primary,
-                                fontSize: 14,
-                                lineHeight: 1.45,
-                                pr: 1,
-                                transition: 'max-height 0.3s ease-in-out, opacity 0.3s ease-in-out',
-                                maxHeight: isExpanded ? 'none' : '500px',
-                                overflow: 'hidden',
-                                opacity: 1,
-                                wordBreak: 'break-word',
-                                maxWidth: '100%',
-                            }}
-                        >
-                            <ReactMarkdown
-                                remarkPlugins={[remarkGfm]}
-                                components={{
-                                    p: ({node, children, ...props}) => <Typography variant="body2" sx={{margin: 0, padding: 0, fontSize: 'inherit', lineHeight: 'inherit', whiteSpace: 'pre-wrap', '&:not(:last-child)': { mb: 1 }}} {...props}>{withEmoji(children)}</Typography>,
-                                    a: ({node, children, ...props}) => <a style={{color: theme.palette.primary.main, textDecoration: 'underline'}} target="_blank" rel="noopener noreferrer" {...props}>{withEmoji(children)}</a>,
-                                    strong: ({node, children, ...props}) => <strong {...props}>{withEmoji(children)}</strong>,
-                                    em: ({node, children, ...props}) => <em {...props}>{withEmoji(children)}</em>,
-                                    del: ({node, children, ...props}) => <del {...props}>{withEmoji(children)}</del>,
-                                    pre: ({node, children, ...props}) => <pre style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.05)', padding: '8px', borderRadius: '4px', overflowX: 'auto', margin: '4px 0', maxWidth: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} {...props}>{children}</pre>,
-                                    code: ({node, inline, children, ...props}) => 
-                                        inline 
-                                        ? <code style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: '4px', wordBreak: 'break-word' }} {...props}>{withEmoji(children)}</code>
-                                        : <code {...props}>{withEmoji(children)}</code>,
-                                    blockquote: ({node, children, ...props}) => <blockquote style={{ borderLeft: '4px solid #ccc', paddingLeft: '8px', margin: '4px 0 4px 0', color: '#666' }} {...props}>{withEmoji(children)}</blockquote>,
-                                    ul: ({node, children, ...props}) => <ul style={{ padding: 0, margin: '4px 0 4px 24px' }} {...props}>{withEmoji(children)}</ul>,
-                                    ol: ({node, children, ...props}) => <ol style={{ padding: 0, margin: '4px 0 4px 24px' }} {...props}>{withEmoji(children)}</ol>,
-                                    li: ({node, children, ...props}) => <li style={{ margin: 0, padding: 0 }} {...props}>{withEmoji(children)}</li>,
-                                    h1: ({node, children, ...props}) => <strong style={{ fontSize: '1.2em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
-                                    h2: ({node, children, ...props}) => <strong style={{ fontSize: '1.1em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
-                                    h3: ({node, children, ...props}) => <strong style={{ fontSize: '1.05em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
-                                    h4: ({node, children, ...props}) => <strong style={{ fontSize: '1em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
-                                    h5: ({node, children, ...props}) => <strong style={{ fontSize: '0.9em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
-                                    h6: ({node, children, ...props}) => <strong style={{ fontSize: '0.8em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
-                                }}
-                            >
-                                {displayText}
-                            </ReactMarkdown>
-                        </Box>
-                        {shouldTruncate && (
-                            <Typography
-                                variant="caption"
-                                sx={{
-                                    color: theme.palette.primary.main,
-                                    cursor: 'pointer',
-                                    fontSize: 12,
-                                    fontWeight: 500,
-                                    ml: 0.5,
-                                    transition: 'opacity 0.2s ease-in-out',
-                                    '&:hover': { textDecoration: 'underline' }
-                                }}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setIsExpanded(!isExpanded);
-                                }}
-                            >
-                                {isExpanded ? 'See less' : 'See more'}
-                            </Typography>
-                        )}
-                    </>
+                    <ReadMoreText
+                        content={messageText}
+                        remarkPlugins={remarkPlugins}
+                        components={markdownComponents}
+                        maxLines={20}
+                        minChars={1200}
+                        isExpanded={isExpanded}
+                        onToggle={onToggleExpand}
+                        sx={{ color: theme.palette.text.primary }}
+                    />
                 ) : (
                     <Box sx={{ maxWidth: msg.MessageType === 'document' ? 350 : 250, width: '100%' }}>
                         <MediaMessage
@@ -299,71 +253,16 @@ const MessageContent = ({
 
                         {/* Caption under media */}
                         {msg?.Message && (
-                            <>
-                                <Box
-                                    className="message-text"
-                                    sx={{
-                                        mt: 0.5,
-                                        color: theme.palette.text.primary,
-                                        fontSize: 14,
-                                        lineHeight: 1.45,
-                                        wordBreak: 'break-word',
-                                        transition: 'max-height 0.3s ease-in-out, opacity 0.3s ease-in-out',
-                                        maxHeight: isExpanded ? 'none' : '500px',
-                                        overflow: 'hidden',
-                                        opacity: 1,
-                                        maxWidth: '100%',
-                                    }}
-                                >
-                                    <ReactMarkdown
-                                        remarkPlugins={[remarkGfm]}
-                                        components={{
-                                            p: ({node, children, ...props}) => <Typography variant="body2" sx={{margin: 0, padding: 0, fontSize: 'inherit', lineHeight: 'inherit', whiteSpace: 'pre-wrap', '&:not(:last-child)': { mb: 1 }}} {...props}>{withEmoji(children)}</Typography>,
-                                            a: ({node, children, ...props}) => <a style={{color: theme.palette.primary.main, textDecoration: 'underline'}} target="_blank" rel="noopener noreferrer" {...props}>{withEmoji(children)}</a>,
-                                            strong: ({node, children, ...props}) => <strong {...props}>{withEmoji(children)}</strong>,
-                                            em: ({node, children, ...props}) => <em {...props}>{withEmoji(children)}</em>,
-                                            del: ({node, children, ...props}) => <del {...props}>{withEmoji(children)}</del>,
-                                            pre: ({node, children, ...props}) => <pre style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.05)', padding: '8px', borderRadius: '4px', overflowX: 'auto', margin: '4px 0', maxWidth: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} {...props}>{children}</pre>,
-                                            code: ({node, inline, children, ...props}) => 
-                                                inline 
-                                                ? <code style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: '4px', wordBreak: 'break-word' }} {...props}>{withEmoji(children)}</code>
-                                                : <code {...props}>{withEmoji(children)}</code>,
-                                            blockquote: ({node, children, ...props}) => <blockquote style={{ borderLeft: '4px solid #ccc', paddingLeft: '8px', margin: '4px 0 4px 0', color: '#666' }} {...props}>{withEmoji(children)}</blockquote>,
-                                            ul: ({node, children, ...props}) => <ul style={{ padding: 0, margin: '4px 0 4px 24px' }} {...props}>{withEmoji(children)}</ul>,
-                                            ol: ({node, children, ...props}) => <ol style={{ padding: 0, margin: '4px 0 4px 24px' }} {...props}>{withEmoji(children)}</ol>,
-                                            li: ({node, children, ...props}) => <li style={{ margin: 0, padding: 0 }} {...props}>{withEmoji(children)}</li>,
-                                            h1: ({node, children, ...props}) => <strong style={{ fontSize: '1.2em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
-                                            h2: ({node, children, ...props}) => <strong style={{ fontSize: '1.1em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
-                                            h3: ({node, children, ...props}) => <strong style={{ fontSize: '1.05em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
-                                            h4: ({node, children, ...props}) => <strong style={{ fontSize: '1em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
-                                            h5: ({node, children, ...props}) => <strong style={{ fontSize: '0.9em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
-                                            h6: ({node, children, ...props}) => <strong style={{ fontSize: '0.8em', display: 'block', margin: '4px 0' }} {...props}>{withEmoji(children)}</strong>,
-                                        }}
-                                    >
-                                        {displayText}
-                                    </ReactMarkdown>
-                                </Box>
-                                {shouldTruncate && (
-                                    <Typography
-                                        variant="caption"
-                                        sx={{
-                                            color: theme.palette.primary.main,
-                                            cursor: 'pointer',
-                                            fontSize: 12,
-                                            fontWeight: 500,
-                                            ml: 0.5,
-                                            transition: 'opacity 0.2s ease-in-out',
-                                            '&:hover': { textDecoration: 'underline' }
-                                        }}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setIsExpanded(!isExpanded);
-                                        }}
-                                    >
-                                        {isExpanded ? 'See less' : 'See more'}
-                                    </Typography>
-                                )}
-                            </>
+                            <ReadMoreText
+                                content={messageText}
+                                remarkPlugins={remarkPlugins}
+                                components={markdownComponents}
+                                maxLines={20}
+                                minChars={1200}
+                                isExpanded={isExpanded}
+                                onToggle={onToggleExpand}
+                                sx={{ mt: 0.5, color: theme.palette.text.primary }}
+                            />
                         )}
                     </Box>
                 )}

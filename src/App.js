@@ -22,6 +22,8 @@ import Lottie from 'lottie-react';
 import loader from './assets/lotties/loader.json';
 import NotificationPermissionModal from './components/_ui/NotificationPermissionModal';
 import { eraseCookie } from './utils/cookieUtils';
+import { useVersionCheck } from './hooks/useVersionCheck';
+import UpdateNotification from './components/UpdateNotification/UpdateNotification';
 
 const PagenotFound = () => <div>404 - Page Not Found</div>;
 
@@ -115,6 +117,16 @@ function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [socketStatus, setSocketStatus] = useState('disconnected');
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+
+  // ── Version update detection ───────────────────────────────────────────────
+  const {
+    updateAvailable,
+    serverVersion,
+    buildTime,
+    dismissUpdate,
+    applyUpdate,
+    checkNow: checkVersionNow,
+  } = useVersionCheck();
 
   // Store latest auth values in refs to avoid reconnecting socket on every auth change
   const authRef = useRef(auth);
@@ -221,6 +233,9 @@ function App() {
           await emitStoreSocketData();
           setIsConnected(true);
           setSocketStatus('connected');
+
+          // Check for app updates after socket (re)connect
+          checkVersionNow();
         };
 
         /** ⚠️ On disconnect */
@@ -342,6 +357,13 @@ function App() {
     <NotificationProvider>
       <Toaster {...toastConfig} />
       <NotificationPermissionModal />
+      <UpdateNotification
+        updateAvailable={updateAvailable}
+        serverVersion={serverVersion}
+        buildTime={buildTime}
+        onRefresh={applyUpdate}
+        onDismiss={dismissUpdate}
+      />
       {isSyncing && (
         <Box
           sx={{

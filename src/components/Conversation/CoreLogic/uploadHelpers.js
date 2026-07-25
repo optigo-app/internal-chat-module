@@ -1,6 +1,39 @@
 import { uploadMediaAPi } from '../../../API/FileUpload/uploadHelpers';
 import { generateMediaFolderName } from '../../../utils/globalFunc';
 
+export const getMediaDimensions = (file) => new Promise((resolve) => {
+    if (!file || !(file instanceof File)) return resolve(null);
+
+    if (file.type.startsWith('image/')) {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            resolve(null);
+        };
+        img.src = url;
+    } else if (file.type.startsWith('video/')) {
+        const video = document.createElement('video');
+        const url = URL.createObjectURL(file);
+        video.preload = 'metadata';
+        video.onloadedmetadata = () => {
+            URL.revokeObjectURL(url);
+            resolve({ width: video.videoWidth, height: video.videoHeight });
+        };
+        video.onerror = () => {
+            URL.revokeObjectURL(url);
+            resolve(null);
+        };
+        video.src = url;
+    } else {
+        resolve(null);
+    }
+});
+
 export const uploadFiles = async ({ files, conversationId, type, onProgress }) => {
   const folderCategory = type === 'image' ? 'images' : type === 'video' ? 'videos' : 'docs';
   const folderName = generateMediaFolderName(conversationId, folderCategory);

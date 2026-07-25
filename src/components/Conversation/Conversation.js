@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useContext, useLayoutEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useContext } from 'react';
 import { Box, Typography, useMediaQuery, IconButton, Tooltip } from '@mui/material';
 import './Conversation.scss';
 import CustomerDetails from '../CustomerDetails/CustomerDetails';
@@ -52,12 +52,9 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
     const isAutoScrollingRef = useRef(false);
     const scrollListenerAttachedRef = useRef(false);
     const fileInputRef = useRef(null);
-    const lastMessageIdRef = useRef(null);
-    const lastConversationIdRef = useRef(null);
     const [showPicker, setShowPicker] = useState(false);
     const emojiPickerRef = useRef(null);
     const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-    const [isSwitchingConversation, setIsSwitchingConversation] = useState(false);
     const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
     const messagesRef = useRef(null);
     const [isCurrentUserAdmin, setIsCurrentUserAdmin] = useState(false);
@@ -90,7 +87,7 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
         mediaViewerOpen, setMediaViewerOpen,
         mediaViewerItems, mediaViewerIndex,
         mediaViewerMessage, groupMessagesByDate,
-        currentPage, forwardAnchorEl,
+        forwardAnchorEl,
         handleCloseForward, loadOlderMessages,
         parseTemplateData, getMediaSrcForMessage,
         getMediaKey, markLoaded,
@@ -354,67 +351,6 @@ const Conversation = ({ selectedCustomer, onConversationRead, onViewConversation
             }, 100);
         }
     }, []);
-
-    useEffect(() => {
-        if (!containerRef.current || loading || isSwitchingConversation) return;
-        const container = containerRef.current;
-        const { scrollTop, scrollHeight, clientHeight } = container;
-        const isNearBottom = scrollHeight - clientHeight - scrollTop < 300;
-        if (isNearBottom) {
-            const timer = setTimeout(() => {
-                scrollToBottom('auto');
-            }, 50);
-            return () => clearTimeout(timer);
-        }
-    }, [loadedMedia, loading, isSwitchingConversation, scrollToBottom]);
-
-    useLayoutEffect(() => {
-        const currentConvId = selectedCustomer?.ConversationId;
-        if (!currentConvId) return;
-        if (currentConvId !== lastConversationIdRef.current) {
-            setIsSwitchingConversation(true);
-            lastConversationIdRef.current = currentConvId;
-        }
-        if (!loading && isSwitchingConversation) {
-            const messageList = Array.isArray(messages?.data) ? messages.data : [];
-
-            if (containerRef.current) {
-                const scroll = () => {
-                    if (containerRef.current) {
-                        containerRef.current.scrollTop = containerRef.current.scrollHeight;
-                    }
-                };
-                scroll();
-                const t1 = setTimeout(scroll, 0);
-                const t2 = setTimeout(scroll, 50);
-                if (messageList.length > 0) {
-                    const lastMessage = messageList[messageList.length - 1];
-                    lastMessageIdRef.current = lastMessage?.Id || lastMessage?.MessageId || lastMessage?.id;
-                }
-                const timer = setTimeout(() => {
-                    setIsSwitchingConversation(false);
-                }, 150);
-                return () => {
-                    clearTimeout(t1);
-                    clearTimeout(t2);
-                    clearTimeout(timer);
-                };
-            }
-        }
-    }, [selectedCustomer?.ConversationId, loading, messages, isSwitchingConversation]);
-
-    useEffect(() => {
-        if (currentPage > 1) return;
-        const messageList = Array.isArray(messages?.data) ? messages.data : [];
-        const currentConvId = selectedCustomer?.ConversationId;
-        if (messageList.length === 0) return;
-        const lastMessage = messageList[messageList.length - 1];
-        const lastId = lastMessage?.Id || lastMessage?.MessageId || lastMessage?.id;
-        if (currentConvId === lastConversationIdRef.current && lastId !== lastMessageIdRef.current) {
-            scrollToBottom('smooth');
-            lastMessageIdRef.current = lastId;
-        }
-    }, [messages, currentPage, scrollToBottom, selectedCustomer?.ConversationId]);
 
     const handleScroll = useCallback(() => {
         if (!containerRef.current) return;

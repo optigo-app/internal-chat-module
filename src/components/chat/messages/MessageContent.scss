@@ -67,6 +67,23 @@
     word-break: break-word;
   }
 
+  .read-more-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--read-more-lines, 5);
+    line-clamp: var(--read-more-lines, 5);
+    overflow: hidden;
+    word-break: break-word;
+    white-space: pre-wrap;
+
+    &.expanded {
+      display: block;
+      -webkit-line-clamp: unset;
+      line-clamp: unset;
+      overflow: visible;
+    }
+  }
+
   .message-status {
     display: flex;
     align-items: center;

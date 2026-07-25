@@ -5,7 +5,7 @@ import { showToast } from '../../../utils/toastHelper';
 import { UI } from './uiReducer';
 import { MSG } from './conversationReducer';
 import { sendImageMessage, sendDocumentMessage, sendVideoMessage } from '../../../API/SendMessage/SendMessageApi';
-import { uploadFiles, buildMediaPayload } from './uploadHelpers';
+import { uploadFiles, buildMediaPayload, getMediaDimensions } from './uploadHelpers';
 import { emitMediaMessage } from './socketHelpers';
 export function useMediaHandlers({ auth, selectedCustomer, uiState, dispatchUI, dispatchMsg, fetchAndCacheGroupMembers, onCustomerSelect, selectedCustomerRef, tempConversationId }) {
 
@@ -22,10 +22,18 @@ export function useMediaHandlers({ auth, selectedCustomer, uiState, dispatchUI, 
     if (skippedTotal.length > 0) showToast('Total selection exceeds 100MB.', 'error', { id: 'total-too-large' });
     if (!acceptedFiles.length) return;
 
-    const newMediaFiles = acceptedFiles.map(file => ({
-      file, preview: URL.createObjectURL(file),
-      type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file',
-      name: file.name, size: file.size,
+    const newMediaFiles = await Promise.all(acceptedFiles.map(async (file) => {
+      const dim = await getMediaDimensions(file);
+      if (dim) {
+        file.width = dim.width;
+        file.height = dim.height;
+      }
+      return {
+        file, preview: URL.createObjectURL(file),
+        type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file',
+        name: file.name, size: file.size,
+        ...(dim ? { width: dim.width, height: dim.height } : {}),
+      };
     }));
 
     dispatchUI({ type: UI.SET_MEDIA_FILES, value: newMediaFiles });
@@ -71,8 +79,19 @@ export function useMediaHandlers({ auth, selectedCustomer, uiState, dispatchUI, 
         }),
       });
 
-      const attachments = safeFiles.map((f, i) => ({ FileUrl: uploadedUrls[i], FileName: f.name, MimeType: f.type }));
-      const mediaItems = safeFiles.map((f, i) => ({ url: uploadedUrls[i], filename: f.name, mimeType: f.type }));
+      const attachments = safeFiles.map((f, i) => ({
+        FileUrl: uploadedUrls[i],
+        FileName: f.name,
+        MimeType: f.type,
+        ...(f.width && f.height ? { Width: f.width, Height: f.height } : {}),
+      }));
+      const mediaItems = safeFiles.map((f, i) => ({
+        url: uploadedUrls[i],
+        filename: f.name,
+        mimeType: f.type,
+        size: f.size,
+        ...(f.width && f.height ? { width: f.width, height: f.height } : {}),
+      }));
 
       const receiverId = customer?.CustomerId || customer?.UserId;
       const sendFn = type === 'image' ? sendImageMessage : type === 'video' ? sendVideoMessage : sendDocumentMessage;

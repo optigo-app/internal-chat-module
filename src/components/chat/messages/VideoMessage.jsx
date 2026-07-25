@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Skeleton, IconButton } from "@mui/material";
 import { Play } from "lucide-react";
 
@@ -17,9 +17,30 @@ const VideoMessage = ({
     const mediaKey = getMediaKey(msg, 0);
     const src = getMediaSrcForMessage(msg);
 
+    const parseDim = (val) => {
+        const n = Number(val);
+        return Number.isFinite(n) && n > 0 ? n : null;
+    };
+
+    const dims = useMemo(() => {
+        const w = parseDim(msg?.mediaWidth);
+        const h = parseDim(msg?.mediaHeight);
+        if (w && h) return { w, h };
+
+        const first = Array.isArray(msg?.mediaItems) ? msg.mediaItems[0] : null;
+        const fw = parseDim(first?.width);
+        const fh = parseDim(first?.height);
+        if (fw && fh) return { w: fw, h: fh };
+
+        return null;
+    }, [msg?.mediaWidth, msg?.mediaHeight, msg?.mediaItems]);
+
     const hasGrid = mediaItems.length > 1;
     const gridRows = mediaItems.length <= 2 ? "1fr" : "1fr 1fr";
     const gridHeight = mediaItems.length <= 2 ? 160 : 250;
+    const singleVideoHeight = dims
+        ? Math.max(140, Math.min(320, Math.round(250 * (dims.h / dims.w))))
+        : 220;
 
     return (
         <div style={{ position: "relative" }}>
@@ -28,7 +49,7 @@ const VideoMessage = ({
                 style={{
                     position: "relative",
                     width: 250,
-                    height: hasGrid ? gridHeight : "auto",
+                    height: hasGrid ? gridHeight : singleVideoHeight,
                     borderRadius: 12,
                     overflow: "hidden",
                     backgroundColor: "rgba(0,0,0,0.05)"

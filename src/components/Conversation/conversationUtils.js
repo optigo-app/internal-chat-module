@@ -72,6 +72,23 @@ export const normalizeServerMessages = (messagesArray, auth) => {
             msg?.fileName ||
             '';
 
+        const parseDim = (val) => {
+            const n = Number(val);
+            return Number.isFinite(n) && n > 0 ? n : null;
+        };
+        const attachmentWidth = parseDim(
+            firstAttachment?.Width ??
+            firstAttachment?.ImageWidth ??
+            firstAttachment?.FileWidth ??
+            firstAttachment?.width
+        );
+        const attachmentHeight = parseDim(
+            firstAttachment?.Height ??
+            firstAttachment?.ImageHeight ??
+            firstAttachment?.FileHeight ??
+            firstAttachment?.height
+        );
+
         const mediaItems = attachmentsArray
             .map((a) => {
                 const url =
@@ -85,12 +102,16 @@ export const normalizeServerMessages = (messagesArray, auth) => {
                 if (!url) return null;
                 const mimeType = a?.MimeType || a?.mimeType || a?.mimetype || a?.fileType || '';
                 const fileName = a?.FileName || a?.fileName || a?.filename || a?.name || '';
+                const width = parseDim(a?.Width ?? a?.ImageWidth ?? a?.FileWidth ?? a?.width);
+                const height = parseDim(a?.Height ?? a?.ImageHeight ?? a?.FileHeight ?? a?.height);
                 return {
                     url,
                     mimeType,
                     filename: fileName,
                     fileName,
                     size: a?.size,
+                    width,
+                    height,
                     attachmentId: a?.attachmentId || a?.AttachmentId || a?.Id || a?.id
                 };
             })
@@ -217,6 +238,7 @@ export const normalizeServerMessages = (messagesArray, auth) => {
             ...(!forceTextReply && attachmentName ? { fileName: attachmentName } : {}),
             ...(!forceTextReply && attachmentMime ? { fileType: attachmentMime } : {}),
             ...(!forceTextReply && mediaItems.length ? { mediaItems } : {}),
+            ...(!forceTextReply && attachmentWidth && attachmentHeight ? { mediaWidth: attachmentWidth, mediaHeight: attachmentHeight } : {}),
         };
     });
 };

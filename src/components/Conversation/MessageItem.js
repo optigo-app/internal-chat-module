@@ -32,7 +32,9 @@ const MessageItem = ({
     messageById,
     handleForward,
     setDrawerViewState,
-    setDrawerOpen
+    setDrawerOpen,
+    isExpanded,
+    onToggleExpand,
 }) => {
     const hoverHideTimeoutRef = useRef(null);
     const messageDomId = msg.Id ?? msg.fileName;
@@ -135,6 +137,8 @@ const MessageItem = ({
                 handleForward={isMediaMessage ? handleForward : undefined}
                 setDrawerViewState={setDrawerViewState}
                 setDrawerOpen={setDrawerOpen}
+                isExpanded={isExpanded}
+                onToggleExpand={onToggleExpand}
             />
         </div>
     );
@@ -150,6 +154,7 @@ export default React.memo(MessageItem, (prevProps, nextProps) => {
         prevProps.reactionMenuMessageId === nextProps.reactionMenuMessageId &&
         prevProps.reactionMenuAnchorEl === nextProps.reactionMenuAnchorEl &&
         prevProps.loadedMedia === nextProps.loadedMedia &&
-        prevProps.selectedCustomer === nextProps.selectedCustomer
+        prevProps.selectedCustomer === nextProps.selectedCustomer &&
+        prevProps.isExpanded === nextProps.isExpanded
     );
 });

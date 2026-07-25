@@ -71,6 +71,14 @@ const formatWhatsAppText = (text) => {
     });
 };
 
+export const normalizeMessageText = (text) => {
+    if (!text || typeof text !== 'string') return text || '';
+    return text
+        .replace(/\\r\\n/g, '\n')
+        .replace(/\\n/g, '\n')
+        .replace(/\\([\\\\*_[\]()~`>#+\-=|.!\n])/g, '$1');
+};
+
 export const renderTextWithLinks = (rawText, options = {}) => {
     const { linkStyle = {} } = options;
 

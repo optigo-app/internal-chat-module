@@ -11,7 +11,7 @@ import { HeadingNode, QuoteNode } from '@lexical/rich-text';
 import { ListNode, ListItemNode, $isListItemNode } from '@lexical/list';
 import { CodeNode, CodeHighlightNode } from '@lexical/code';
 import { LinkNode } from '@lexical/link';
-import { COMMAND_PRIORITY_NORMAL, FORMAT_TEXT_COMMAND, KEY_ENTER_COMMAND, COMMAND_PRIORITY_HIGH, $getSelection, $isRangeSelection, $getRoot, $createParagraphNode } from 'lexical';
+import { COMMAND_PRIORITY_NORMAL, FORMAT_TEXT_COMMAND, KEY_ENTER_COMMAND, PASTE_COMMAND, COMMAND_PRIORITY_HIGH, $getSelection, $isRangeSelection, $getRoot, $createParagraphNode, $createTextNode } from 'lexical';
 import { ListPlugin } from '@lexical/react/LexicalListPlugin';
 import { ClearEditorPlugin } from '@lexical/react/LexicalClearEditorPlugin';
 
@@ -60,7 +60,7 @@ function EditorRefPlugin({ editorRef }) {
 }
 
 // Plugin to listen for Enter key to trigger custom submit or let lists handle it
-function EnterKeyPlugin({ onEnter }) {
+function EnterKeyPlugin({ onEnter, submitOnEnter = true }) {
     const [editor] = useLexicalComposerContext();
     
     useEffect(() => {
@@ -83,8 +83,8 @@ function EnterKeyPlugin({ onEnter }) {
                     }
                 });
                 
+                // Ctrl+Enter or Cmd+Enter ALWAYS submits, even inside lists
                 if (event && (event.ctrlKey || event.metaKey)) {
-                    // Ctrl+Enter or Cmd+Enter ALWAYS sends the message, even inside lists
                     event.preventDefault();
                     if (onEnter) onEnter(event);
                     return true;
@@ -100,16 +100,21 @@ function EnterKeyPlugin({ onEnter }) {
                     return false;
                 }
 
-                // If not in a list and no shift key, trigger onEnter to send the message
-                if (event) {
-                    event.preventDefault();
+                // If submitOnEnter is enabled, plain Enter also submits
+                if (submitOnEnter) {
+                    if (event) {
+                        event.preventDefault();
+                    }
+                    if (onEnter) onEnter(event || { key: 'Enter' });
+                    return true; // Prevent default Lexical paragraph insertion
                 }
-                if (onEnter) onEnter(event || { key: 'Enter' });
-                return true; // Prevent default Lexical paragraph insertion
+
+                // Otherwise let Lexical insert a normal paragraph break
+                return false;
             },
             COMMAND_PRIORITY_HIGH
         );
-    }, [editor, onEnter]);
+    }, [editor, onEnter, submitOnEnter]);
     
     return null;
 }
@@ -166,6 +171,80 @@ function OneTimeFormattingPlugin() {
     return null;
 }
 
+// Centralized paste handler plugin.
+// Registers a single PASTE_COMMAND so text paste is processed exactly once.
+function PasteHandlerPlugin({ maxChars, onPasteTextOverflow, onPasteFiles, captureMessageScrollState }) {
+    const [editor] = useLexicalComposerContext();
+    const overflowRef = useRef(onPasteTextOverflow);
+    const filesRef = useRef(onPasteFiles);
+    const scrollRef = useRef(captureMessageScrollState);
+    const maxCharsRef = useRef(maxChars);
+
+    useEffect(() => {
+        overflowRef.current = onPasteTextOverflow;
+    }, [onPasteTextOverflow]);
+    useEffect(() => {
+        filesRef.current = onPasteFiles;
+    }, [onPasteFiles]);
+    useEffect(() => {
+        scrollRef.current = captureMessageScrollState;
+    }, [captureMessageScrollState]);
+    useEffect(() => {
+        maxCharsRef.current = maxChars;
+    }, [maxChars]);
+
+    useEffect(() => {
+        return editor.registerCommand(
+            PASTE_COMMAND,
+            (event) => {
+                if (!event || !event.clipboardData) return false;
+
+                const files = Array.from(event.clipboardData.files || []);
+                if (files.length > 0) {
+                    if (scrollRef.current) scrollRef.current();
+                    if (filesRef.current) filesRef.current(files);
+                    // Preserve original behavior: do not mark as fully handled so
+                    // any accompanying text/html in the clipboard can still be inserted.
+                    return false;
+                }
+
+                const text = event.clipboardData.getData('text');
+                if (!text) return false;
+
+                const limit = maxCharsRef.current;
+                if (limit && text.length > limit) {
+                    event.preventDefault();
+                    if (overflowRef.current) overflowRef.current(text);
+                    return true;
+                }
+
+                // Trim leading/trailing (top/bottom) whitespace while preserving inner spaces.
+                const trimmed = text.trim();
+                if (trimmed !== text) {
+                    event.preventDefault();
+                    editor.update(() => {
+                        const selection = $getSelection();
+                        if ($isRangeSelection(selection)) {
+                            selection.insertNodes([$createTextNode(trimmed)]);
+                        } else {
+                            const paragraph = $createParagraphNode();
+                            paragraph.append($createTextNode(trimmed));
+                            $getRoot().append(paragraph);
+                        }
+                    });
+                    return true;
+                }
+
+                // Normal text paste: let Lexical's default RichTextPlugin handle it.
+                return false;
+            },
+            COMMAND_PRIORITY_HIGH
+        );
+    }, [editor]);
+
+    return null;
+}
+
 // Plugin to sync external value changes to lexical state (e.g. when drafts load on conversation switch)
 function ExternalValueSyncPlugin({ value, syncKey }) {
     const [editor] = useLexicalComposerContext();
@@ -206,17 +285,22 @@ function ExternalValueSyncPlugin({ value, syncKey }) {
 const LexicalChatEditor = ({
     value,
     onChange,
-    onPaste,
     onKeyDown,
     placeholder,
     className,
     editorRef,
     syncKey,
-    hasDraft = false
+    hasDraft = false,
+    maxChars,
+    onPasteTextOverflow,
+    onPasteFiles,
+    captureMessageScrollState,
+    namespace = 'WhatsAppChatEditor',
+    submitOnEnter = true,
 }) => {
 
     const initialConfig = {
-        namespace: 'WhatsAppChatEditor',
+        namespace,
         theme,
         onError: (error) => console.error(error),
         nodes: [
@@ -237,7 +321,6 @@ const LexicalChatEditor = ({
                     contentEditable={
                         <ContentEditable
                             className="lexical-content-editable"
-                            onPaste={onPaste}
                         />
                     }
                     placeholder={!hasDraft ? <div className="lexical-placeholder">{placeholder}</div> : null}
@@ -249,8 +332,14 @@ const LexicalChatEditor = ({
                 <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
                 <MarkdownExportPlugin onChange={onChange} />
                 <EditorRefPlugin editorRef={editorRef} />
-                <EnterKeyPlugin onEnter={onKeyDown} />
+                <EnterKeyPlugin onEnter={onKeyDown} submitOnEnter={submitOnEnter} />
                 <OneTimeFormattingPlugin />
+                <PasteHandlerPlugin
+                    maxChars={maxChars}
+                    onPasteTextOverflow={onPasteTextOverflow}
+                    onPasteFiles={onPasteFiles}
+                    captureMessageScrollState={captureMessageScrollState}
+                />
                 <ExternalValueSyncPlugin value={value} syncKey={syncKey} />
             </div>
         </LexicalComposer>
